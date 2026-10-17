@@ -11,6 +11,7 @@ SAMPLE_FPS = 5.0
 ALPHA = 0.25  # exponential smoothing weight of the newest target
 DEAD_ZONE = 0.04  # fraction of source width the face may drift before the crop follows
 TARGET_ASPECT = 9 / 16
+CUT_THRESHOLD = 0.5  # histogram correlation between samples below this means a hard cut
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,7 @@ class Detection:
     t: float
     cx: float | None = None
     cy: float | None = None
+    cut: bool = False  # a new shot starts at this sample (hard cut in the source)
 
 
 Detector = Callable[[str, Source, float], list[Detection]]
@@ -40,7 +42,8 @@ def smooth_track(
     """Turn raw detections into smoothed keys. Pure, so tests can feed fake detections.
 
     Gaps hold the last known position (leading gaps take the first one). The crop only moves
-    once the target leaves the dead zone around it, then eases toward it exponentially.
+    once the target leaves the dead zone around it, then eases toward it exponentially. At a
+    hard cut (`Detection.cut`) it jumps straight to the new shot's face (ADR 0503).
     Centers are clamped so the crop window never leaves the frame. cy stays 0.5 because the
     crop uses the full source height.
     """
@@ -49,22 +52,41 @@ def smooth_track(
         return Reframe()  # already vertical (or narrower), or no face: center crop
 
     lo, hi = half, 1 - half
-    first = next(d.cx for d in detections if d.cx is not None)
-    pos = min(max(first, lo), hi)
+    clamp = lambda x: min(max(x, lo), hi)  # noqa: E731
+
+    def first_face(i: int) -> float | None:
+        """First face at or after sample i, within the same shot."""
+        for j in range(i, len(detections)):
+            if j > i and detections[j].cut:
+                return None
+            if detections[j].cx is not None:
+                return detections[j].cx
+        return None
+
+    pos = clamp(first_face(0) or next(d.cx for d in detections if d.cx is not None))
     keys: list[ReframeKey] = []
-    for d in detections:
-        if d.cx is not None:
-            target = min(max(d.cx, lo), hi)
+    for i, d in enumerate(detections):
+        if d.cut and i > 0:
+            # Snap to the new shot's speaker instead of easing across the cut, and hold the old
+            # position right up to the cut so interpolation between keys can't glide over it.
+            nxt = first_face(i)
+            if nxt is not None:
+                keys.append(ReframeKey(t=max(0.0, d.t - 0.001), cx=round(pos, 4), cy=0.5))
+                pos = clamp(nxt)
+        elif d.cx is not None:
+            target = clamp(d.cx)
             if abs(target - pos) > dead_zone:
                 pos += alpha * (target - pos)
         keys.append(ReframeKey(t=max(0.0, d.t), cx=round(pos, 4), cy=0.5))
     return Reframe(keys=keys)
 
 
-def _sample_frames(video_path: str, sample_fps: float) -> Iterator[tuple[float, object]]:
+def _sample_frames(video_path: str, sample_fps: float) -> Iterator[tuple[float, object, bool]]:
+    """Yield (t, frame, cut) for sampled frames; cut marks a hard cut since the previous sample."""
     import cv2  # optional dependency
 
     cap = cv2.VideoCapture(video_path)
+    prev_hist = None
     try:
         fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
         step = max(1, round(fps / sample_fps))
@@ -73,27 +95,65 @@ def _sample_frames(video_path: str, sample_fps: float) -> Iterator[tuple[float, 
             if index % step == 0:
                 ok, frame = cap.retrieve()
                 if ok:
-                    yield index / fps, frame
+                    small = cv2.cvtColor(cv2.resize(frame, (160, 90)), cv2.COLOR_BGR2HSV)
+                    hist = cv2.calcHist([small], [0, 1], None, [32, 32], [0, 180, 0, 256])
+                    cv2.normalize(hist, hist)
+                    cut = prev_hist is not None and cv2.compareHist(prev_hist, hist, cv2.HISTCMP_CORREL) < CUT_THRESHOLD
+                    prev_hist = hist
+                    yield index / fps, frame, cut
             index += 1
     finally:
         cap.release()
 
 
+MODEL_URL = (
+    "https://storage.googleapis.com/mediapipe-models/face_detector/"
+    "blaze_face_short_range/float16/latest/blaze_face_short_range.tflite"
+)
+
+
+def _model_path() -> str:
+    """The MediaPipe face model, downloaded once into ~/.cache/hypercut (or HYPERCUT_CACHE)."""
+    import os
+    import urllib.request
+    from pathlib import Path
+
+    cache = Path(os.environ.get("HYPERCUT_CACHE", Path.home() / ".cache" / "hypercut"))
+    path = cache / "blaze_face_short_range.tflite"
+    if not path.exists():
+        cache.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".part")
+        urllib.request.urlretrieve(MODEL_URL, tmp)
+        tmp.replace(path)
+    return str(path)
+
+
 def detect_faces(video_path: str, source: Source, sample_fps: float = SAMPLE_FPS) -> list[Detection]:
-    """Real detector: largest MediaPipe face per sampled frame. Needs the `reframe` extra."""
+    """Real detector: largest MediaPipe face per sampled frame. Needs the `reframe` extra.
+
+    Uses the MediaPipe Tasks API; the legacy `mp.solutions` API is gone from the
+    releases that support Python 3.13 (see ADR 0502).
+    """
     import cv2
     import mediapipe as mp
+    from mediapipe.tasks.python import BaseOptions, vision
 
+    options = vision.FaceDetectorOptions(
+        base_options=BaseOptions(model_asset_path=_model_path()),
+        running_mode=vision.RunningMode.IMAGE,
+        min_detection_confidence=0.5,
+    )
     out: list[Detection] = []
-    with mp.solutions.face_detection.FaceDetection(model_selection=1, min_detection_confidence=0.5) as fd:
-        for t, frame in _sample_frames(video_path, sample_fps):
-            result = fd.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            faces = [d.location_data.relative_bounding_box for d in (result.detections or [])]
-            if not faces:
-                out.append(Detection(t))
+    with vision.FaceDetector.create_from_options(options) as fd:
+        for t, frame, cut in _sample_frames(video_path, sample_fps):
+            h, w = frame.shape[:2]
+            image = mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            boxes = [d.bounding_box for d in fd.detect(image).detections]
+            if not boxes:
+                out.append(Detection(t, cut=cut))
                 continue
-            b = max(faces, key=lambda b: b.width * b.height)
-            out.append(Detection(t, b.xmin + b.width / 2, b.ymin + b.height / 2))
+            b = max(boxes, key=lambda b: b.width * b.height)
+            out.append(Detection(t, (b.origin_x + b.width / 2) / w, (b.origin_y + b.height / 2) / h, cut))
     return out
 
 

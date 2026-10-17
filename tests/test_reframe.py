@@ -64,3 +64,26 @@ def test_reframe_uses_injected_detector():
 def test_real_detector_importable_or_skipped():
     pytest.importorskip("mediapipe")
     pytest.importorskip("cv2")
+
+
+def test_hard_cut_snaps_to_new_speaker_and_holds_until_the_cut():
+    d = [Detection(0.0, 0.35), Detection(0.2, 0.35), Detection(0.4, 0.65, cut=True), Detection(0.6, 0.65)]
+    keys = smooth_track(d, LANDSCAPE).keys
+    assert keys[1].cx == pytest.approx(0.35)
+    hold, snap = keys[2], keys[3]
+    assert hold.t == pytest.approx(0.399) and hold.cx == pytest.approx(0.35)
+    assert snap.t == pytest.approx(0.4) and snap.cx == pytest.approx(0.65)
+    assert keys[-1].cx == pytest.approx(0.65)
+
+
+def test_cut_without_a_face_yet_looks_ahead_within_the_shot():
+    d = [Detection(0.0, 0.35), Detection(0.2, None, cut=True), Detection(0.4, 0.62), Detection(0.6, 0.62)]
+    keys = smooth_track(d, LANDSCAPE).keys
+    assert [k.cx for k in keys if k.t >= 0.2] == pytest.approx([0.62, 0.62, 0.62])
+
+
+def test_cut_into_a_faceless_shot_holds_position():
+    d = [Detection(0.0, 0.35), Detection(0.2, None, cut=True), Detection(0.4, None), Detection(0.6, 0.6, cut=True)]
+    keys = smooth_track(d, LANDSCAPE).keys
+    assert keys[1].cx == pytest.approx(0.35) and keys[2].cx == pytest.approx(0.35)
+    assert keys[-1].cx == pytest.approx(0.6)

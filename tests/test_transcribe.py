@@ -102,3 +102,18 @@ def test_cli(wav, tmp_path, monkeypatch):
     assert json.loads(out.read_text())["words"][0]["text"] == "Hello"
     assert "Hello world." in srt.read_text()
     assert main([str(tmp_path / "missing.wav")]) == 1
+
+
+def test_model_download_failure_names_the_host(monkeypatch):
+    import sys
+    import types
+
+    from hypercut import transcribe as t
+
+    class Boom:
+        def __init__(self, *a, **k):
+            raise RuntimeError("403 Forbidden")
+
+    monkeypatch.setitem(sys.modules, "faster_whisper", types.SimpleNamespace(WhisperModel=Boom))
+    with pytest.raises(t.TranscribeError, match="huggingface.co"):
+        t._load_whisper_model("small")
