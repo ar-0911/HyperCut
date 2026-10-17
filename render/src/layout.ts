@@ -151,15 +151,17 @@ export function layoutAt(spans: LayoutSpan[], t: number): {mode: LayoutMode; ent
 
 /**
  * The mode actually drawn at t: the layout mode, except that a split or visual span with no visual
- * graphic on screen falls back to speaker (never an empty panel). `enter` counts from when the run of
+ * graphic on screen falls back to speaker (never an empty panel), and a visual graphic during a speaker
+ * span opens the split panel (text cards never sit on the face). `enter` counts from when the run of
  * visual graphics inside the span began, so a visual arriving mid-span still animates in.
  */
 export function modeAt(spans: LayoutSpan[], graphics: Graphic[], t: number): {mode: LayoutMode; enter: number} {
 	const l = layoutAt(spans, t);
-	if (l.mode === 'speaker') return l;
 	const vis = graphics.filter((g) => isVisualType(g.type));
 	const active = vis.filter((g) => t >= g.start && t < g.end);
 	if (!active.length) return {mode: 'speaker', enter: Infinity};
+	// A visual during a speaker span opens the split panel rather than covering the speaker's face.
+	const mode: LayoutMode = l.mode === 'speaker' ? 'split' : l.mode;
 	// Walk back through overlapping / touching visuals to the start of this run of coverage.
 	let start = Math.min(...active.map((g) => g.start));
 	for (let moved = true; moved; ) {
@@ -171,8 +173,8 @@ export function modeAt(spans: LayoutSpan[], graphics: Graphic[], t: number): {mo
 			}
 		}
 	}
-	const spanStart = t - l.enter;
-	return {mode: l.mode, enter: t - Math.max(start, spanStart)};
+	const spanStart = l.mode === 'speaker' ? -Infinity : t - l.enter;
+	return {mode, enter: t - Math.max(start, spanStart)};
 }
 
 /** Extra zoom on the speaker in split mode: half-size framing of a wide shot leaves the face small. */

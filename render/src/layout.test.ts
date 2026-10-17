@@ -133,6 +133,10 @@ describe('modeAt', () => {
 		const gs = [g('a', 'kinetic_text', 1, 3), g('b', 'stat_card', 3, 5)];
 		expect(modeAt(spans, gs, 4).enter).toBeCloseTo(3);
 	});
+	it('opens the split panel for a visual during a speaker span', () => {
+		expect(modeAt([], [g('a', 'kinetic_text', 2, 4)], 2.5)).toEqual({mode: 'split', enter: expect.closeTo(0.5)});
+		expect(modeAt([], [g('a', 'emoji_burst', 2, 4)], 2.5).mode).toBe('speaker');
+	});
 	it('never counts from before the span', () => {
 		expect(modeAt([{start: 5, end: 9, mode: 'visual'}], [g('a', 'illustration', 0, 9)], 6).enter).toBeCloseTo(1);
 	});

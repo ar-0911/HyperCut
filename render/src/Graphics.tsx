@@ -1,5 +1,5 @@
 import React from 'react';
-import {BAND_Y, placeGraphic, SPLIT_AREA, VISUAL_AREA} from './layout';
+import {BAND_Y, CAPTION_Y, placeGraphic, SPLIT_AREA, VISUAL_AREA} from './layout';
 import type {Graphic, GraphicsStyle, LayoutMode} from './plan';
 import {themeTokens, type Theme} from './theme';
 
@@ -102,7 +102,7 @@ const StatCard: React.FC<TemplateProps> = ({graphic, elapsed, remaining, theme})
 /** Furthest an emoji center may travel vertically, as a fraction of output height: the burst stays in its band. */
 export const EMOJI_REACH_Y = 0.12;
 
-const EmojiBurst: React.FC<TemplateProps> = ({graphic, elapsed, remaining, height, mode}) => {
+const EmojiBurst: React.FC<TemplateProps> = ({graphic, elapsed, remaining, width, height, mode}) => {
 	// Next to a visual the burst is an accent, not the subject.
 	const shrink = mode === 'speaker' ? 1 : 0.6;
 	const emoji = str(graphic.props.emoji, '🔥');
@@ -114,9 +114,12 @@ const EmojiBurst: React.FC<TemplateProps> = ({graphic, elapsed, remaining, heigh
 				// Deterministic fan-out: no Math.random, so every render of a frame is identical.
 				const angle = (i / count) * Math.PI * 2 + 0.3 * (i % 2);
 				const reach = (260 + (i % 3) * 90) * clamp01(elapsed / 0.5) * shrink;
-				const x = Math.cos(angle) * reach;
-				// Flattened fan plus a slow rise, clamped so the burst never climbs onto the face.
-				const y = Math.max(-limit, Math.min(limit, Math.sin(angle) * reach * 0.5 - elapsed * 40));
+				// Over the speaker: two low clusters at the frame's sides; next to a visual: a fan.
+				const side = i % 2 ? 1 : -1;
+				const x = mode === 'speaker' ? side * (width * 0.36 + Math.cos(angle) * reach * 0.25) : Math.cos(angle) * reach;
+				const rise = mode === 'speaker' ? 0.2 : 0.5;
+				// Clamped so the burst never climbs onto the face.
+				const y = Math.max(-limit * rise, Math.min(limit * rise, Math.sin(angle) * reach * rise - elapsed * 40));
 				const size = (120 + (i % 3) * 36) * shrink;
 				return (
 					<span
@@ -345,6 +348,8 @@ export function placedY(type: Graphic['type'], anchor: Graphic['anchor'], mode: 
 	if (mode === 'split') return type === 'lower_third' ? 0.88 : (SPLIT_AREA.top + SPLIT_AREA.bottom) / 2;
 	// Over a full-frame visual, side graphics sit at the art's foot so they do not cover it.
 	if (mode === 'visual') return VISUAL_AREA.bottom;
+	// Over the speaker an emoji burst flanks the caption line, the part of the frame furthest from a face.
+	if (type === 'emoji_burst') return CAPTION_Y[captionPos] - 0.06;
 	return BAND_Y[placeGraphic(anchor, faceY, captionPos)];
 }
 
