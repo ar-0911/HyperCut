@@ -120,6 +120,16 @@ Run it with `npm run render -- --plan plan.json --video normalized.mp4 --out out
 (`REMOTION_BROWSER` selects a Chromium). See ADRs [0601](decisions/0601-render-architecture.md) to
 [0604](decisions/0604-render-cli-and-browser.md).
 
+**API.** `uvicorn api.main:app` serves a job per upload. `POST /jobs` (multipart `video`, `style`,
+`hook_strategy`) saves to `media/<job_id>/` and returns an id; a background thread runs
+`hypercut.run.run_pipeline` (ingest, then transcribe and reframe together, then style, then analyze) and
+writes `plan.json`. `GET /jobs/{id}` returns `status` (`queued|running|done|error`), the current `stage`,
+`error`, `render` state, the plan and the file list. `PUT /jobs/{id}/plan` replaces the plan after
+validation (e.g. a different `hook.chosen`, a fixed transcript). `POST /jobs/{id}/render` runs the render
+project's `npm run render` into `output.mp4`; `GET /jobs/{id}/files/{name}` serves outputs. State is one
+`job.json` per job, no database. `python -m hypercut.run VIDEO [--style ...] [--render]` runs the same
+pipeline without the server. See [ADR 0701](decisions/0701-job-server-design.md).
+
 ## Claude calls
 
 All of them go through `hypercut/llm.py`'s `ask_json`. By default it runs Claude Code headless
