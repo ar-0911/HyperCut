@@ -1,0 +1,66 @@
+import pytest
+
+from hypercut.plan import Source
+from hypercut.reframe import Detection, reframe, smooth_track
+
+LANDSCAPE = Source(path="x.mp4", width=1920, height=1080, fps=30, duration=10)
+VERTICAL = Source(path="x.mp4", width=1080, height=1920, fps=30, duration=10)
+HALF = (1080 * 9 / 16) / 1920 / 2
+
+
+def dets(xs, dt=0.2):
+    return [Detection(i * dt, x, 0.4 if x is not None else None) for i, x in enumerate(xs)]
+
+
+def test_no_face_is_center_crop():
+    assert smooth_track(dets([None, None]), LANDSCAPE).keys == []
+
+
+def test_vertical_source_has_no_keys_and_skips_detection():
+    def boom(*a):
+        raise AssertionError("detector should not run")
+
+    assert reframe("x.mp4", VERTICAL, detector=boom).keys == []
+
+
+def test_dead_zone_stops_jitter():
+    keys = smooth_track(dets([0.5, 0.51, 0.49, 0.52, 0.5]), LANDSCAPE).keys
+    assert {k.cx for k in keys} == {0.5}
+    assert all(k.cy == 0.5 for k in keys)
+
+
+def test_follows_a_move_smoothly():
+    keys = smooth_track(dets([0.4] * 3 + [0.6] * 30), LANDSCAPE).keys
+    xs = [k.cx for k in keys]
+    assert xs[0] == 0.4
+    assert xs == sorted(xs)
+    assert xs[3] < 0.5  # eased, not a jump
+    assert xs[-1] == pytest.approx(0.6, abs=0.05)
+
+
+def test_gaps_hold_and_leading_gap_backfills():
+    keys = smooth_track(dets([None, 0.45, None, None]), LANDSCAPE).keys
+    assert len(keys) == 4
+    assert {k.cx for k in keys} == {0.45}
+
+
+def test_crop_stays_inside_frame():
+    keys = smooth_track(dets([0.0] * 5 + [1.0] * 60), LANDSCAPE).keys
+    assert all(HALF - 1e-3 <= k.cx <= 1 - HALF + 1e-3 for k in keys)
+
+
+def test_reframe_uses_injected_detector():
+    seen = {}
+
+    def fake(path, source, fps):
+        seen["args"] = (path, fps)
+        return dets([0.5, 0.5])
+
+    out = reframe("v.mp4", LANDSCAPE, detector=fake)
+    assert seen["args"] == ("v.mp4", 5.0)
+    assert len(out.keys) == 2
+
+
+def test_real_detector_importable_or_skipped():
+    pytest.importorskip("mediapipe")
+    pytest.importorskip("cv2")
