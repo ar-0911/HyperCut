@@ -44,7 +44,10 @@ needs a change, keep it small and additive.
 
 - `docs/architecture.md` explains how the system works; `docs/decisions/` records every design decision.
 - When your task makes a real choice (a library, a format, a trade-off, a default), add a numbered decision
-  record in `docs/decisions/` (what, alternatives, why, consequences), list it in
-  `docs/decisions/README.md`, and update the stage's section of `docs/architecture.md`.
-- To avoid merge clashes on the shared index, take the next free number after the highest one on your base
-  branch, and only append rows to the index table.
+  record in `docs/decisions/` (what, alternatives, why, consequences) and update your stage's section of
+  `docs/architecture.md`.
+- Decision numbers are reserved per stage so parallel work never collides: ingest 0101+, transcribe 0201+,
+  style 0301+, analyze 0401+, reframe 0501+, render 0601+, api 0701+, web 0801+. Shared or cross-cutting
+  decisions use the next free number below 0100.
+- In `docs/architecture.md`, edit only your stage's paragraph(s). Don't edit `docs/decisions/README.md`;
+  the lead adds the index rows when the work lands.

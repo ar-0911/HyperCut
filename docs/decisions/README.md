@@ -1,7 +1,9 @@
 # Decision records
 
-Each file records one decision: what we chose, what else we considered, and why. Add a new numbered file
-when a decision changes rather than rewriting history; mark the old one "Superseded by NNNN".
+Each file records one decision: what we chose, what else we considered, and why. Numbers below 0100 are
+project-wide; each stage has its own range (ingest 01xx, transcribe 02xx, style 03xx, analyze 04xx, reframe
+05xx, render 06xx, api 07xx, web 08xx). Add a new file
+when a decision changes rather than rewriting history, and mark the old one "Superseded by NNNN".
 
 | # | decision | status |
 |---|---|---|
