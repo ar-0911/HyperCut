@@ -130,6 +130,16 @@ project's `npm run render` into `output.mp4`; `GET /jobs/{id}/files/{name}` serv
 `job.json` per job, no database. `python -m hypercut.run VIDEO [--style ...] [--render]` runs the same
 pipeline without the server. See [ADR 0701](decisions/0701-job-server-design.md).
 
+**Web.** `web/` is a Next.js 14 App Router app (client components, no server code) that talks to the API at
+`NEXT_PUBLIC_API_URL` (default `http://localhost:8000`). `/` uploads a video with a style prompt (preset
+chips fill the prompt) and a hook strategy; `/jobs/[id]` polls the job and shows the four stages, then an
+editor: a `@remotion/player` preview of the `HyperCut` composition imported from `render/src` (one
+implementation of the look, no copy), the three hook candidates, an editable transcript, and Save, Render and
+Download. Picking a hook or editing a word changes the plan in the browser (`web/lib/rehook.ts` rebuilds
+`segments` as `analyze` does); Save and Render `PUT` the plan first. The preview plays the API's
+`normalized.mp4`. `npm test` in `web/` runs vitest (API client, hook logic) and a production build. See
+ADRs [0801](decisions/0801-nextjs-app-and-shared-composition.md) to [0803](decisions/0803-client-side-plan-edits.md).
+
 ## Claude calls
 
 All of them go through `hypercut/llm.py`'s `ask_json`. By default it runs Claude Code headless
