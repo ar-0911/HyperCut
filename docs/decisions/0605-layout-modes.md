@@ -15,6 +15,10 @@ Status: accepted, 2026-10-17
 - *Never an empty panel.* A split/visual span with no visual graphic on screen renders as `speaker`
   (`modeAt`). The entrance clock counts from the start of the span or of the run of touching visuals,
   whichever is later, and back-to-back spans of one mode count as one, so nothing re-animates at a seam.
+- *Never over the face.* A visual graphic during a `speaker` span opens the split panel for its duration
+  instead of being placed over the speaker. Over the speaker, an emoji burst splits into two low clusters
+  at the frame's sides, next to the caption line. (Both came from the first full real-footage render, where
+  a hook title sat on a speaker's hair and a close-up's emoji covered his beard.)
 - *Animation.* Entering split, the speaker panel's top eases from 0 to 0.5H over 0.3 s (ease-in-out
   cubic), revealing the top panel behind it, and the caption line travels from the style position to the
   seam with it. A visual fades and scales (1.06 to 1) in over 0.25 s. Leaving is a cut. The backdrop is a
@@ -26,7 +30,7 @@ Status: accepted, 2026-10-17
   `defs`. Layers pop in in order (stagger `min(0.2 s, 50% of span / layers)`, ease-out-back scale
   0.85 to 1, rise 40 units, fade), the art drifts 1 to 1.05 over its span and fades out in the last 0.2 s.
   An optional `title` sits above in the theme font. Art is fitted to its box: the top panel (0.03H to 0.44H)
-  in split, 0.06H to 0.74H in visual, a 0.7W x 0.26H card in the band `placeGraphic` picks in speaker mode.
+  in split, 0.06H to 0.74H in visual, and never over the speaker (see above).
 - *Determinism.* No CSS animations, no `Math.random`: every frame is a function of the frame number.
 
 **Alternatives.** Picture-in-picture speaker over full-frame art (covers the art, small face); a variable
