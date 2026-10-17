@@ -117,3 +117,39 @@ def test_model_download_failure_names_the_host(monkeypatch):
     monkeypatch.setitem(sys.modules, "faster_whisper", types.SimpleNamespace(WhisperModel=Boom))
     with pytest.raises(t.TranscribeError, match="huggingface.co"):
         t._load_whisper_model("small")
+
+
+def test_whisper_gets_decoded_samples_for_ingest_wav(tmp_path, monkeypatch):
+    import wave
+
+    np = pytest.importorskip("numpy")
+    p = tmp_path / "real.wav"
+    with wave.open(str(p), "wb") as f:
+        f.setnchannels(1)
+        f.setsampwidth(2)
+        f.setframerate(16000)
+        f.writeframes(np.array([0, 16384, -32768], dtype="<i2").tobytes())
+    seen = []
+
+    class Model(FakeModel):
+        def transcribe(self, audio, word_timestamps, vad_filter):
+            seen.append(audio)
+            return super().transcribe(audio, word_timestamps, vad_filter)
+
+    monkeypatch.setattr(tr, "_load_whisper_model", lambda n: Model())
+    tr.transcribe(p, "whisper")
+    assert isinstance(seen[0], np.ndarray) and seen[0].dtype == np.float32
+    assert seen[0].tolist() == [0.0, 0.5, -1.0]
+
+
+def test_whisper_gets_path_for_other_audio(wav, monkeypatch):
+    seen = []
+
+    class Model(FakeModel):
+        def transcribe(self, audio, word_timestamps, vad_filter):
+            seen.append(audio)
+            return super().transcribe(audio, word_timestamps, vad_filter)
+
+    monkeypatch.setattr(tr, "_load_whisper_model", lambda n: Model())
+    tr.transcribe(wav, "whisper")
+    assert seen == [str(wav)]

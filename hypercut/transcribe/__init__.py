@@ -80,9 +80,26 @@ def _load_whisper_model(name: str):
         ) from e
 
 
+def _audio(path: Path):
+    """Ingest's 16 kHz mono 16-bit wav as a float32 array, so faster-whisper skips its own PyAV
+    decode (PyAV 14+ dropped an argument faster-whisper 1.2 passes). Anything else goes by path."""
+    import wave
+
+    try:
+        with wave.open(str(path), "rb") as f:
+            if (f.getframerate(), f.getnchannels(), f.getsampwidth()) != (16000, 1, 2):
+                return str(path)
+            frames = f.readframes(f.getnframes())
+    except (wave.Error, EOFError):
+        return str(path)
+    import numpy as np
+
+    return np.frombuffer(frames, dtype="<i2").astype(np.float32) / 32768.0
+
+
 def _whisper(path: Path) -> tuple[str, list[dict]]:
     model = _load_whisper_model(os.environ.get("HYPERCUT_WHISPER_MODEL", DEFAULT_WHISPER_MODEL))
-    segments, info = model.transcribe(str(path), word_timestamps=True, vad_filter=True)
+    segments, info = model.transcribe(_audio(path), word_timestamps=True, vad_filter=True)
     raw = [
         {"text": w.word, "start": w.start, "end": w.end, "confidence": w.probability}
         for seg in segments
