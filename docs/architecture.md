@@ -77,16 +77,18 @@ footage breaks frame-accurate rendering) and extracts 16 kHz mono audio for tran
 starting from the closest preset and changing only what the prompt asks for, then validated against the
 schema so a bad answer can never reach the renderer.
 
-**Analyze.** One Claude call reads the timed transcript and the style and returns, as JSON:
-- up to three hook candidates, each a span with a score and a reason (bold claim, surprising number,
-  question, conflict, payoff tease);
-- filler words and dead air to cut (also detected deterministically from word gaps and FFmpeg
-  `silencedetect`, so cuts don't depend on the model alone);
+**Analyze.** `analyze(transcript, source, style, audio_wav=None, strategy="cold_open")`. One Claude call
+gets the transcript as `index time word` lines and the style, and returns as JSON:
+- up to three hook candidates as word-index spans with a score and a reason (bold claim, surprising number,
+  question, conflict, payoff tease); code converts them to times and text;
 - graphics: each a span, a template type (`kinetic_text`, `stat_card`, `emoji_burst`, `list_build`,
-  `lower_third`, `progress_bar`) and its props, with density capped by the style;
-- punch-in zooms on emphasis and topic changes.
+  `lower_third`, `progress_bar`) and its props, capped per minute by `style.graphics.density`;
+- punch-in zooms on emphasis and topic changes, capped per minute by `style.camera.zoom_frequency`.
 
-Code then assembles `segments` from the chosen hook strategy and the cuts.
+Every item is validated against the source duration and dropped if invalid. Cuts never involve Claude:
+filler words and gaps over `style.pacing.max_silence` come from word timings (plus FFmpeg `silencedetect`
+when the wav is given). Code then assembles `segments`: `cold_open` puts the hook first and keeps it in
+place; `trim` starts at the hook. See ADR 0401.
 
 **Reframe.** MediaPipe finds the face every few frames; the track is smoothed so the crop glides instead of
 jittering, and stored as normalized crop-center keyframes. No face found means a center crop. The renderer
