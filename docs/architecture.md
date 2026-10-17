@@ -64,9 +64,12 @@ and starting the next after it. Analyzers never need to know what else has been 
 
 ## Stage details
 
-**Ingest.** `ffprobe` reads size, rate and duration; inputs over 3 minutes (or under 10 seconds) are
-rejected with a clear message. FFmpeg re-encodes to constant frame rate H.264 (variable frame rate phone
-footage breaks frame-accurate rendering) and extracts 16 kHz mono audio for transcription.
+**Ingest.** `ingest(input_path, job_dir) -> (Source, normalized_mp4, audio_wav)`. `ffprobe` reads size, rate
+and duration; inputs without video or audio, under 10 seconds or over 3 minutes are rejected with an
+`IngestError` carrying a clear message (ADR 0102). FFmpeg re-encodes to 30 fps constant frame rate H.264/AAC
+(variable frame rate phone footage breaks frame-accurate rendering) and extracts 16 kHz mono audio for
+transcription (ADR 0101). `Source` is probed from the normalized file. Manual run:
+`python -m hypercut.ingest <file> <out_dir>`.
 
 **Transcribe.** Returns every word with start and end times. faster-whisper runs locally for free (the
 `small` model handles 3 minutes in about a minute on CPU); Deepgram is the fast paid option, chosen with
