@@ -4,7 +4,7 @@ Paste raw footage, get a short. HyperCut transcribes the video, adds animated ca
 and opens with it, and drops in motion graphics where the content calls for them, in a style you describe
 in a prompt. The speaker is never altered: everything is cuts and overlays.
 
-Status: skeleton. The edit plan schema (`hypercut/plan.py`) and Claude helper are in place; the stages are being built.
+Status: MVP built (pipeline stages, renderer, API, web app). See the quickstart below.
 
 ```sh
 python -m venv .venv && .venv/bin/pip install -e '.[dev]'
@@ -20,6 +20,12 @@ Quickstart (needs FFmpeg; `cd render && npm ci` once for rendering):
 curl -F video=@talk.mp4 -F style='bold and punchy' localhost:8000/jobs        # -> {"id": ...}
 curl localhost:8000/jobs/<id>                                                 # status, stage, plan
 curl -X POST localhost:8000/jobs/<id>/render; curl -O localhost:8000/jobs/<id>/files/output.mp4
+```
+
+Web app (with the job server running):
+
+```sh
+cd web && npm ci && NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev     # http://localhost:3000
 ```
 
 - [Architecture](docs/architecture.md): how the pipeline works

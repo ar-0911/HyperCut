@@ -29,7 +29,8 @@ export const Captions: React.FC<{words: Word[]; style: CaptionStyle; t: number; 
 				display: 'flex',
 				flexWrap: 'wrap',
 				justifyContent: 'center',
-				gap: `${style.size * 0.05}px ${style.size * 0.3}px`,
+				// wide enough for the active word's pop scale plus both outlines, so neighbours never touch
+				gap: `${style.size * 0.05}px ${style.size * 0.45}px`,
 				fontFamily: `"${style.font}", ${FONT_STACK}`,
 				fontWeight: style.weight,
 				fontSize: style.size,
