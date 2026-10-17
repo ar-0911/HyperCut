@@ -12,6 +12,7 @@ from hypercut.plan import Source
 MIN_SECONDS = 10.0
 MAX_SECONDS = 180.0
 TARGET_FPS = 30
+MAX_HEIGHT = 1920  # the 1080x1920 output never needs more source pixels than this (ADR 0103)
 
 
 class IngestError(ValueError):
@@ -76,7 +77,7 @@ def ingest(input_path: str | Path, job_dir: str | Path) -> tuple[Source, Path, P
     res = _run([
         "ffmpeg", "-y", "-v", "error", "-i", str(input_path),
         "-map", "0:v:0", "-map", "0:a:0",
-        "-vf", f"fps={TARGET_FPS}", "-fps_mode", "cfr",
+        "-vf", f"fps={TARGET_FPS},scale=-2:'min(ih,{MAX_HEIGHT})'", "-fps_mode", "cfr",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
         "-movflags", "+faststart", str(mp4),
