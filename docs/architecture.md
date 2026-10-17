@@ -103,10 +103,21 @@ filler words and gaps over `style.pacing.max_silence` come from word timings (pl
 when the wav is given). Code then assembles `segments`: `cold_open` puts the hook first and keeps it in
 place; `trim` starts at the hook. See ADR 0401.
 
+With `visuals=True` (the default in `run_pipeline`; `--no-visuals` turns it off) analyze also directs the
+look of the video (`hypercut/analyze/visuals.py`, ADR 0402). Code groups the played words into beats of
+2-4.5 s, breaking at sentence ends. One director call, allowed to search the web for reference, picks each
+beat's `layout` mode (`speaker`, `split` with the visual above the speaker, or `visual` full frame) and
+writes an art brief specific to what is said, or picks a text card. Parallel illustrator calls turn
+the briefs into original SVG drawings. Code sanitizes them and splits each into layers that the renderer
+reveals in order (graphic type `illustration`). Code also enforces the mix: no visual-only opening, no two
+visual-only beats in a row, visual-only under 30% of the time. Text graphics from the main call that would
+share the panel with a visual are dropped.
+
 **Reframe.** `reframe(video, source)` samples ~5 frames/s with OpenCV and takes the largest MediaPipe face per
 frame. The track is smoothed (exponential, with a dead zone so the crop ignores small movements), clamped so the
-full-height 9:16 window stays inside the frame, and stored as normalized crop-center keyframes (`cy` is always
-0.5). No face, or an already-vertical source, means empty keys (center crop). The detector is an injectable
+full-height 9:16 window stays inside the frame, and stored as normalized crop-center keyframes. `cy` is the
+face's own height in the frame, smoothed the same way; the renderer zooms in on it and keeps graphics off it
+(decision 0504). No face, or an already-vertical source, means empty keys (center crop). The detector is an injectable
 function so tests need no mediapipe. Detection uses the MediaPipe Tasks face detector, whose model is fetched
 once into `~/.cache/hypercut` (decision 0502). Hard cuts between shots are found from colour-histogram jumps
 between samples, and at a cut the crop snaps to the new shot's speaker instead of easing (decision 0503), so

@@ -4,6 +4,7 @@ from typing import Any, get_args
 
 from hypercut import llm
 from hypercut.analyze import cuts as cutting
+from hypercut.analyze.visuals import merge_graphics, plan_visuals
 from hypercut.plan import (
     EditPlan, Graphic, GraphicType, Hook, HookCandidate, Source, Style, Transcript, Zoom,
 )
@@ -51,8 +52,13 @@ def analyze(
     style: Style,
     audio_wav: str | None = None,
     strategy: str = "cold_open",
+    visuals: bool = False,
 ) -> EditPlan:
-    """Fill hook, segments, graphics and zooms of an EditPlan."""
+    """Fill hook, segments, graphics and zooms of an EditPlan.
+
+    With `visuals`, also mix layouts per beat and draw an original illustration for the beats that
+    get a visual (more Claude calls; see `hypercut.analyze.visuals`).
+    """
     if strategy not in ("cold_open", "trim"):
         raise ValueError(f"unknown hook strategy: {strategy!r}")
     plan = EditPlan(source=source, transcript=transcript, style=style)
@@ -88,6 +94,10 @@ def analyze(
     )
     hook_span = (candidates[0].start, candidates[0].end) if candidates else None
     plan.segments = cutting.build_segments(source.duration, cuts, hook_span, strategy)
+    if visuals:
+        layout, art = plan_visuals(transcript, plan.segments, source.duration, style, hook_span)
+        plan.layout = layout
+        plan.graphics = merge_graphics(plan.graphics, art, layout)
     return plan
 
 

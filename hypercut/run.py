@@ -1,7 +1,7 @@
 """python -m hypercut.run VIDEO [--style 'prompt'] [--strategy trim] [--out DIR] [--render]
 
 Runs the whole pipeline on one file without the server: ingest -> (transcribe, reframe) -> style
--> analyze, then writes plan.json (and output.mp4 with --render). The API calls `run_pipeline` too.
+-> analyze (with per-beat layouts and illustrations unless --no-visuals), then writes plan.json (and output.mp4 with --render). The API calls `run_pipeline` too.
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ def run_pipeline(
     style_prompt: str = "",
     strategy: str = "cold_open",
     on_stage: Callable[[str], None] | None = None,
+    visuals: bool = True,
 ) -> EditPlan:
     """Run every stage and save `plan.json` in `job_dir`. `on_stage(name)` is called as each begins."""
     job_dir = Path(job_dir)
@@ -50,7 +51,7 @@ def run_pipeline(
     style = style_from_prompt(style_prompt)
 
     note("analyze")
-    plan = analyze(transcript, source, style, audio_wav=str(wav), strategy=strategy)
+    plan = analyze(transcript, source, style, audio_wav=str(wav), strategy=strategy, visuals=visuals)
     plan = plan.model_copy(update={"reframe": reframe_result})
     plan = EditPlan.model_validate(plan.model_dump())  # fail here, not in the renderer
     plan_mod.save(plan, job_dir / "plan.json")
@@ -80,6 +81,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--strategy", choices=["cold_open", "trim"], default="cold_open")
     ap.add_argument("--out", help="output directory (default media/cli-<video name>)")
     ap.add_argument("--render", action="store_true", help="also render output.mp4 with Remotion")
+    ap.add_argument("--no-visuals", action="store_true", help="skip per-beat layouts and illustrations")
     args = ap.parse_args(argv)
 
     job_dir = Path(args.out) if args.out else ROOT / "media" / ("cli-" + Path(args.video).stem)
@@ -87,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
         plan = run_pipeline(
             args.video, job_dir, args.style, args.strategy,
             on_stage=lambda s: print("[" + s + "]", file=sys.stderr),
+            visuals=not args.no_visuals,
         )
         print(
             f"{len(plan.transcript.words)} words, {len(plan.hook.candidates)} hooks, "

@@ -29,7 +29,7 @@ def fake_stages(monkeypatch):
         (Path(job_dir) / "audio.wav").write_bytes(b"wav")
         return SOURCE, Path(job_dir) / "normalized.mp4", Path(job_dir) / "audio.wav"
 
-    def analyze(transcript, source, style, audio_wav=None, strategy="cold_open"):
+    def analyze(transcript, source, style, audio_wav=None, strategy="cold_open", visuals=False):
         calls["strategy"] = strategy
         calls["style"] = style.name
         hook = Hook(strategy=strategy, candidates=[
