@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from hookline import plan
+from hypercut import plan
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / "schema" / "examples" / "sample_plan.json"
@@ -45,4 +45,4 @@ def test_rejects_unknown_fields():
 
 def test_checked_in_schema_is_current():
     checked_in = json.loads((ROOT / "schema" / "edit_plan.schema.json").read_text())
-    assert checked_in == plan.json_schema(), "run: python -m hookline.plan"
+    assert checked_in == plan.json_schema(), "run: python -m hypercut.plan"

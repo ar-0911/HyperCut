@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hookline"
+name = "hypercut"
 version = "0.1.0"
 description = "Automatic short-form video editor: transcribe, caption, find the hook, add motion graphics."
 requires-python = ">=3.10"
@@ -18,7 +18,7 @@ api = ["fastapi>=0.110", "uvicorn>=0.29", "python-multipart>=0.0.9"]
 anthropic = ["anthropic>=1.0"]
 
 [tool.setuptools.packages.find]
-include = ["hookline*"]
+include = ["hypercut*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

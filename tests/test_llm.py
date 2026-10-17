@@ -1,6 +1,6 @@
 import pytest
 
-from hookline.llm import LLMError, extract_json
+from hypercut.llm import LLMError, extract_json
 
 
 def test_extract_fenced():
