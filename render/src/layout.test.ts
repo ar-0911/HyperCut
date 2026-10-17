@@ -1,5 +1,20 @@
 import {describe, expect, it} from 'vitest';
-import {cropRect, placeGraphic, pointInOutput, reframeAt, zoomAt} from './layout';
+import {
+	CAPTION_Y,
+	captionY,
+	cropRect,
+	layoutAt,
+	modeAt,
+	panelAt,
+	placeGraphic,
+	pointInOutput,
+	reframeAt,
+	sceneAt,
+	SPLIT,
+	SPLIT_IN,
+	zoomAt,
+} from './layout';
+import {normalizePlan, type Graphic, type LayoutSpan} from './plan';
 
 describe('reframeAt', () => {
 	const keys = [
@@ -80,5 +95,124 @@ describe('placeGraphic', () => {
 	});
 	it('still returns something when nothing is clear', () => {
 		expect(['top', 'center', 'bottom']).toContain(placeGraphic('auto', 0.45, 'middle'));
+	});
+});
+
+describe('layoutAt', () => {
+	const spans: LayoutSpan[] = [
+		{start: 2, end: 4, mode: 'split'},
+		{start: 4, end: 6, mode: 'split'},
+		{start: 6, end: 8, mode: 'visual'},
+	];
+	it('is speaker outside every span', () => {
+		expect(layoutAt([], 3)).toEqual({mode: 'speaker', enter: Infinity});
+		expect(layoutAt(spans, 1).mode).toBe('speaker');
+		expect(layoutAt(spans, 8).mode).toBe('speaker');
+	});
+	it('reports the mode and time since the span started', () => {
+		expect(layoutAt(spans, 2.5)).toEqual({mode: 'split', enter: 0.5});
+		expect(layoutAt(spans, 7)).toEqual({mode: 'visual', enter: 1});
+	});
+	it('treats back-to-back spans of one mode as one', () => {
+		expect(layoutAt(spans, 5)).toEqual({mode: 'split', enter: 3});
+		expect(layoutAt([...spans].reverse(), 5).enter).toBe(3);
+	});
+});
+
+describe('modeAt', () => {
+	const g = (id: string, type: Graphic['type'], start: number, end: number): Graphic => ({id, type, start, end, props: {}, anchor: 'auto'});
+	const spans: LayoutSpan[] = [{start: 0, end: 10, mode: 'split'}];
+	it('falls back to speaker with no visual on screen', () => {
+		expect(modeAt(spans, [g('a', 'lower_third', 0, 10)], 3).mode).toBe('speaker');
+		expect(modeAt(spans, [g('a', 'illustration', 4, 6)], 3).mode).toBe('speaker');
+	});
+	it('counts enter from the visual that arrived mid-span', () => {
+		expect(modeAt(spans, [g('a', 'illustration', 4, 6)], 4.1)).toEqual({mode: 'split', enter: expect.closeTo(0.1)});
+	});
+	it('does not restart across touching visuals', () => {
+		const gs = [g('a', 'kinetic_text', 1, 3), g('b', 'stat_card', 3, 5)];
+		expect(modeAt(spans, gs, 4).enter).toBeCloseTo(3);
+	});
+	it('never counts from before the span', () => {
+		expect(modeAt([{start: 5, end: 9, mode: 'visual'}], [g('a', 'illustration', 0, 9)], 6).enter).toBeCloseTo(1);
+	});
+});
+
+describe('panelAt', () => {
+	it('is the full frame outside split', () => {
+		expect(panelAt('speaker', 0, 1920)).toEqual({top: 0, height: 1920});
+		expect(panelAt('visual', 0, 1920)).toEqual({top: 0, height: 1920});
+	});
+	it('slides from full frame to the bottom half', () => {
+		expect(panelAt('split', 0, 1920).top).toBe(0);
+		const mid = panelAt('split', SPLIT_IN / 2, 1920).top;
+		expect(mid).toBeGreaterThan(0);
+		expect(mid).toBeLessThan(SPLIT * 1920);
+		expect(panelAt('split', SPLIT_IN, 1920)).toEqual({top: 960, height: 960});
+		expect(panelAt('split', 99, 1920)).toEqual({top: 960, height: 960});
+	});
+});
+
+describe('captionY', () => {
+	it('follows the style in speaker mode', () => {
+		expect(captionY('speaker', 'top')).toBe(CAPTION_Y.top);
+		expect(captionY('speaker', 'bottom')).toBe(CAPTION_Y.bottom);
+	});
+	it('sits on the seam in split and at the bottom over a visual', () => {
+		expect(captionY('split', 'top')).toBe(SPLIT);
+		expect(captionY('visual', 'top')).toBe(CAPTION_Y.bottom);
+	});
+});
+
+describe('sceneAt (zoom about the face)', () => {
+	const base = {
+		source: {path: 's.mp4', width: 3414, height: 1920, fps: 30, duration: 20},
+		reframe: {keys: [{t: 0, cx: 0.5, cy: 0.25}]},
+		zooms: [{start: 0, end: 20, scale: 1.2, ease: 'snap'}],
+		graphics: [{id: 'v', type: 'illustration', start: 10, end: 20, props: {layers: []}}],
+		layout: [{start: 10, end: 20, mode: 'split'}],
+	};
+	const plan = normalizePlan(base);
+	it('zooms about the face in speaker mode, and the face does not move', () => {
+		const s = sceneAt(plan, 1);
+		expect(s.mode).toBe('speaker');
+		expect(s.origin.x).toBeCloseTo(540);
+		expect(s.origin.y).toBeCloseTo(0.25 * 1920);
+		expect(s.faceY).toBeCloseTo(0.25);
+	});
+	it('puts the face in the bottom panel in split mode', () => {
+		const s = sceneAt(plan, 15);
+		expect(s.mode).toBe('split');
+		expect(s.panel).toEqual({top: 960, height: 960});
+		expect(s.rect.height).toBeCloseTo(960);
+		expect(s.origin.y).toBeCloseTo(0.25 * 960);
+		expect(s.face.y).toBeCloseTo(960 + 0.25 * 960);
+		expect(s.captionY).toBe(SPLIT);
+	});
+	it('moves the captions with the seam while the panel slides', () => {
+		const y = sceneAt(plan, 10 + SPLIT_IN / 2).captionY;
+		expect(y).toBeGreaterThan(SPLIT);
+		expect(y).toBeLessThan(CAPTION_Y.bottom);
+		expect(sceneAt(plan, 10).captionY).toBeCloseTo(CAPTION_Y.bottom);
+	});
+	it('keeps the panel covered: scaling >= 1 about a point inside it', () => {
+		for (const t of [1, 10.1, 15]) {
+			const s = sceneAt(plan, t);
+			expect(s.origin.x).toBeGreaterThanOrEqual(0);
+			expect(s.origin.x).toBeLessThanOrEqual(1080);
+			expect(s.origin.y).toBeGreaterThanOrEqual(0);
+			expect(s.origin.y).toBeLessThanOrEqual(s.panel.height);
+			// Scaled crop still spans the panel on every side.
+			const z = s.zoom;
+			expect(s.origin.x + (s.rect.left - s.origin.x) * z).toBeLessThanOrEqual(0.001);
+			expect(s.origin.y + (s.rect.top - s.origin.y) * z).toBeLessThanOrEqual(0.001);
+			expect(s.origin.x + (s.rect.left + s.rect.width - s.origin.x) * z).toBeGreaterThanOrEqual(1080 - 0.001);
+			expect(s.origin.y + (s.rect.top + s.rect.height - s.origin.y) * z).toBeGreaterThanOrEqual(s.panel.height - 0.001);
+		}
+	});
+	it('keeps the old defaults without a face track', () => {
+		const s = sceneAt(normalizePlan({...base, reframe: {keys: []}, layout: []}), 1);
+		expect(s.origin).toEqual({x: 540, y: 960});
+		expect(s.faceY).toBe(0.4);
 	});
 });

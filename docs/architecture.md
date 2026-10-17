@@ -130,11 +130,18 @@ cropped and zoomed source frame, the caption line for the current words (styled 
 length taken from the plan. The video layer is one Remotion sequence per segment; overlays are driven by the
 *source* time of the current frame, so the cold-open hook shows its captions and graphics both times it plays
 and cut material shows nothing. The logic is in pure, unit-tested modules (`timing.ts`, `layout.ts`,
-`captions.ts`). Crop follows the interpolated reframe keys (center crop without them); zooms scale about the
-frame center; graphics take one of three vertical bands chosen to stay clear of the face and the captions.
+`captions.ts`); `sceneAt(plan, t)` gives both layers the frame's layout mode, speaker panel, crop, zoom and
+face point. `plan.layout` switches between three modes (decision 0605): `speaker` (full frame; the default),
+`split` (speaker slides into the bottom half, visuals above on an animated accent backdrop, captions on the
+seam) and `visual` (the visual graphic fills the frame while the speaker keeps talking underneath); a
+split/visual span with no visual graphic on screen plays as speaker. Crop follows the interpolated reframe
+keys (center crop without them); zooms scale about the face (`cx`, `cy` from the track, decision 0606);
+in speaker mode graphics take one of three vertical bands chosen to stay clear of the face and the captions.
+`illustration` graphics are Claude-drawn SVG layers that pop in one by one. Every frame is a pure function
+of the frame number (no CSS animation, no randomness).
 Run it with `npm run render -- --plan plan.json --video normalized.mp4 --out out.mp4` in `render/`
 (`REMOTION_BROWSER` selects a Chromium). See ADRs [0601](decisions/0601-render-architecture.md) to
-[0604](decisions/0604-render-cli-and-browser.md).
+[0606](decisions/0606-zoom-about-the-face.md).
 
 **API.** `uvicorn api.main:app` serves a job per upload. `POST /jobs` (multipart `video`, `style`,
 `hook_strategy`) saves to `media/<job_id>/` and returns an id; a background thread runs
