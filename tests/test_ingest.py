@@ -65,3 +65,9 @@ def test_cli(tmp_path, capsys):
     assert main([str(clip), str(tmp_path / "out")]) == 0
     assert '"width": 160' in capsys.readouterr().out
     assert main([str(tmp_path / "nope.mp4"), str(tmp_path / "out")]) == 1
+
+
+def test_ingest_caps_4k_at_1920_tall(tmp_path):
+    clip = make_clip(tmp_path / "in.mp4", 11, size="3840x2160")
+    source, _, _ = ingest(clip, tmp_path / "job")
+    assert (source.width, source.height) == (3414, 1920)

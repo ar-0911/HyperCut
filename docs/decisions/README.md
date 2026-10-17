@@ -34,3 +34,4 @@ when a decision changes rather than rewriting history, and mark the old one "Sup
 | [0803](0803-client-side-plan-edits.md) | Web: hook choice and transcript edits happen in the browser | accepted |
 | [0502](0502-mediapipe-tasks-api.md) | Face detection uses the MediaPipe Tasks API | accepted |
 | [0503](0503-reframe-hard-cuts.md) | The crop jumps at hard cuts instead of easing | accepted |
+| [0103](0103-cap-normalized-height.md) | Ingest caps the normalized video at 1920 pixels tall | accepted |
