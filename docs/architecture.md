@@ -76,6 +76,8 @@ transcription (ADR 0101). `Source` is probed from the normalized file. Manual ru
 `HYPERCUT_TRANSCRIBE=deepgram` and `DEEPGRAM_API_KEY`. Also writes an SRT for platforms that want one.
 Entry point: `transcribe(wav_path, backend=None) -> Transcript`; `to_srt(transcript)` groups words into short
 lines; `python -m hypercut.transcribe audio.wav --out transcript.json --srt captions.srt` runs it by hand.
+The Whisper backend reads ingest's wav itself and passes faster-whisper the samples, which sidesteps a
+PyAV incompatibility (ADR 0203).
 The Whisper model comes from `HYPERCUT_WHISPER_MODEL` (default `small`). Both backends go through one cleanup
 step so word timings are always ordered with `end > start`. See [ADR 0201](decisions/0201-backend-selection-and-word-cleanup.md)
 and [ADR 0202](decisions/0202-srt-line-grouping.md).
