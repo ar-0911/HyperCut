@@ -32,3 +32,5 @@ when a decision changes rather than rewriting history, and mark the old one "Sup
 | [0801](0801-nextjs-app-and-shared-composition.md) | Web: Next.js client app that imports the render composition | accepted |
 | [0802](0802-polling-and-api-contract.md) | Web: polling, and how the browser uses the job API | accepted |
 | [0803](0803-client-side-plan-edits.md) | Web: hook choice and transcript edits happen in the browser | accepted |
+| [0502](0502-mediapipe-tasks-api.md) | Face detection uses the MediaPipe Tasks API | accepted |
+| [0503](0503-reframe-hard-cuts.md) | The crop jumps at hard cuts instead of easing | accepted |

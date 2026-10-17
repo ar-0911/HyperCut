@@ -105,7 +105,10 @@ place; `trim` starts at the hook. See ADR 0401.
 frame. The track is smoothed (exponential, with a dead zone so the crop ignores small movements), clamped so the
 full-height 9:16 window stays inside the frame, and stored as normalized crop-center keyframes (`cy` is always
 0.5). No face, or an already-vertical source, means empty keys (center crop). The detector is an injectable
-function so tests need no mediapipe. The renderer also uses the track to keep graphics off the face. See
+function so tests need no mediapipe. Detection uses the MediaPipe Tasks face detector, whose model is fetched
+once into `~/.cache/hypercut` (decision 0502). Hard cuts between shots are found from colour-histogram jumps
+between samples, and at a cut the crop snaps to the new shot's speaker instead of easing (decision 0503), so
+montages of several speakers stay framed. The renderer also uses the track to keep graphics off the face. See
 decision 0501.
 
 **Render.** A Remotion composition (`HyperCut`, props `{plan, videoSrc}`) draws, per output frame: the

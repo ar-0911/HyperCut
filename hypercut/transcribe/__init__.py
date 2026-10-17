@@ -71,7 +71,13 @@ def _load_whisper_model(name: str):
         from faster_whisper import WhisperModel
     except ImportError as e:
         raise TranscribeError("faster-whisper is not installed: pip install 'hypercut[whisper]'") from e
-    return WhisperModel(name, device="auto", compute_type="auto")
+    try:
+        return WhisperModel(name, device="auto", compute_type="auto")
+    except Exception as e:  # first run downloads the model from the Hugging Face Hub
+        raise TranscribeError(
+            f"could not load Whisper model {name!r}: {e}. The first run downloads it from huggingface.co; "
+            "allow that host, pre-download the model, or set HYPERCUT_TRANSCRIBE=deepgram"
+        ) from e
 
 
 def _whisper(path: Path) -> tuple[str, list[dict]]:
