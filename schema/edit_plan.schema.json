@@ -1,0 +1,675 @@
+{
+  "$defs": {
+    "Camera": {
+      "additionalProperties": false,
+      "properties": {
+        "zoom_frequency": {
+          "default": "medium",
+          "enum": [
+            "none",
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Zoom Frequency",
+          "type": "string"
+        },
+        "zoom_scale": {
+          "default": 1.15,
+          "maximum": 2,
+          "minimum": 1,
+          "title": "Zoom Scale",
+          "type": "number"
+        }
+      },
+      "title": "Camera",
+      "type": "object"
+    },
+    "CaptionStyle": {
+      "additionalProperties": false,
+      "properties": {
+        "font": {
+          "default": "Montserrat",
+          "title": "Font",
+          "type": "string"
+        },
+        "weight": {
+          "default": 800,
+          "title": "Weight",
+          "type": "integer"
+        },
+        "size": {
+          "default": 72,
+          "title": "Size",
+          "type": "integer"
+        },
+        "color": {
+          "default": "#FFFFFF",
+          "title": "Color",
+          "type": "string"
+        },
+        "highlight_color": {
+          "default": "#FFE600",
+          "title": "Highlight Color",
+          "type": "string"
+        },
+        "stroke_color": {
+          "default": "#000000",
+          "title": "Stroke Color",
+          "type": "string"
+        },
+        "stroke_width": {
+          "default": 6,
+          "title": "Stroke Width",
+          "type": "integer"
+        },
+        "uppercase": {
+          "default": true,
+          "title": "Uppercase",
+          "type": "boolean"
+        },
+        "position": {
+          "default": "bottom",
+          "enum": [
+            "top",
+            "middle",
+            "bottom"
+          ],
+          "title": "Position",
+          "type": "string"
+        },
+        "words_per_line": {
+          "default": 3,
+          "maximum": 8,
+          "minimum": 1,
+          "title": "Words Per Line",
+          "type": "integer"
+        },
+        "animation": {
+          "default": "pop",
+          "enum": [
+            "karaoke",
+            "pop",
+            "typewriter",
+            "bounce"
+          ],
+          "title": "Animation",
+          "type": "string"
+        }
+      },
+      "title": "CaptionStyle",
+      "type": "object"
+    },
+    "Graphic": {
+      "additionalProperties": false,
+      "properties": {
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "number"
+        },
+        "end": {
+          "exclusiveMinimum": 0,
+          "title": "End",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "kinetic_text",
+            "stat_card",
+            "emoji_burst",
+            "list_build",
+            "lower_third",
+            "progress_bar"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "props": {
+          "additionalProperties": true,
+          "default": {},
+          "title": "Props",
+          "type": "object"
+        },
+        "anchor": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "top",
+            "center",
+            "bottom"
+          ],
+          "title": "Anchor",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start",
+        "end",
+        "id",
+        "type"
+      ],
+      "title": "Graphic",
+      "type": "object"
+    },
+    "GraphicsStyle": {
+      "additionalProperties": false,
+      "properties": {
+        "density": {
+          "default": "balanced",
+          "enum": [
+            "minimal",
+            "balanced",
+            "heavy"
+          ],
+          "title": "Density",
+          "type": "string"
+        },
+        "theme": {
+          "default": "bold",
+          "enum": [
+            "clean",
+            "bold",
+            "playful",
+            "cinematic"
+          ],
+          "title": "Theme",
+          "type": "string"
+        },
+        "accent_color": {
+          "default": "#FFE600",
+          "title": "Accent Color",
+          "type": "string"
+        }
+      },
+      "title": "GraphicsStyle",
+      "type": "object"
+    },
+    "Hook": {
+      "additionalProperties": false,
+      "properties": {
+        "strategy": {
+          "default": "cold_open",
+          "enum": [
+            "cold_open",
+            "trim"
+          ],
+          "title": "Strategy",
+          "type": "string"
+        },
+        "chosen": {
+          "default": 0,
+          "title": "Chosen",
+          "type": "integer"
+        },
+        "candidates": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/HookCandidate"
+          },
+          "title": "Candidates",
+          "type": "array"
+        }
+      },
+      "title": "Hook",
+      "type": "object"
+    },
+    "HookCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "number"
+        },
+        "end": {
+          "exclusiveMinimum": 0,
+          "title": "End",
+          "type": "number"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "score": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Score",
+          "type": "number"
+        },
+        "why": {
+          "default": "",
+          "title": "Why",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start",
+        "end",
+        "text",
+        "score"
+      ],
+      "title": "HookCandidate",
+      "type": "object"
+    },
+    "Output": {
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "default": 1080,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "default": 1920,
+          "title": "Height",
+          "type": "integer"
+        },
+        "fps": {
+          "default": 30,
+          "title": "Fps",
+          "type": "number"
+        }
+      },
+      "title": "Output",
+      "type": "object"
+    },
+    "Pacing": {
+      "additionalProperties": false,
+      "properties": {
+        "remove_fillers": {
+          "default": true,
+          "title": "Remove Fillers",
+          "type": "boolean"
+        },
+        "max_silence": {
+          "default": 0.35,
+          "minimum": 0,
+          "title": "Max Silence",
+          "type": "number"
+        }
+      },
+      "title": "Pacing",
+      "type": "object"
+    },
+    "Reframe": {
+      "additionalProperties": false,
+      "properties": {
+        "keys": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ReframeKey"
+          },
+          "title": "Keys",
+          "type": "array"
+        }
+      },
+      "title": "Reframe",
+      "type": "object"
+    },
+    "ReframeKey": {
+      "additionalProperties": false,
+      "properties": {
+        "t": {
+          "minimum": 0,
+          "title": "T",
+          "type": "number"
+        },
+        "cx": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Cx",
+          "type": "number"
+        },
+        "cy": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Cy",
+          "type": "number"
+        }
+      },
+      "required": [
+        "t",
+        "cx",
+        "cy"
+      ],
+      "title": "ReframeKey",
+      "type": "object"
+    },
+    "Segment": {
+      "additionalProperties": false,
+      "description": "A piece of source video kept in the output. Played in list order.",
+      "properties": {
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "number"
+        },
+        "end": {
+          "exclusiveMinimum": 0,
+          "title": "End",
+          "type": "number"
+        },
+        "reason": {
+          "default": "body",
+          "enum": [
+            "hook",
+            "body"
+          ],
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "Segment",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "fps": {
+          "exclusiveMinimum": 0,
+          "title": "Fps",
+          "type": "number"
+        },
+        "duration": {
+          "exclusiveMinimum": 0,
+          "title": "Duration",
+          "type": "number"
+        }
+      },
+      "required": [
+        "path",
+        "width",
+        "height",
+        "fps",
+        "duration"
+      ],
+      "title": "Source",
+      "type": "object"
+    },
+    "Style": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "default": "bold_creator",
+          "title": "Name",
+          "type": "string"
+        },
+        "caption": {
+          "$ref": "#/$defs/CaptionStyle",
+          "default": {
+            "font": "Montserrat",
+            "weight": 800,
+            "size": 72,
+            "color": "#FFFFFF",
+            "highlight_color": "#FFE600",
+            "stroke_color": "#000000",
+            "stroke_width": 6,
+            "uppercase": true,
+            "position": "bottom",
+            "words_per_line": 3,
+            "animation": "pop"
+          }
+        },
+        "graphics": {
+          "$ref": "#/$defs/GraphicsStyle",
+          "default": {
+            "density": "balanced",
+            "theme": "bold",
+            "accent_color": "#FFE600"
+          }
+        },
+        "pacing": {
+          "$ref": "#/$defs/Pacing",
+          "default": {
+            "remove_fillers": true,
+            "max_silence": 0.35
+          }
+        },
+        "camera": {
+          "$ref": "#/$defs/Camera",
+          "default": {
+            "zoom_frequency": "medium",
+            "zoom_scale": 1.15
+          }
+        }
+      },
+      "title": "Style",
+      "type": "object"
+    },
+    "Transcript": {
+      "additionalProperties": false,
+      "properties": {
+        "language": {
+          "default": "en",
+          "title": "Language",
+          "type": "string"
+        },
+        "words": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Word"
+          },
+          "title": "Words",
+          "type": "array"
+        }
+      },
+      "title": "Transcript",
+      "type": "object"
+    },
+    "Word": {
+      "additionalProperties": false,
+      "properties": {
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "number"
+        },
+        "end": {
+          "exclusiveMinimum": 0,
+          "title": "End",
+          "type": "number"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "speaker": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Speaker"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        }
+      },
+      "required": [
+        "start",
+        "end",
+        "text"
+      ],
+      "title": "Word",
+      "type": "object"
+    },
+    "Zoom": {
+      "additionalProperties": false,
+      "properties": {
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "number"
+        },
+        "end": {
+          "exclusiveMinimum": 0,
+          "title": "End",
+          "type": "number"
+        },
+        "scale": {
+          "default": 1.15,
+          "maximum": 2,
+          "minimum": 1,
+          "title": "Scale",
+          "type": "number"
+        },
+        "ease": {
+          "default": "ease_in_out",
+          "enum": [
+            "linear",
+            "ease_in_out",
+            "snap"
+          ],
+          "title": "Ease",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "Zoom",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1,
+      "default": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "source": {
+      "$ref": "#/$defs/Source"
+    },
+    "output": {
+      "$ref": "#/$defs/Output",
+      "default": {
+        "width": 1080,
+        "height": 1920,
+        "fps": 30.0
+      }
+    },
+    "transcript": {
+      "$ref": "#/$defs/Transcript",
+      "default": {
+        "language": "en",
+        "words": []
+      }
+    },
+    "hook": {
+      "$ref": "#/$defs/Hook",
+      "default": {
+        "strategy": "cold_open",
+        "chosen": 0,
+        "candidates": []
+      }
+    },
+    "segments": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Segment"
+      },
+      "title": "Segments",
+      "type": "array"
+    },
+    "graphics": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Graphic"
+      },
+      "title": "Graphics",
+      "type": "array"
+    },
+    "zooms": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Zoom"
+      },
+      "title": "Zooms",
+      "type": "array"
+    },
+    "reframe": {
+      "$ref": "#/$defs/Reframe",
+      "default": {
+        "keys": []
+      }
+    },
+    "style": {
+      "$ref": "#/$defs/Style",
+      "default": {
+        "name": "bold_creator",
+        "caption": {
+          "animation": "pop",
+          "color": "#FFFFFF",
+          "font": "Montserrat",
+          "highlight_color": "#FFE600",
+          "position": "bottom",
+          "size": 72,
+          "stroke_color": "#000000",
+          "stroke_width": 6,
+          "uppercase": true,
+          "weight": 800,
+          "words_per_line": 3
+        },
+        "graphics": {
+          "accent_color": "#FFE600",
+          "density": "balanced",
+          "theme": "bold"
+        },
+        "pacing": {
+          "max_silence": 0.35,
+          "remove_fillers": true
+        },
+        "camera": {
+          "zoom_frequency": "medium",
+          "zoom_scale": 1.15
+        }
+      }
+    }
+  },
+  "required": [
+    "source"
+  ],
+  "title": "EditPlan",
+  "type": "object"
+}
