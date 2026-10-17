@@ -1,0 +1,159 @@
+from pathlib import Path
+
+import pytest
+
+from hypercut import llm, plan
+from hypercut.analyze import analyze
+from hypercut.analyze import cuts
+from hypercut.plan import Style, Transcript, Word
+
+SAMPLE = Path(__file__).resolve().parent.parent / "schema" / "examples" / "sample_plan.json"
+
+
+@pytest.fixture
+def sample():
+    return plan.load(SAMPLE)
+
+
+@pytest.fixture
+def fake_llm(monkeypatch):
+    calls = []
+
+    def install(answer):
+        def ask_json(prompt, system="", timeout=300):
+            calls.append(prompt)
+            return answer
+
+        monkeypatch.setattr(llm, "ask_json", ask_json)
+        return calls
+
+    return install
+
+
+GOOD = {
+    "hooks": [
+        {"start_word": 7, "end_word": 11, "score": 0.6, "why": "payoff tease"},
+        {"start_word": 0, "end_word": 6, "score": 0.9, "why": "surprising number"},
+    ],
+    "graphics": [{"type": "stat_card", "start": 1.1, "end": 2.2, "props": {"value": "10"}}],
+    "zooms": [{"start": 6.0, "end": 7.3, "ease": "snap"}],
+}
+
+
+def run(sample, **kw):
+    return analyze(sample.transcript, sample.source, kw.pop("style", Style()), **kw)
+
+
+def test_cold_open_puts_hook_first_and_keeps_it_in_place(sample, fake_llm):
+    calls = fake_llm(GOOD)
+    p = run(sample)
+    assert len(calls) == 1
+    assert [c.score for c in p.hook.candidates] == [0.9, 0.6]
+    assert p.hook.chosen == 0
+    assert p.hook.candidates[0].text == "Most people waste ten hours a week."
+    assert p.segments[0].reason == "hook"
+    assert (p.segments[0].start, p.segments[0].end) == (0.2, 2.2)
+    bodies = [s for s in p.segments if s.reason == "body"]
+    assert bodies[0].start < 0.3 and bodies[0].end > 2.0  # hook words also in original place
+    assert p.graphics[0].id == "g1" and p.zooms[0].ease == "snap"
+    plan.EditPlan.model_validate(p.model_dump())
+
+
+def test_gap_longer_than_max_silence_is_cut(sample, fake_llm):
+    fake_llm(GOOD)
+    p = run(sample)
+    bodies = [s for s in p.segments if s.reason == "body"]
+    # 2.2s -> 6.0s is dead air: nothing kept in the middle of it
+    assert all(not (s.start < 5.0 and s.end > 3.0) for s in bodies)
+    assert bodies[-1].end < 7.5  # trailing silence after last word dropped
+
+
+def test_trim_drops_everything_before_hook(sample, fake_llm):
+    fake_llm({**GOOD, "hooks": [{"start_word": 7, "end_word": 11, "score": 0.9}]})
+    p = run(sample, strategy="trim")
+    assert p.hook.strategy == "trim"
+    assert all(s.reason == "body" for s in p.segments)
+    assert p.segments[0].start == pytest.approx(6.0)
+
+
+def test_fillers_are_cut(fake_llm):
+    words = [
+        Word(text="So", start=0.0, end=0.3),
+        Word(text="um,", start=0.3, end=0.7),
+        Word(text="this", start=0.7, end=1.0),
+        Word(text="works.", start=1.0, end=1.5),
+    ]
+    fake_llm({"hooks": [], "graphics": [], "zooms": []})
+    src = plan.Source(path="x.mp4", width=10, height=10, fps=30, duration=1.5)
+    p = analyze(Transcript(words=words), src, Style())
+    assert [(s.start, s.end) for s in p.segments] == [(0.0, 0.3), (0.7, 1.5)]
+    p = analyze(Transcript(words=words), src, Style(pacing=plan.Pacing(remove_fillers=False)))
+    assert [(s.start, s.end) for s in p.segments] == [(0.0, 1.5)]
+
+
+def test_invalid_claude_items_are_dropped(sample, fake_llm):
+    fake_llm({
+        "hooks": [
+            {"start_word": 0, "end_word": 99, "score": 0.5},
+            {"start_word": 5, "end_word": 2, "score": 0.5},
+            "nonsense",
+            {"start_word": 0, "end_word": 6, "score": 7},
+        ],
+        "graphics": [
+            {"type": "hologram", "start": 1, "end": 2},
+            {"type": "kinetic_text", "start": 11, "end": 20},
+            {"type": "kinetic_text", "start": "a", "end": 2},
+            {"type": "emoji_burst", "start": 3, "end": 3.1},
+            {"type": "kinetic_text", "start": 1, "end": 2, "props": "bad"},
+        ],
+        "zooms": [{"start": -1, "end": 2}, {"start": 5, "end": 99}, None, {"start": 1, "end": 2, "ease": "wobble"}],
+    })
+    p = run(sample)
+    assert len(p.hook.candidates) == 1 and p.hook.candidates[0].score == 1.0
+    assert [(g.type, g.props) for g in p.graphics] == [("kinetic_text", {})]
+    assert [(z.start, z.ease) for z in p.zooms] == [(1.0, "ease_in_out")]
+
+
+def test_density_and_zoom_frequency_cap_counts(sample, fake_llm):
+    many = [{"type": "emoji_burst", "start": float(i), "end": i + 0.5} for i in range(10)]
+    zooms = [{"start": float(i), "end": i + 0.5} for i in range(10)]
+    fake_llm({"hooks": [], "graphics": many, "zooms": zooms})
+    style = Style(
+        graphics=plan.GraphicsStyle(density="minimal"),
+        camera=plan.Camera(zoom_frequency="low", zoom_scale=1.3),
+    )
+    p = run(sample, style=style)  # 12 s of video
+    assert len(p.graphics) == 1 and len(p.zooms) == 1
+    assert p.zooms[0].scale == 1.3
+    p = run(sample, style=Style(camera=plan.Camera(zoom_frequency="none")))
+    assert p.zooms == []
+
+
+def test_no_hook_still_produces_segments(sample, fake_llm):
+    fake_llm({})
+    p = run(sample)
+    assert p.hook.candidates == []
+    assert p.segments and all(s.reason == "body" for s in p.segments)
+
+
+def test_empty_transcript_skips_claude(sample, fake_llm):
+    calls = fake_llm(GOOD)
+    p = analyze(Transcript(), sample.source, Style())
+    assert calls == [] and p.segments == []
+
+
+def test_unknown_strategy(sample):
+    with pytest.raises(ValueError):
+        run(sample, strategy="loop")
+
+
+def test_silencedetect_cuts_extra_silence(sample, monkeypatch, fake_llm):
+    fake_llm({})
+    monkeypatch.setattr(cuts, "detect_silences", lambda wav, d: [(0.9, 1.5)])
+    p = run(sample, audio_wav="x.wav")
+    assert any(abs(s.end - 0.98) < 1e-6 for s in p.segments)
+
+
+def test_cut_helpers():
+    assert cuts.is_filler("Um,") and not cuts.is_filler("umbrella")
+    assert cuts.subtract((0, 10), [(2, 3), (3, 5)]) == [(0, 2), (5, 10)]

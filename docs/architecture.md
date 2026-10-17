@@ -88,16 +88,18 @@ are deep-merged onto the preset. Invalid output is retried once, then the preset
 prompt returns `bold_creator` with no Claude call. API: `get_preset(name)`, `style_from_prompt(prompt)`,
 CLI `python -m hypercut.style "prompt"` (see decision 0301).
 
-**Analyze.** One Claude call reads the timed transcript and the style and returns, as JSON:
-- up to three hook candidates, each a span with a score and a reason (bold claim, surprising number,
-  question, conflict, payoff tease);
-- filler words and dead air to cut (also detected deterministically from word gaps and FFmpeg
-  `silencedetect`, so cuts don't depend on the model alone);
+**Analyze.** `analyze(transcript, source, style, audio_wav=None, strategy="cold_open")`. One Claude call
+gets the transcript as `index time word` lines and the style, and returns as JSON:
+- up to three hook candidates as word-index spans with a score and a reason (bold claim, surprising number,
+  question, conflict, payoff tease); code converts them to times and text;
 - graphics: each a span, a template type (`kinetic_text`, `stat_card`, `emoji_burst`, `list_build`,
-  `lower_third`, `progress_bar`) and its props, with density capped by the style;
-- punch-in zooms on emphasis and topic changes.
+  `lower_third`, `progress_bar`) and its props, capped per minute by `style.graphics.density`;
+- punch-in zooms on emphasis and topic changes, capped per minute by `style.camera.zoom_frequency`.
 
-Code then assembles `segments` from the chosen hook strategy and the cuts.
+Every item is validated against the source duration and dropped if invalid. Cuts never involve Claude:
+filler words and gaps over `style.pacing.max_silence` come from word timings (plus FFmpeg `silencedetect`
+when the wav is given). Code then assembles `segments`: `cold_open` puts the hook first and keeps it in
+place; `trim` starts at the hook. See ADR 0401.
 
 **Reframe.** `reframe(video, source)` samples ~5 frames/s with OpenCV and takes the largest MediaPipe face per
 frame. The track is smoothed (exponential, with a dead zone so the crop ignores small movements), clamped so the
