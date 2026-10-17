@@ -1,0 +1,28 @@
+{
+  "name": "hypercut-render",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Remotion project that renders a HyperCut edit plan to a 1080x1920 mp4",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "tsx scripts/render.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.250",
+    "@remotion/cli": "4.0.250",
+    "@remotion/renderer": "4.0.250",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.250"
+  },
+  "devDependencies": {
+    "@types/node": "22.9.0",
+    "@types/react": "18.3.12",
+    "tsx": "4.19.2",
+    "typescript": "5.6.3",
+    "vitest": "2.1.8"
+  }
+}

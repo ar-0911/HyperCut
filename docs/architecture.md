@@ -106,9 +106,17 @@ full-height 9:16 window stays inside the frame, and stored as normalized crop-ce
 function so tests need no mediapipe. The renderer also uses the track to keep graphics off the face. See
 decision 0501.
 
-**Render.** A Remotion composition takes `plan.json` and the normalized video and draws, per output frame:
-the cropped and zoomed source frame, the caption group for the current words (styled and animated by
-`Style.caption`), and any active graphic templates. Output is 1080x1920, 30 fps H.264.
+**Render.** A Remotion composition (`HyperCut`, props `{plan, videoSrc}`) draws, per output frame: the
+cropped and zoomed source frame, the caption line for the current words (styled and animated by
+`Style.caption`), and any active graphic templates. Output is 1080x1920, 30 fps H.264, with size, fps and
+length taken from the plan. The video layer is one Remotion sequence per segment; overlays are driven by the
+*source* time of the current frame, so the cold-open hook shows its captions and graphics both times it plays
+and cut material shows nothing. The logic is in pure, unit-tested modules (`timing.ts`, `layout.ts`,
+`captions.ts`). Crop follows the interpolated reframe keys (center crop without them); zooms scale about the
+frame center; graphics take one of three vertical bands chosen to stay clear of the face and the captions.
+Run it with `npm run render -- --plan plan.json --video normalized.mp4 --out out.mp4` in `render/`
+(`REMOTION_BROWSER` selects a Chromium). See ADRs [0601](decisions/0601-render-architecture.md) to
+[0604](decisions/0604-render-cli-and-browser.md).
 
 ## Claude calls
 
