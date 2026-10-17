@@ -88,9 +88,12 @@ schema so a bad answer can never reach the renderer.
 
 Code then assembles `segments` from the chosen hook strategy and the cuts.
 
-**Reframe.** MediaPipe finds the face every few frames; the track is smoothed so the crop glides instead of
-jittering, and stored as normalized crop-center keyframes. No face found means a center crop. The renderer
-also uses the track to keep graphics off the face.
+**Reframe.** `reframe(video, source)` samples ~5 frames/s with OpenCV and takes the largest MediaPipe face per
+frame. The track is smoothed (exponential, with a dead zone so the crop ignores small movements), clamped so the
+full-height 9:16 window stays inside the frame, and stored as normalized crop-center keyframes (`cy` is always
+0.5). No face, or an already-vertical source, means empty keys (center crop). The detector is an injectable
+function so tests need no mediapipe. The renderer also uses the track to keep graphics off the face. See
+decision 0501.
 
 **Render.** A Remotion composition takes `plan.json` and the normalized video and draws, per output frame:
 the cropped and zoomed source frame, the caption group for the current words (styled and animated by
