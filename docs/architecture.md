@@ -75,7 +75,10 @@ footage breaks frame-accurate rendering) and extracts 16 kHz mono audio for tran
 **Style.** Six named presets (for example `bold_creator`, `clean_corporate`, `playful`, `cinematic`,
 `minimal`, `podcast`) give a good result with an empty prompt. A prompt is turned into a `Style` by Claude,
 starting from the closest preset and changing only what the prompt asks for, then validated against the
-schema so a bad answer can never reach the renderer.
+schema so a bad answer can never reach the renderer. Claude answers `{"preset", "changes"}`; the changes
+are deep-merged onto the preset. Invalid output is retried once, then the preset is used as is. An empty
+prompt returns `bold_creator` with no Claude call. API: `get_preset(name)`, `style_from_prompt(prompt)`,
+CLI `python -m hypercut.style "prompt"` (see decision 0301).
 
 **Analyze.** One Claude call reads the timed transcript and the style and returns, as JSON:
 - up to three hook candidates, each a span with a score and a reason (bold claim, surprising number,
