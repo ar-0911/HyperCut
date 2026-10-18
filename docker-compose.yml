@@ -1,0 +1,30 @@
+# Run HyperCut on your own machine: `docker compose up`, then open http://localhost:3000.
+# Settings come from .env (copy .env.example). Everything stays on this machine; see README.md.
+services:
+  api:
+    build: .
+    image: hypercut:local
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      HYPERCUT_MEDIA: /app/media
+    volumes:
+      - ./media:/app/media              # uploads and finished reels, visible on your disk
+      - hypercut-cache:/home/ubuntu/.cache # Whisper and MediaPipe models, downloaded once
+    ports:
+      - "127.0.0.1:8000:8000"           # only this computer can reach it
+    restart: unless-stopped
+
+  web:
+    build: .          # same image as api; the second build is all cache
+    image: hypercut:local
+    depends_on: [api]
+    command: npm --prefix web run start
+    ports:
+      - "127.0.0.1:3000:3000"
+    restart: unless-stopped
+
+volumes:
+  hypercut-cache:

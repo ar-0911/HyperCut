@@ -245,8 +245,12 @@ render/          Remotion project (TypeScript)
 api/             FastAPI job server
 web/             Next.js app
 media/           uploads and outputs, git-ignored
-docs/            this file and the decision records
+docs/            this file, the decision records, hosting-plan.md
+Dockerfile, docker-compose.yml, .env.example   one-command local run (ADR 0015)
 ```
+
+Deployment: everything runs on the user's own computer, normally with `docker compose up` (the README has
+the steps and every setting). Options for hosting it for other people are in [hosting-plan.md](hosting-plan.md).
 
 ## Cost
 

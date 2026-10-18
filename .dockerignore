@@ -1,0 +1,10 @@
+.git
+.venv
+**/node_modules
+**/__pycache__
+**/*.egg-info
+media
+out
+dist
+web/.next
+.env
