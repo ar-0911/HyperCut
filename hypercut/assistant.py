@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -27,6 +28,7 @@ from hypercut.plan import EditPlan
 
 TEXT_TYPES = ("kinetic_text", "stat_card", "list_build", "lower_third", "emoji_burst")
 MODES = ("speaker", "split", "visual")
+BACKGROUND_KINDS = ("original", "blur", "dim", "color", "gradient", "media")
 MAX_OPS = 20
 MAX_ADD_SECONDS = 8.0
 
@@ -48,6 +50,10 @@ visual = the visual fills the frame while the speaker keeps talking):
 
 Zooms:
 {zooms}
+
+Green-screen effects (speaker cut out of the frame): {depth}
+Background stretches:
+{backgrounds}
 
 Imported files the user uploaded (use with add_media):
 {assets}
@@ -76,11 +82,16 @@ lower_third {{"title","subtitle"}}; emoji_burst {{"emoji"}}
 "words_per_line"|"animation": value}}}}  fonts: {fonts}
 - {{"op": "pacing", "speed": 0.7-1.3, "keep_pause": 0.08 (tight) | 0.15 (natural) | 0.3 (relaxed)}}  slow down or \
 speed up the whole reel; keep_pause is how much pause stays around each cut (re-cuts the video)
+- {{"op": "behind_text", "start": s, "end": e, "text": "1-3 words"}}  a big title BEHIND the speaker's head (green-screen look; turns the effects on and keeps the speaker full frame there)
+- {{"op": "layer", "key": "g1", "layer": "behind" | "front"}}  put a graphic behind the speaker or back in front
+- {{"op": "background", "kind": "original" | "blur" | "dim" | "color" | "gradient" | "media", "start": s, "end": e, "color": "#RRGGBB", "asset": "<file name, for media>", "parallax": 0-1}}  change what is behind the speaker (turns the effects on); without start/end it applies to the whole reel; parallax drifts a replaced background for a 3D feel
+- {{"op": "depth", "enabled": false}}  turn all green-screen effects off
 - {{"op": "transitions", "style": "hard" | "smooth" | "zoom", "fade_out": seconds}}  hard cuts, short crossfades, \
 or alternating punch-ins at cuts; fade to black at the end
 
 A new visual (illustration, footage, big text, stat card, list) replaces any visual already in that stretch.
-Use only what the request asks for. "From X to Y" means start X, end Y. If a time is not given, use the
+Use only what the request asks for; green-screen ops only when the user asks for something behind them,
+a different background, or a depth/3D/green-screen look. "From X to Y" means start X, end Y. If a time is not given, use the
 playhead. If the request is unclear or impossible, return no operations and say why in "message".
 Return {{"message": "<one short sentence for the user>", "ops": [...]}}"""
 
@@ -104,9 +115,12 @@ def _detail(props: dict) -> str:
 
 def summarize(plan: EditPlan, assets: list[dict]) -> dict[str, str]:
     items = [
-        f"{g.id}: {g.type}, {_fmt(edit.first_reel(plan, g.start, g.end))}, {_detail(g.props)}"
+        f"{g.id}: {g.type}{' (behind the speaker)' if g.layer == 'behind' else ''}, "
+        f"{_fmt(edit.first_reel(plan, g.start, g.end))}, {_detail(g.props)}"
         for g in plan.graphics
     ]
+    depth = plan.style.depth
+    backgrounds = [f"bg{i}: {b.kind}, {_fmt(edit.first_reel(plan, b.start, b.end))}" for i, b in enumerate(plan.backgrounds)]
     layout = [f"l{i}: {s.mode}, {_fmt(edit.first_reel(plan, s.start, s.end))}" for i, s in enumerate(plan.layout)]
     zooms = [f"z{i}: x{z.scale}, {_fmt(edit.first_reel(plan, z.start, z.end))}" for i, z in enumerate(plan.zooms)]
     lines, line, line_t = [], [], None
@@ -131,6 +145,8 @@ def summarize(plan: EditPlan, assets: list[dict]) -> dict[str, str]:
         "items": "\n".join(items) or "(none)",
         "layout": "\n".join(layout) or "(speaker throughout)",
         "zooms": "\n".join(zooms) or "(none)",
+        "depth": f"on, default background {depth.background}" if depth.enabled else "off",
+        "backgrounds": "\n".join(backgrounds) or "(none)",
         "assets": "\n".join(asset_lines) or "(none)",
         "captions": "\n".join(captions) or "(none)",
     }
@@ -168,6 +184,7 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
     by_key: dict[str, Any] = {g.id: g for g in plan.graphics}
     by_key.update({f"z{i}": z for i, z in enumerate(plan.zooms)})
     by_key.update({f"l{i}": s for i, s in enumerate(plan.layout)})
+    by_key.update({f"bg{i}": b for i, b in enumerate(plan.backgrounds)})
 
     def span_of(op: dict, default_len: float = 3.0, cap: float | None = None) -> tuple[float, float] | None:
         r = _reel_span(op, duration, playhead, default_len)
@@ -250,6 +267,45 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
             if pause is not None and abs(pause - plan.style.pacing.keep_pause) > 1e-6:
                 plan.style.pacing.keep_pause = min(1.0, max(0.0, pause))
                 recut = True
+        elif kind == "behind_text" and str(op.get("text") or "").strip():
+            span = span_of(op, 2.5, MAX_ADD_SECONDS)
+            if span:
+                text = " ".join(str(op["text"]).split()[:3])[:24]
+                g = edit.add_graphic(plan, "kinetic_text", *span, {"text": text}, prefix="b")
+                g.layer = "behind"
+                edit.set_layout(plan, *span, "speaker")
+                plan.style.depth.enabled = True
+                changes.append(f"Added {text!r} behind the speaker as {g.id}")
+        elif kind == "layer" and isinstance(by_key.get(op.get("key")), plan_mod.Graphic) and op.get("layer") in ("front", "behind"):
+            g = by_key[op["key"]]
+            g.layer = op["layer"]
+            if g.layer == "behind":
+                plan.style.depth.enabled = True
+            changes.append(f"Moved {g.id} {'behind the speaker' if g.layer == 'behind' else 'to the front'}")
+        elif kind == "background" and op.get("kind") in BACKGROUND_KINDS:
+            src = None
+            if op["kind"] == "media":
+                a = asset_by_name.get(op.get("asset"))
+                if a is None:
+                    continue
+                src = a["name"]
+            color = op.get("color") if isinstance(op.get("color"), str) and re.fullmatch(r"#[0-9A-Fa-f]{6}", op["color"]) else None
+            parallax = min(1.0, max(0.0, _num(op.get("parallax")) or 0.0))
+            plan.style.depth.enabled = True
+            if op.get("start") is None and op.get("end") is None and src is None and color is None and not parallax:
+                plan.style.depth.background = op["kind"]
+                plan.backgrounds = []
+                changes.append(f"Background: {op['kind']} throughout")
+            else:
+                full = op.get("start") is None and op.get("end") is None
+                span = (0.0, plan.source.duration) if full else span_of(op, 3.0)
+                if span:
+                    edit.set_background(plan, *span, plan_mod.BackgroundSpan(
+                        start=span[0], end=span[1], kind=op["kind"], color=color, src=src, parallax=parallax))
+                    changes.append(f"Background: {op['kind']}" + ("" if full else f" {_fmt(_reel_span(op, duration, playhead))}s"))
+        elif kind == "depth" and op.get("enabled") is False:
+            plan.style.depth.enabled = False
+            changes.append("Turned green-screen effects off")
         elif kind == "transitions":
             t = plan.style.transitions
             if op.get("style") in ("hard", "smooth", "zoom"):
@@ -282,6 +338,7 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
     plan.graphics = [g for g in plan.graphics if not gone(g)]
     plan.zooms = [z for z in plan.zooms if not gone(z)]
     plan.layout = [s for s in plan.layout if not gone(s)]
+    plan.backgrounds = [b for b in plan.backgrounds if not gone(b)]
 
     if recut:
         # Rebuild the cuts for the new pause before reel-time cuts, which refer to the reel as it was;

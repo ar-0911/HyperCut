@@ -6,7 +6,7 @@ from hypercut import llm
 from hypercut.analyze import cuts as cutting
 from hypercut.analyze.visuals import merge_graphics, plan_visuals
 from hypercut.plan import (
-    GENERATED_GRAPHIC_TYPES, EditPlan, Graphic, Hook, HookCandidate, Source, Style, Transcript, Zoom,
+    GENERATED_GRAPHIC_TYPES, BackgroundSpan, EditPlan, Graphic, Hook, HookCandidate, Source, Style, Transcript, Zoom,
 )
 
 MAX_HOOKS = 3
@@ -18,6 +18,8 @@ GRAPHICS_PER_MIN = {"minimal": 2, "balanced": 5, "heavy": 9}
 ZOOMS_PER_MIN = {"none": 0, "low": 2, "medium": 4, "high": 8}
 EASES = ("linear", "ease_in_out", "snap")
 ANCHORS = ("auto", "top", "center", "bottom")
+BEHIND_PER_MIN = 3  # big titles behind the speaker per minute, with green-screen effects on
+BACKGROUNDS = ("original", "blur", "dim", "gradient")
 
 SYSTEM = (
     "You are the editor of a short-form vertical video (TikTok/Reels/Shorts). "
@@ -48,6 +50,18 @@ Graphic props: kinetic_text {{"text"}}; stat_card {{"value","label"}}; emoji_bur
 list_build {{"items": [..]}}; lower_third {{"title","subtitle"}}; progress_bar {{}}.
 All times are source seconds within 0..{duration:.1f}."""
 
+# Added to the prompt only when the style asks for green-screen effects (ADR 0901).
+DEPTH_PROMPT = """
+
+Green-screen effects are on: the speaker is cut out of the frame, so things can sit behind them.
+Also return these keys in the same object:
+  "behind": [  // at most {max_behind} big titles placed BEHIND the speaker's head, for the hook and the biggest moments (a number, a bold claim); 1-3 words each, 1.5-4 s, not overlapping other graphics
+    {{"start": <s>, "end": <s>, "text": "<1-3 words>"}}
+  ],
+  "backgrounds": [  // optional stretches where the background changes, for emphasis; the rest stays "{background}"
+    {{"start": <s>, "end": <s>, "kind": "original"|"blur"|"dim"|"gradient"}}
+  ]"""
+
 
 def analyze(
     transcript: Transcript,
@@ -72,6 +86,9 @@ def analyze(
     minutes = source.duration / 60
     max_graphics = _cap(GRAPHICS_PER_MIN[style.graphics.density], minutes)
     max_zooms = _cap(ZOOMS_PER_MIN[style.camera.zoom_frequency], minutes)
+    depth = style.depth.enabled
+    max_behind = _cap(BEHIND_PER_MIN, minutes) if depth and style.depth.behind_titles else 0
+    extra = DEPTH_PROMPT.format(max_behind=max_behind, background=style.depth.background) if depth else ""
     raw = llm.ask_json(
         PROMPT.format(
             words="\n".join(f"{i} {w.start:.2f} {w.text}" for i, w in enumerate(words)),
@@ -82,7 +99,7 @@ def analyze(
             max_graphics=max_graphics,
             max_zooms=max_zooms,
             types=list(GENERATED_GRAPHIC_TYPES),
-        ),
+        ) + extra,
         system=SYSTEM,
     )
 
@@ -107,7 +124,60 @@ def analyze(
         layout, art = plan_visuals(transcript, plan.segments, source.duration, style, hook_span)
         plan.layout = layout
         plan.graphics = merge_graphics(plan.graphics, art, layout)
+    if depth:
+        plan.backgrounds = _backgrounds(raw.get("backgrounds"), source.duration)
+        plan.graphics = add_behind(plan.graphics, _behind(raw.get("behind"), source.duration, max_behind), plan.layout)
     return plan
+
+
+def _behind(items: Any, duration: float, limit: int) -> list[Graphic]:
+    """Big titles behind the speaker's head, as kinetic_text on the behind layer."""
+    out: list[Graphic] = []
+    for item in items if isinstance(items, list) else []:
+        span = _span(item, duration)
+        text = str(item.get("text") or "").strip() if isinstance(item, dict) else ""
+        if span is None or not text:
+            continue
+        start, end = span
+        out.append(Graphic(id="", type="kinetic_text", start=start, end=min(end, start + MAX_GRAPHIC_SECONDS),
+                           props={"text": " ".join(text.split()[:3])[:24]}, layer="behind"))
+    out.sort(key=lambda g: g.start)
+    kept: list[Graphic] = []
+    for g in out:
+        if not kept or g.start >= kept[-1].end:
+            kept.append(g)
+    return kept[:limit]
+
+
+def add_behind(graphics: list[Graphic], behind: list[Graphic], layout: list) -> list[Graphic]:
+    """Add behind-the-speaker titles where the speaker fills the frame (the only place they are drawn
+    behind), dropping front text graphics they overlap so the two don't fight."""
+    busy = [(s.start, s.end) for s in layout if s.mode != "speaker"]
+    overlaps = lambda a, b: a.start < b[1] and b[0] < a.end  # noqa: E731
+    titles = [g for g in behind if not any(overlaps(g, s) for s in busy)]
+    kept = [
+        g for g in graphics
+        if g.layer == "behind" or g.type not in ("kinetic_text", "stat_card")
+        or not any(overlaps(g, (t.start, t.end)) for t in titles)
+    ]
+    for i, g in enumerate(titles, 1):
+        g.id = f"b{i}"
+    return sorted(kept + titles, key=lambda g: g.start)
+
+
+def _backgrounds(items: Any, duration: float) -> list[BackgroundSpan]:
+    out: list[BackgroundSpan] = []
+    for item in items if isinstance(items, list) else []:
+        span = _span(item, duration)
+        if span is None or item.get("kind") not in BACKGROUNDS:
+            continue
+        out.append(BackgroundSpan(start=span[0], end=span[1], kind=item["kind"]))
+    out.sort(key=lambda b: b.start)
+    kept: list[BackgroundSpan] = []
+    for b in out:
+        if not kept or b.start >= kept[-1].end:
+            kept.append(b)
+    return kept
 
 
 def _cap(per_minute: int, minutes: float) -> int:

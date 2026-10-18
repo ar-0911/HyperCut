@@ -1,5 +1,71 @@
 {
   "$defs": {
+    "BackgroundSpan": {
+      "additionalProperties": false,
+      "description": "What is behind the cut-out speaker for a stretch of the source (needs `style.depth.enabled`).\n\noriginal: the real background. blur: the real background out of focus. dim: darkened, a spotlight on\nthe speaker. color / gradient: a flat colour or the style's accent glow (`color`, default the accent).\nmedia: an imported picture or clip (`src`, a file in the job folder). Outside every span the style's\n`depth.background` applies.",
+      "properties": {
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "number"
+        },
+        "end": {
+          "exclusiveMinimum": 0,
+          "title": "End",
+          "type": "number"
+        },
+        "kind": {
+          "default": "blur",
+          "enum": [
+            "original",
+            "blur",
+            "dim",
+            "color",
+            "gradient",
+            "media"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color"
+        },
+        "src": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Src"
+        },
+        "parallax": {
+          "default": 0.0,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Parallax",
+          "type": "number"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "BackgroundSpan",
+      "type": "object"
+    },
     "Camera": {
       "additionalProperties": false,
       "properties": {
@@ -101,6 +167,38 @@
       "title": "CaptionStyle",
       "type": "object"
     },
+    "Depth": {
+      "additionalProperties": false,
+      "description": "Green-screen effects: the speaker is cut out of the frame and things go behind them (ADR 0901).\n\nOff unless the user asks for it in their style prompt or in the editor.",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "True only if the user explicitly asks for a green-screen look: text or graphics behind the speaker, a removed, replaced, blurred or dimmed background, or a 3D/depth effect.",
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "background": {
+          "default": "original",
+          "enum": [
+            "original",
+            "blur",
+            "dim",
+            "color",
+            "gradient",
+            "media"
+          ],
+          "title": "Background",
+          "type": "string"
+        },
+        "behind_titles": {
+          "default": true,
+          "title": "Behind Titles",
+          "type": "boolean"
+        }
+      },
+      "title": "Depth",
+      "type": "object"
+    },
     "Graphic": {
       "additionalProperties": false,
       "properties": {
@@ -147,6 +245,15 @@
             "bottom"
           ],
           "title": "Anchor",
+          "type": "string"
+        },
+        "layer": {
+          "default": "front",
+          "enum": [
+            "front",
+            "behind"
+          ],
+          "title": "Layer",
           "type": "string"
         }
       },
@@ -514,6 +621,14 @@
             "fade_in": 0.0,
             "fade_out": 0.8
           }
+        },
+        "depth": {
+          "$ref": "#/$defs/Depth",
+          "default": {
+            "enabled": false,
+            "background": "original",
+            "behind_titles": true
+          }
         }
       },
       "title": "Style",
@@ -735,6 +850,14 @@
       "title": "Layout",
       "type": "array"
     },
+    "backgrounds": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/BackgroundSpan"
+      },
+      "title": "Backgrounds",
+      "type": "array"
+    },
     "reframe": {
       "$ref": "#/$defs/Reframe",
       "default": {
@@ -778,6 +901,11 @@
           "fade_out": 0.8,
           "length": 0.2,
           "style": "smooth"
+        },
+        "depth": {
+          "background": "original",
+          "behind_titles": true,
+          "enabled": false
         }
       }
     }

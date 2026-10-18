@@ -80,3 +80,13 @@ def test_fallback_to_default_on_errors(monkeypatch):
 def test_non_object_changes(monkeypatch):
     fake(monkeypatch, {"preset": "podcast", "changes": "none"}, {"preset": "podcast", "changes": []})
     assert style_from_prompt("x") == get_preset("podcast")
+
+
+def test_green_screen_only_when_the_prompt_asks(monkeypatch):
+    on = {"preset": "bold_creator", "changes": {"depth": {"enabled": True, "background": "blur"}}}
+    fake(monkeypatch, on, on)
+    asked = style_from_prompt("loud captions, put titles behind me and blur the background")
+    assert asked.depth.enabled and asked.depth.background == "blur"
+    # Claude turning it on for a prompt that never asked is overruled.
+    assert not style_from_prompt("loud and energetic, yellow captions").depth.enabled
+    assert not get_preset("cinematic").depth.enabled

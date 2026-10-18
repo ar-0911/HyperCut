@@ -11,6 +11,7 @@ import {
 	fileUrl,
 	getJob,
 	recutPlan,
+	requestMatte,
 	restorePlan,
 	savePlan,
 	startRender,
@@ -60,13 +61,21 @@ export default function Editor({job}: {job: Job}) {
 	const [renderError, setRenderError] = useState<string | null>(job.render_error);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
+	// The speaker cut-out behind green-screen effects: made once, when the plan first asks for them.
+	const [matte, setMatte] = useState<Job['matte']>(job.files.includes('matte.webm') ? 'done' : job.matte === 'error' ? 'error' : null);
+	const wantsMatte = Boolean(plan.style.depth?.enabled);
 	const playerRef = useRef<PlayerRef>(null);
 	const dirty = plan !== saved;
 
 	const meta = useMemo(() => calculateMetadata({props: {plan, videoSrc: ''}}), [plan]);
 	const inputProps = useMemo(
-		() => ({plan, videoSrc: fileUrl(job.id, 'normalized.mp4'), assetBase: `${API_URL}/jobs/${job.id}/files/`}),
-		[plan, job.id],
+		() => ({
+			plan,
+			videoSrc: fileUrl(job.id, 'normalized.mp4'),
+			assetBase: `${API_URL}/jobs/${job.id}/files/`,
+			matteSrc: matte === 'done' ? fileUrl(job.id, 'matte.webm') : undefined,
+		}),
+		[plan, job.id, matte],
 	);
 	const items = useMemo(() => buildItems(plan), [plan]);
 	const duration = useMemo(() => reelDuration(plan), [plan]);
@@ -100,6 +109,34 @@ export default function Editor({job}: {job: Job}) {
 		}, 2000);
 		return () => clearInterval(timer);
 	}, [render, job.id]);
+
+	// Green-screen effects turned on (style prompt, AI box): make the cut-out, then poll until it is there.
+	useEffect(() => {
+		if (!wantsMatte || matte !== null) return;
+		setMatte('running');
+		requestMatte(job.id)
+			.then((r) => setMatte(r.matte))
+			.catch((e) => {
+				setMatte('error');
+				setError((e as Error).message);
+			});
+	}, [wantsMatte, matte, job.id]);
+	useEffect(() => {
+		if (matte !== 'running') return;
+		const timer = setInterval(async () => {
+			try {
+				const next = await getJob(job.id);
+				if (next.files.includes('matte.webm')) setMatte('done');
+				else if (next.matte === 'error') {
+					setMatte('error');
+					setError(`Could not cut the speaker out: ${next.matte_error ?? 'unknown error'}`);
+				}
+			} catch (e) {
+				setError((e as Error).message);
+			}
+		}, 3000);
+		return () => clearInterval(timer);
+	}, [matte, job.id]);
 
 	// Don't lose edits by closing the tab.
 	useEffect(() => {
@@ -343,6 +380,9 @@ export default function Editor({job}: {job: Job}) {
 			</div>
 			{render === 'running' && <p className="hint">Rendering the final video takes a few minutes. Keep editing; the preview is always live.</p>}
 			{render === 'error' && <p className="error">Render failed: {renderError}</p>}
+			{wantsMatte && matte === 'running' && (
+				<p className="hint">Cutting the speaker out for the green-screen effects. The preview shows them once that is done (a few minutes).</p>
+			)}
 			{error && <p className="error">{error}</p>}
 
 			<Timeline

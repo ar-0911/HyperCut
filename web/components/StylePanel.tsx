@@ -1,7 +1,7 @@
 'use client';
 
 import {CAPTION_FONTS, captionFamily, captionWeight} from '@render/fonts';
-import type {CaptionStyle, EditPlan, TransitionStyle, Transitions} from '@render/plan';
+import type {BackgroundKind, CaptionStyle, Depth, EditPlan, TransitionStyle, Transitions} from '@render/plan';
 import {useState} from 'react';
 
 const PAUSES = [
@@ -16,7 +16,15 @@ const CUTS: {value: TransitionStyle; label: string; hint: string}[] = [
 	{value: 'zoom', label: 'Zoom cuts', hint: 'Alternating punch-in hides jump cuts'},
 ];
 
-/** Pace, cuts and caption look for the whole reel. */
+const BACKGROUNDS: {value: BackgroundKind; label: string}[] = [
+	{value: 'original', label: 'Original'},
+	{value: 'blur', label: 'Blurred'},
+	{value: 'dim', label: 'Dimmed'},
+	{value: 'gradient', label: 'Gradient'},
+	{value: 'color', label: 'Colour'},
+];
+
+/** Pace, cuts, caption look and green-screen effects for the whole reel. */
 export default function StylePanel({
 	plan,
 	onChange,
@@ -30,6 +38,8 @@ export default function StylePanel({
 	const [recutting, setRecutting] = useState(false);
 	const {pacing, transitions, caption} = plan.style;
 	const setCaption = (patch: Partial<CaptionStyle>) => onChange({...plan, style: {...plan.style, caption: {...caption, ...patch}}});
+	const depth: Depth = plan.style.depth ?? {enabled: false, background: 'original', behind_titles: true};
+	const setDepth = (patch: Partial<Depth>) => onChange({...plan, style: {...plan.style, depth: {...depth, ...patch}}});
 	const setTransitions = (patch: Partial<Transitions>) => onChange({...plan, style: {...plan.style, transitions: {...transitions, ...patch}}});
 	const pause = PAUSES.reduce((best, p) => (Math.abs(p.value - pacing.keep_pause) < Math.abs(best.value - pacing.keep_pause) ? p : best), PAUSES[0]);
 
@@ -88,6 +98,24 @@ export default function StylePanel({
 				<span>Fade out at the end: {transitions.fade_out.toFixed(1)}s</span>
 				<input type="range" min={0} max={2} step={0.1} value={transitions.fade_out} onChange={(e) => setTransitions({fade_out: Number(e.target.value)})} />
 			</label>
+
+			<h3>Green screen</h3>
+			<label className="check">
+				<input type="checkbox" checked={depth.enabled} onChange={(e) => setDepth({enabled: e.target.checked})} /> Cut the speaker out
+			</label>
+			<p className="hint">Lets titles sit behind your head and swaps the background. Off unless you turn it on.</p>
+			{depth.enabled && (
+				<div className="field">
+					<span>Background</span>
+					<div className="seg">
+						{BACKGROUNDS.map((b) => (
+							<button key={b.value} className={depth.background === b.value ? 'active' : ''} onClick={() => setDepth({background: b.value})}>
+								{b.label}
+							</button>
+						))}
+					</div>
+				</div>
+			)}
 
 			<h3>Caption font</h3>
 			<div className="fonts">

@@ -102,6 +102,10 @@ class Graphic(Span):
     # Where it sits, normalized 0..1 on the output frame. The renderer keeps
     # graphics off the face using `reframe` when this is omitted.
     anchor: Literal["auto", "top", "center", "bottom"] = "auto"
+    # front: over the speaker (the default). behind: between the background and the cut-out speaker, so
+    # the speaker's head and body pass in front of it (needs `style.depth.enabled`; ADR 0901). Big text
+    # behind the speaker is drawn as a title around the head; any other type fills the frame behind them.
+    layer: Literal["front", "behind"] = "front"
 
 
 class LayoutSpan(Span):
@@ -110,6 +114,25 @@ class LayoutSpan(Span):
     # speaker: speaker fills the frame. split: speaker in the bottom half, visuals above.
     # visual: the visual fills the frame while the speaker keeps talking (B-roll).
     mode: Literal["speaker", "split", "visual"] = "speaker"
+
+
+BackgroundKind = Literal["original", "blur", "dim", "color", "gradient", "media"]
+
+
+class BackgroundSpan(Span):
+    """What is behind the cut-out speaker for a stretch of the source (needs `style.depth.enabled`).
+
+    original: the real background. blur: the real background out of focus. dim: darkened, a spotlight on
+    the speaker. color / gradient: a flat colour or the style's accent glow (`color`, default the accent).
+    media: an imported picture or clip (`src`, a file in the job folder). Outside every span the style's
+    `depth.background` applies.
+    """
+
+    kind: BackgroundKind = "blur"
+    color: str | None = None
+    src: str | None = None
+    # 0..1: how far a replaced background drifts and scales against the speaker, for a 3D feel.
+    parallax: float = Field(default=0.0, ge=0, le=1)
 
 
 class Zoom(Span):
@@ -181,6 +204,22 @@ class Camera(_Model):
     zoom_scale: float = Field(default=1.15, ge=1, le=2)
 
 
+class Depth(_Model):
+    """Green-screen effects: the speaker is cut out of the frame and things go behind them (ADR 0901).
+
+    Off unless the user asks for it in their style prompt or in the editor.
+    """
+
+    enabled: bool = Field(
+        default=False,
+        description="True only if the user explicitly asks for a green-screen look: text or graphics behind "
+        "the speaker, a removed, replaced, blurred or dimmed background, or a 3D/depth effect.",
+    )
+    # Background where no `backgrounds` span says otherwise.
+    background: BackgroundKind = "original"
+    behind_titles: bool = True  # analyze puts a few big titles behind the speaker's head
+
+
 class Style(_Model):
     name: str = "bold_creator"
     caption: CaptionStyle = CaptionStyle()
@@ -188,6 +227,7 @@ class Style(_Model):
     pacing: Pacing = Pacing()
     camera: Camera = Camera()
     transitions: Transitions = Transitions()
+    depth: Depth = Depth()
 
 
 class EditPlan(_Model):
@@ -200,13 +240,14 @@ class EditPlan(_Model):
     graphics: list[Graphic] = []
     zooms: list[Zoom] = []
     layout: list[LayoutSpan] = []  # empty: speaker full frame throughout
+    backgrounds: list[BackgroundSpan] = []  # only used with style.depth.enabled
     reframe: Reframe = Reframe()
     style: Style = Style()
 
     @model_validator(mode="after")
     def _within_source(self) -> "EditPlan":
         limit = self.source.duration + 1e-6
-        for name in ("segments", "graphics", "zooms", "layout"):
+        for name in ("segments", "graphics", "zooms", "layout", "backgrounds"):
             for item in getattr(self, name):
                 if item.end > limit:
                     raise ValueError(f"{name}: {item.end}s is past the source end ({self.source.duration}s)")

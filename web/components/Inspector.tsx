@@ -144,7 +144,25 @@ export default function Inspector({
 
 			{g && <GraphicFields plan={plan} g={g} onChange={onChange} />}
 
-			{g && isVisualType(g.type) && (
+			{g && g.type !== 'progress_bar' && (
+				<label className="check">
+					<input
+						type="checkbox"
+						checked={g.layer === 'behind'}
+						onChange={(e) =>
+							onChange({
+								...plan,
+								// Behind the speaker needs the speaker cut out, so this turns green-screen effects on.
+								style: e.target.checked ? {...plan.style, depth: {...plan.style.depth, enabled: true}} : plan.style,
+								graphics: plan.graphics.map((x) => (x.id === g.id ? {...x, layer: e.target.checked ? 'behind' : 'front'} : x)),
+							})
+						}
+					/>{' '}
+					Behind the speaker
+				</label>
+			)}
+
+			{g && isVisualType(g.type) && g.layer !== 'behind' && (
 				<Field label="Show as">
 					<div className="seg">
 						{(['split', 'visual'] as const).map((m) => (
