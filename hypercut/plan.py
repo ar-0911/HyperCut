@@ -129,8 +129,15 @@ class Reframe(_Model):
     keys: list[ReframeKey] = []  # empty: center crop
 
 
+# Caption fonts the renderer bundles (Google Fonts). Any other name falls back to a system sans-serif.
+CAPTION_FONTS = (
+    "Montserrat", "Inter", "Poppins", "Bebas Neue", "Anton", "Oswald", "Archivo Black",
+    "Playfair Display", "Permanent Marker", "Bangers",
+)
+
+
 class CaptionStyle(_Model):
-    font: str = "Montserrat"
+    font: str = Field(default="Montserrat", description="One of: " + ", ".join(CAPTION_FONTS))
     weight: int = 800
     size: int = 72  # px on the 1080x1920 output
     color: str = "#FFFFFF"
@@ -152,6 +159,21 @@ class GraphicsStyle(_Model):
 class Pacing(_Model):
     remove_fillers: bool = True
     max_silence: float = Field(default=0.35, ge=0)  # longer gaps get cut
+    # Pause kept on each side of a cut, so speech doesn't run into itself. Older plans used 0.08.
+    keep_pause: float = Field(default=0.15, ge=0, le=1)
+    # Playback speed of the whole reel (0.8 = 20% slower). Audio keeps its pitch.
+    speed: float = Field(default=1.0, ge=0.5, le=2)
+
+
+class Transitions(_Model):
+    """How one kept piece of footage meets the next, and how the reel starts and ends."""
+
+    # hard: straight cuts. smooth: a short crossfade with the sound eased across it.
+    # zoom: straight cuts that alternate a slight punch-in, so jump cuts look intentional.
+    style: Literal["hard", "smooth", "zoom"] = "smooth"
+    length: float = Field(default=0.2, ge=0, le=1)  # seconds, for smooth
+    fade_in: float = Field(default=0.0, ge=0, le=3)  # seconds from black at the start
+    fade_out: float = Field(default=0.8, ge=0, le=3)  # seconds to black (and silence) at the end
 
 
 class Camera(_Model):
@@ -165,6 +187,7 @@ class Style(_Model):
     graphics: GraphicsStyle = GraphicsStyle()
     pacing: Pacing = Pacing()
     camera: Camera = Camera()
+    transitions: Transitions = Transitions()
 
 
 class EditPlan(_Model):
@@ -192,9 +215,8 @@ class EditPlan(_Model):
         return self
 
     def output_duration(self) -> float:
-        if not self.segments:
-            return self.source.duration
-        return sum(s.end - s.start for s in self.segments)
+        kept = self.source.duration if not self.segments else sum(s.end - s.start for s in self.segments)
+        return kept / self.style.pacing.speed
 
 
 def load(path: str | Path) -> EditPlan:

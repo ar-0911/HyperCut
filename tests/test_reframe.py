@@ -82,10 +82,11 @@ def test_cut_without_a_face_yet_looks_ahead_within_the_shot():
     assert [k.cx for k in keys if k.t >= 0.2] == pytest.approx([0.62, 0.62, 0.62])
 
 
-def test_cut_into_a_faceless_shot_holds_position():
+def test_cut_into_a_faceless_shot_centres_it():
     d = [Detection(0.0, 0.35), Detection(0.2, None, cut=True), Detection(0.4, None), Detection(0.6, 0.6, cut=True)]
     keys = smooth_track(d, LANDSCAPE).keys
-    assert keys[1].cx == pytest.approx(0.35) and keys[2].cx == pytest.approx(0.35)
+    assert keys[1].cx == pytest.approx(0.35)  # held right up to the cut
+    assert keys[2].cx == pytest.approx(0.5) and keys[3].cx == pytest.approx(0.5)
     assert keys[-1].cx == pytest.approx(0.6)
 
 
@@ -100,3 +101,46 @@ def test_face_height_follows_and_snaps_at_cuts():
 def test_missing_face_height_defaults_to_middle():
     keys = smooth_track([Detection(0.0, 0.4), Detection(0.2, 0.4)], LANDSCAPE).keys
     assert {k.cy for k in keys} == {0.5}
+
+
+def test_tiles_cover_the_frame_with_overlap():
+    from hypercut.reframe.track import tiles
+
+    full, half = tiles(3414, 1920)
+    assert all(side == 1920 for _, _, side in full) and full[0][0] == 0 and full[-1][0] + 1920 == 3414
+    assert len(full) >= 2 and all(side == 960 for _, _, side in half)
+    assert {y for _, y, _ in half} == {0, 480} and max(x for x, _, _ in half) + 960 == 3414
+    # Neighbouring windows overlap, so a face on a seam is whole in one of them.
+    xs = sorted({x for x, _, _ in half})
+    assert all(b - a < 960 for a, b in zip(xs, xs[1:]))
+
+
+def test_stray_detections_are_ignored():
+    from hypercut.reframe.track import drop_outliers
+
+    xs = [0.32, 0.6, 0.32, 0.31, 0.6, 0.32, 0.33]
+    d = [Detection(i * 0.2, x) for i, x in enumerate(xs)] + [Detection(1.4, 0.7, cut=True), Detection(1.6, 0.71)]
+    kept = [x.cx for x in drop_outliers(d)]
+    assert kept == [0.32, None, 0.32, 0.31, None, 0.32, 0.33, 0.7, 0.71]  # the next shot is judged on its own
+    keys = smooth_track(d, LANDSCAPE).keys
+    assert all(abs(k.cx - 0.32) < 0.03 for k in keys if k.t < 1.39)
+
+
+def test_follows_the_shots_main_face_not_the_biggest_one():
+    from hypercut.reframe.track import follow_main_face
+
+    face, shirt, other = (0.32, 0.24, 0.9), (0.6, 0.47, 0.8), (0.75, 0.3, 0.6)
+    frames = [(face, shirt), (shirt,), (face, shirt), (face,), (face, shirt, other), (face, shirt)]
+    # The detector's own pick (cx) is the shirt, the biggest "face" in most frames.
+    d = [Detection(i * 0.2, 0.6, 0.47, candidates=c) for i, c in enumerate(frames)]
+    d.append(Detection(1.2, 0.5, 0.3, cut=True, candidates=((0.5, 0.3, 0.9),)))
+    picked = [x.cx for x in follow_main_face(d)]
+    assert picked == [0.32, None, 0.32, 0.32, 0.32, 0.32, 0.5]
+
+
+def test_main_face_is_followed_as_it_moves():
+    from hypercut.reframe.track import follow_main_face
+
+    xs = [0.3, 0.35, 0.4, 0.45, 0.5, 0.55]
+    d = [Detection(i * 0.2, x, 0.3, candidates=((x, 0.3, 0.9), (0.8, 0.6, 0.6))) for i, x in enumerate(xs)]
+    assert [x.cx for x in follow_main_face(d)] == xs

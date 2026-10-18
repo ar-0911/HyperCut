@@ -21,6 +21,7 @@ from typing import Any
 
 from hypercut import edit, llm
 from hypercut import plan as plan_mod
+from hypercut.analyze import cuts as cutting
 from hypercut.analyze import visuals
 from hypercut.plan import EditPlan
 
@@ -35,6 +36,7 @@ SYSTEM = (
 )
 
 PROMPT = """The reel is {duration:.1f} s long. The playhead is at {playhead:.1f} s. {selection}
+Current look: speed {speed}, pause kept at cuts {keep_pause}s, cuts "{transition}", caption font "{font}".
 All times below and in your answer are REEL seconds (what the viewer sees), as the reel is now.
 
 Timeline items (key: type, reel start-end, details):
@@ -70,8 +72,12 @@ lower_third {{"title","subtitle"}}; emoji_burst {{"emoji"}}
 - {{"op": "add_zoom", "start": s, "end": e, "scale": 1.05-1.5}}
 - {{"op": "move", "key": "g1", "start": s, "end": e}}
 - {{"op": "edit", "key": "g1", "props": {{...}}}}  change a graphic's text or other props (merged in)
-- {{"op": "caption_style", "changes": {{"color"|"highlight_color"|"size"|"position"|"uppercase"|\
-"words_per_line"|"animation": value}}}}
+- {{"op": "caption_style", "changes": {{"font"|"color"|"highlight_color"|"size"|"position"|"uppercase"|\
+"words_per_line"|"animation": value}}}}  fonts: {fonts}
+- {{"op": "pacing", "speed": 0.7-1.3, "keep_pause": 0.08 (tight) | 0.15 (natural) | 0.3 (relaxed)}}  slow down or \
+speed up the whole reel; keep_pause is how much pause stays around each cut (re-cuts the video)
+- {{"op": "transitions", "style": "hard" | "smooth" | "zoom", "fade_out": seconds}}  hard cuts, short crossfades, \
+or alternating punch-ins at cuts; fade to black at the end
 
 A new visual (illustration, footage, big text, stat card, list) replaces any visual already in that stretch.
 Use only what the request asks for. "From X to Y" means start X, end Y. If a time is not given, use the
@@ -149,7 +155,8 @@ def _reel_span(op: dict, duration: float, playhead: float, default_len: float = 
     return (s, e) if e > s else None
 
 
-def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], draw=visuals.illustrate) -> tuple[EditPlan, list[str]]:
+def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], draw=visuals.illustrate,
+              audio_wav: str | None = None) -> tuple[EditPlan, list[str]]:
     """Validate and apply Claude's operations to a copy of the plan. Unknown or invalid ops are skipped."""
     plan = plan.model_copy(deep=True)
     duration = edit.reel_duration(plan)
@@ -175,6 +182,7 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
     caption_cuts: list[tuple[float, float]] = []
     doomed: list[Any] = []
     gone = lambda item: any(item is d for d in doomed)  # identity: equal zooms are still different items
+    recut = False
 
     for op in ops:
         kind = op.get("op")
@@ -234,6 +242,22 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
             g = by_key[op["key"]]
             g.props = {**g.props, **{k: v for k, v in op["props"].items() if k not in ("src", "layers", "defs", "viewBox")}}
             changes.append(f"Edited {g.id}")
+        elif kind == "pacing":
+            speed, pause = _num(op.get("speed")), _num(op.get("keep_pause"))
+            if speed is not None:
+                plan.style.pacing.speed = min(2.0, max(0.5, speed))
+                changes.append(f"Speed {round(plan.style.pacing.speed * 100)}%")
+            if pause is not None and abs(pause - plan.style.pacing.keep_pause) > 1e-6:
+                plan.style.pacing.keep_pause = min(1.0, max(0.0, pause))
+                recut = True
+        elif kind == "transitions":
+            t = plan.style.transitions
+            if op.get("style") in ("hard", "smooth", "zoom"):
+                t.style = op["style"]
+                changes.append(f"Cuts: {t.style}")
+            if _num(op.get("fade_out")) is not None:
+                t.fade_out = min(3.0, max(0.0, _num(op["fade_out"])))
+                changes.append(f"Fade out {t.fade_out:.1f}s")
         elif kind == "caption_style" and isinstance(op.get("changes"), dict):
             data = plan.style.caption.model_dump()
             data.update({k: v for k, v in op["changes"].items() if k in data})
@@ -259,6 +283,12 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
     plan.zooms = [z for z in plan.zooms if not gone(z)]
     plan.layout = [s for s in plan.layout if not gone(s)]
 
+    if recut:
+        # Rebuild the cuts for the new pause before reel-time cuts, which refer to the reel as it was;
+        # the user's earlier clip deletions are rebuilt too, which the change message says.
+        plan = cutting.recut(plan, audio_wav)
+        changes.append(f"Re-cut with {plan.style.pacing.keep_pause:.2f}s pauses")
+
     # Reel times refer to the reel before this request: hide captions first, then cut from the end back.
     for a, b in caption_cuts:
         n = edit.remove_captions(plan, a, b)
@@ -273,18 +303,21 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
 
 
 def assist(plan: EditPlan, instruction: str, playhead: float = 0.0, assets: list[dict] | None = None,
-           selected: str | None = None) -> AssistResult:
+           selected: str | None = None, audio_wav: str | None = None) -> AssistResult:
     assets = assets or []
     selection = f"The user has {selected} selected." if selected else ""
     raw = llm.ask_json(
         PROMPT.format(
             duration=edit.reel_duration(plan), playhead=playhead, selection=selection,
-            instruction=instruction.strip()[:2000], text_types=", ".join(TEXT_TYPES), **summarize(plan, assets),
+            speed=plan.style.pacing.speed, keep_pause=plan.style.pacing.keep_pause,
+            transition=plan.style.transitions.style, font=plan.style.caption.font,
+            instruction=instruction.strip()[:2000], text_types=", ".join(TEXT_TYPES), fonts=", ".join(plan_mod.CAPTION_FONTS),
+            **summarize(plan, assets),
         ),
         system=SYSTEM,
     )
     ops = raw.get("ops") if isinstance(raw.get("ops"), list) else []
-    new_plan, changes = apply_ops(plan, ops, playhead, assets)
+    new_plan, changes = apply_ops(plan, ops, playhead, assets, audio_wav=audio_wav)
     message = str(raw.get("message") or "")[:300] or ("Done." if changes else "I couldn't make that change.")
     return AssistResult(new_plan, message, changes)
 

@@ -1,5 +1,6 @@
 import React, {useMemo} from 'react';
 import {groupAt, groupWords, wordState} from './captions';
+import {captionFamily, captionWeight} from './fonts';
 import {CAPTION_Y} from './layout';
 import type {CaptionStyle, Word} from './plan';
 
@@ -33,8 +34,8 @@ export const Captions: React.FC<{
 				justifyContent: 'center',
 				// wide enough for the active word's pop scale plus both outlines, so neighbours never touch
 				gap: `${style.size * 0.05}px ${style.size * 0.45}px`,
-				fontFamily: `"${style.font}", ${FONT_STACK}`,
-				fontWeight: style.weight,
+				fontFamily: `"${captionFamily(style.font)}", ${FONT_STACK}`,
+				fontWeight: captionWeight(style.font, style.weight),
 				fontSize: style.size,
 				lineHeight: 1.1,
 				textAlign: 'center',

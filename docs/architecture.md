@@ -101,7 +101,11 @@ gets the transcript as `index time word` lines and the style, and returns as JSO
 Every item is validated against the source duration and dropped if invalid. Cuts never involve Claude:
 filler words and gaps over `style.pacing.max_silence` come from word timings (plus FFmpeg `silencedetect`
 when the wav is given). Code then assembles `segments`: `cold_open` puts the hook first and keeps it in
-place; `trim` starts at the hook. See ADR 0401.
+place; `trim` starts at the hook. See ADR 0401. Each cut pause keeps `pacing.keep_pause` (0.15 s) on each side
+and is only cut if at least 0.25 s goes, so there are no tiny jump cuts. The same call names the ending, the
+last word worth keeping; code checks it ends a sentence in the second half (falling back to the last such word)
+and ends the reel 0.4 s after it, so a reel never stops mid-thought. `recut(plan, wav)` rebuilds the segments
+for new pacing and keeps the hook and ending (ADR 0403).
 
 With `visuals=True` (the default in `run_pipeline`; `--no-visuals` turns it off) analyze also directs the
 look of the video (`hypercut/analyze/visuals.py`, ADR 0402). Code groups the played words into beats of
@@ -122,7 +126,10 @@ function so tests need no mediapipe. Detection uses the MediaPipe Tasks face det
 once into `~/.cache/hypercut` (decision 0502). Hard cuts between shots are found from colour-histogram jumps
 between samples, and at a cut the crop snaps to the new shot's speaker instead of easing (decision 0503), so
 montages of several speakers stay framed. The renderer also uses the track to keep graphics off the face. See
-decision 0501.
+decision 0501. Small faces in wide shots are found by also searching full-height square tiles of the frame,
+cuts are checked on every frame, and in each shot the crop follows the face with the strongest track across
+the shot rather than the biggest face-like thing in each frame (a shirt pattern, hands), with stray points
+dropped by a running median; a shot with no face is centred (decision 0505).
 
 **Render.** A Remotion composition (`HyperCut`, props `{plan, videoSrc}`) draws, per output frame: the
 cropped and zoomed source frame, the caption line for the current words (styled and animated by
@@ -143,11 +150,15 @@ pictures and clips (decision 0607): they fill the split panel or, in a `visual` 
 pictures drift in slowly, clips play muted from `trim_start` in one Remotion sequence per stretch of output
 (`mediaRuns`, so B-roll plays straight through small filler cuts) and hold their last frame if the block
 outlasts the clip. In the browser preview they load from the `assetBase` prop; in the final render they sit
-next to the video.
+next to the video. `pacing.speed` slows or speeds the whole reel (segments last `duration / speed`, video
+plays at that rate, B-roll at normal speed). `transitions.style` is `hard`, `smooth` (each segment overlaps
+the next by `length` and crossfades) or `zoom` (alternate segments punched in); audio eases at every cut,
+and `fade_in`/`fade_out` fade picture and sound at the ends. Caption fonts are ten bundled Google fonts
+(`src/fonts.ts`). See decision 0608.
 Run it with `npm run render -- --plan plan.json --video normalized.mp4 --out out.mp4 [--assets DIR]` in
 `render/` (`REMOTION_BROWSER` selects a Chromium; imported files are read from the video's folder unless
 `--assets` says otherwise). See ADRs [0601](decisions/0601-render-architecture.md) to
-[0607](decisions/0607-imported-media.md).
+[0608](decisions/0608-speed-transitions-and-fonts.md).
 
 **API.** `uvicorn api.main:app` serves a job per upload. `POST /jobs` (multipart `video`, `style`,
 `hook_strategy`) saves to `media/<job_id>/` and returns an id; a background thread runs
@@ -164,8 +175,9 @@ pipeline without the server. For re-editing (decision 0702): the first `PUT` kee
 names a file the job does not have is rejected. `POST /jobs/{id}/assistant` runs the editor assistant on the
 plan it is sent and returns the edited plan without saving it. CORS allows `HYPERCUT_WEB_ORIGINS` (default
 `http://localhost:3000`). `python -m api.import_job FOLDER [--plan plan_split.json]` turns a CLI run's folder
-into a web job. See ADRs [0701](decisions/0701-job-server-design.md) and
-[0702](decisions/0702-re-editing-endpoints.md).
+into a web job. `POST /jobs/{id}/recut` re-cuts a plan for new pacing with the job's audio and returns it
+unsaved (decision 0703). See ADRs [0701](decisions/0701-job-server-design.md) to
+[0703](decisions/0703-recut-endpoint.md).
 
 **Web.** `web/` is a Next.js 14 App Router app (client components, no server code) that talks to the API at
 `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`). `/` uploads a video with a style prompt (preset
@@ -180,10 +192,11 @@ kept segments, hook marked) and Captions (one block per caption line). Blocks dr
 to trim, snap to word starts and other edges, and anything in the bin drags onto the timeline (or is added at
 the playhead on click). All edits are pure functions of the plan in `web/lib/timeline.ts`, built on the
 renderer's own `buildTimeline`, with undo/redo in `web/lib/history.ts`; something inside a cold-open hook
-shows twice and both copies move together. Picking a hook or editing a word still goes through
+shows twice and both copies move together. A Style tab in the bin sets speed, pauses (re-cut on the
+server), cut style, end fade and the caption font and look (decision 0805). Picking a hook or editing a word still goes through
 `web/lib/rehook.ts`. Save and Render `PUT` the plan first. `npm test` in `web/` runs vitest (API client, hook
 logic, timeline edits) and a production build. See
-ADRs [0801](decisions/0801-nextjs-app-and-shared-composition.md) to [0804](decisions/0804-timeline-editor.md).
+ADRs [0801](decisions/0801-nextjs-app-and-shared-composition.md) to [0805](decisions/0805-style-tab.md).
 
 ## Claude calls
 

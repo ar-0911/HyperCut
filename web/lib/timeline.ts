@@ -54,7 +54,8 @@ export const refKey = (r: ItemRef): string => {
 	}
 };
 
-export const timelineOf = (plan: EditPlan): Timeline => buildTimeline(plan.segments, plan.source.duration, plan.output.fps);
+export const timelineOf = (plan: EditPlan): Timeline =>
+	buildTimeline(plan.segments, plan.source.duration, plan.output.fps, plan.style.pacing.speed);
 
 export const reelDuration = (plan: EditPlan): number => timelineOf(plan).durationInFrames / plan.output.fps;
 
@@ -71,8 +72,8 @@ export function piecesOf(tl: Timeline, start: number, end: number): Piece[] {
 		const a = Math.max(start, s.start);
 		const b = Math.min(end, s.end);
 		if (b <= a) continue;
-		const from = (s.outFrom + (a - s.start) * tl.fps) / tl.fps;
-		const to = (s.outFrom + (b - s.start) * tl.fps) / tl.fps;
+		const from = s.outFrom / tl.fps + (a - s.start) / tl.speed;
+		const to = s.outFrom / tl.fps + (b - s.start) / tl.speed;
 		const prev = out[out.length - 1];
 		// Segments are whole frames long, so touching pieces can be up to a frame apart in seconds.
 		if (prev && Math.abs(prev.to - from) <= 1 / tl.fps + 1e-6) prev.to = to;
@@ -215,8 +216,9 @@ export function trimItem(plan: EditPlan, ref: ItemRef, edge: 'start' | 'end', de
 	const span = spanOf(plan, ref);
 	if (!span || ref.kind === 'caption') return plan;
 	const [a, b] = span;
-	if (edge === 'start') return setSpan(plan, ref, Math.min(a + delta, b - MIN_LEN), b);
-	return setSpan(plan, ref, a, Math.max(b + delta, a + MIN_LEN));
+	const d = delta * plan.style.pacing.speed; // reel seconds to source seconds
+	if (edge === 'start') return setSpan(plan, ref, Math.min(a + d, b - MIN_LEN), b);
+	return setSpan(plan, ref, a, Math.max(b + d, a + MIN_LEN));
 }
 
 export function removeItem(plan: EditPlan, ref: ItemRef): EditPlan {

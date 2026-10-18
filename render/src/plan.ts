@@ -54,12 +54,17 @@ export type GraphicsStyle = {
 	theme: 'clean' | 'bold' | 'playful' | 'cinematic';
 	accent_color: string;
 };
+export type Pacing = {remove_fillers: boolean; max_silence: number; keep_pause: number; speed: number};
+export type TransitionStyle = 'hard' | 'smooth' | 'zoom';
+/** How kept pieces meet (hard cut, crossfade, alternating punch-in) and the fade in/out of the reel. */
+export type Transitions = {style: TransitionStyle; length: number; fade_in: number; fade_out: number};
 export type Style = {
 	name: string;
 	caption: CaptionStyle;
 	graphics: GraphicsStyle;
-	pacing: {remove_fillers: boolean; max_silence: number};
+	pacing: Pacing;
 	camera: {zoom_frequency: 'none' | 'low' | 'medium' | 'high'; zoom_scale: number};
+	transitions: Transitions;
 };
 
 export type EditPlan = {
@@ -101,8 +106,9 @@ export const DEFAULT_STYLE: Style = {
 	name: 'bold_creator',
 	caption: DEFAULT_CAPTION,
 	graphics: {density: 'balanced', theme: 'bold', accent_color: '#FFE600'},
-	pacing: {remove_fillers: true, max_silence: 0.35},
+	pacing: {remove_fillers: true, max_silence: 0.35, keep_pause: 0.15, speed: 1},
 	camera: {zoom_frequency: 'medium', zoom_scale: 1.15},
+	transitions: {style: 'smooth', length: 0.2, fade_in: 0, fade_out: 0.8},
 };
 
 /**
@@ -138,6 +144,7 @@ export function normalizePlan(raw: unknown): EditPlan {
 			graphics: {...DEFAULT_STYLE.graphics, ...(style.graphics ?? {})},
 			pacing: {...DEFAULT_STYLE.pacing, ...(style.pacing ?? {})},
 			camera: {...DEFAULT_STYLE.camera, ...(style.camera ?? {})},
+			transitions: {...DEFAULT_STYLE.transitions, ...(style.transitions ?? {})},
 		},
 	};
 }

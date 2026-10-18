@@ -30,6 +30,7 @@
       "properties": {
         "font": {
           "default": "Montserrat",
+          "description": "One of: Montserrat, Inter, Poppins, Bebas Neue, Anton, Oswald, Archivo Black, Playfair Display, Permanent Marker, Bangers",
           "title": "Font",
           "type": "string"
         },
@@ -325,6 +326,20 @@
           "minimum": 0,
           "title": "Max Silence",
           "type": "number"
+        },
+        "keep_pause": {
+          "default": 0.15,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Keep Pause",
+          "type": "number"
+        },
+        "speed": {
+          "default": 1.0,
+          "maximum": 2,
+          "minimum": 0.5,
+          "title": "Speed",
+          "type": "number"
         }
       },
       "title": "Pacing",
@@ -479,7 +494,9 @@
           "$ref": "#/$defs/Pacing",
           "default": {
             "remove_fillers": true,
-            "max_silence": 0.35
+            "max_silence": 0.35,
+            "keep_pause": 0.15,
+            "speed": 1.0
           }
         },
         "camera": {
@@ -487,6 +504,15 @@
           "default": {
             "zoom_frequency": "medium",
             "zoom_scale": 1.15
+          }
+        },
+        "transitions": {
+          "$ref": "#/$defs/Transitions",
+          "default": {
+            "style": "smooth",
+            "length": 0.2,
+            "fade_in": 0.0,
+            "fade_out": 0.8
           }
         }
       },
@@ -511,6 +537,45 @@
         }
       },
       "title": "Transcript",
+      "type": "object"
+    },
+    "Transitions": {
+      "additionalProperties": false,
+      "description": "How one kept piece of footage meets the next, and how the reel starts and ends.",
+      "properties": {
+        "style": {
+          "default": "smooth",
+          "enum": [
+            "hard",
+            "smooth",
+            "zoom"
+          ],
+          "title": "Style",
+          "type": "string"
+        },
+        "length": {
+          "default": 0.2,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Length",
+          "type": "number"
+        },
+        "fade_in": {
+          "default": 0.0,
+          "maximum": 3,
+          "minimum": 0,
+          "title": "Fade In",
+          "type": "number"
+        },
+        "fade_out": {
+          "default": 0.8,
+          "maximum": 3,
+          "minimum": 0,
+          "title": "Fade Out",
+          "type": "number"
+        }
+      },
+      "title": "Transitions",
       "type": "object"
     },
     "Word": {
@@ -699,12 +764,20 @@
           "theme": "bold"
         },
         "pacing": {
+          "keep_pause": 0.15,
           "max_silence": 0.35,
-          "remove_fillers": true
+          "remove_fillers": true,
+          "speed": 1.0
         },
         "camera": {
           "zoom_frequency": "medium",
           "zoom_scale": 1.15
+        },
+        "transitions": {
+          "fade_in": 0.0,
+          "fade_out": 0.8,
+          "length": 0.2,
+          "style": "smooth"
         }
       }
     }

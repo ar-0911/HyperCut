@@ -70,3 +70,13 @@ def test_clear_visuals_makes_room():
     assert edit.clear_visuals(p, 4.5, 7, keep="new") == []
     assert {g.id: (g.start, g.end) for g in p.graphics} == {"v1": (0, 4), "v2": (7, 12), "e1": (5, 6), "new": (4.5, 7)}
     assert edit.clear_visuals(p, 6, 12, keep="new") == ["v2"]
+
+
+def test_mapping_follows_the_speed():
+    p = _plan()
+    p.style.pacing.speed = 0.5  # half speed: every reel second shows half a source second
+    assert edit.reel_duration(p) == pytest.approx(42)
+    assert edit.to_source(p, 2.0) == (11.0, 0)
+    assert edit.to_reel(p, 1.0) == [6.0]
+    assert edit.cut(p, 6.0, 10.0) == pytest.approx(4)  # reel 6-10 is source 1-3
+    assert [(s.start, s.end) for s in p.segments][:3] == [(10, 12), (0, 1), (3, 8)]

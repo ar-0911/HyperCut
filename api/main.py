@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from api import assets, jobs
 from hypercut import plan as plan_mod
 from hypercut import assistant, llm, run
+from hypercut.analyze import cuts as cutting
 from hypercut.plan import EditPlan
 
 app = FastAPI(title="HyperCut")
@@ -192,10 +193,21 @@ def assistant_edit(job_id: str, req: AssistRequest):
     if state["status"] != "done":
         raise HTTPException(409, f"job is {state['status']}; wait for the plan before editing")
     try:
-        result = assistant.assist(req.plan, req.instruction, req.playhead, state.get("assets", []), req.selected)
+        wav = jobs.job_dir(job_id) / "audio.wav"
+        result = assistant.assist(req.plan, req.instruction, req.playhead, state.get("assets", []), req.selected,
+                                  str(wav) if wav.is_file() else None)
     except llm.LLMError as e:
         raise HTTPException(502, f"the assistant could not answer: {str(e)[:300]}") from None
     return {"plan": result.plan.model_dump(mode="json"), "message": result.message, "changes": result.changes}
+
+
+@app.post("/jobs/{job_id}/recut")
+def recut_plan(job_id: str, plan: EditPlan):
+    """Rebuild the cuts of the plan it is sent from its `style.pacing` (how much pause to keep, fillers).
+    Uses the job's audio for silence detection; nothing is saved."""
+    _job(job_id)
+    wav = jobs.job_dir(job_id) / "audio.wav"
+    return cutting.recut(plan, str(wav) if wav.is_file() else None).model_dump(mode="json")
 
 
 @app.post("/jobs/{job_id}/render", status_code=202)

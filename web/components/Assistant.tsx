@@ -7,6 +7,7 @@ const EXAMPLES = [
 	'Add an illustration of a rocket launch at 12s with subtitles below',
 	'Make the captions yellow and bigger',
 	'Delete the zoom near the start',
+	'Slow it down a little and smooth the cuts',
 ];
 
 /** A box where you type what to change; Claude edits the plan and the result lands on the timeline as one undo step. */

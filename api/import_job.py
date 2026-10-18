@@ -37,7 +37,7 @@ def import_job(folder: str | Path, plan_name: str = "plan.json") -> str:
     directory.mkdir(parents=True)
     _link(video, directory / "normalized.mp4")
     plan_mod.save(plan, directory / "plan.json")
-    for name in ("transcript.json", "transcript.srt"):
+    for name in ("transcript.json", "transcript.srt", "audio.wav"):  # audio lets the editor re-cut pauses
         if (folder / name).is_file():
             _link(folder / name, directory / name)
     jobs.write(job_id, status="done", stage="done", error=None, render=None, render_error=None,
