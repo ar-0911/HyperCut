@@ -173,10 +173,32 @@
       "end": 5.5,
       "props": {
         "items": [
-          "⏰",
-          "💡",
-          "🚀"
+          "alarm clock",
+          "light bulb",
+          "rocket"
         ]
+      },
+      "anchor": "auto"
+    },
+    {
+      "id": "s1",
+      "type": "chart",
+      "start": 0.5,
+      "end": 2.8,
+      "props": {
+        "headline": "10 HOURS",
+        "kind": "bars",
+        "values": [
+          2,
+          5,
+          10
+        ],
+        "labels": [
+          "Mon",
+          "Wed",
+          "Fri"
+        ],
+        "unit": "h"
       },
       "anchor": "auto"
     }
@@ -218,6 +240,10 @@
       "background": "original",
       "behind_titles": true,
       "around": true
+    },
+    "graphics": {
+      "secondary_color": "#3D5AFE",
+      "panel_color": "#0E1330"
     }
   },
   "layout": [

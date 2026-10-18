@@ -294,7 +294,7 @@ const Illustration: React.FC<TemplateProps> = ({graphic, elapsed, remaining, pro
 
 // Imported media is drawn by the composition (it needs the output timeline to play clips), and effects
 // around the speaker by Around.tsx (they need the face and the cut-out), not a template.
-const TEMPLATES: Record<Exclude<Graphic['type'], 'media' | 'orbit' | 'fly_out' | 'particles'>, React.FC<TemplateProps>> = {
+const TEMPLATES: Record<Exclude<Graphic['type'], 'media' | 'orbit' | 'fly_out' | 'particles' | 'card_stack' | 'scene' | 'chart'>, React.FC<TemplateProps>> = {
 	kinetic_text: KineticText,
 	stat_card: StatCard,
 	emoji_burst: EmojiBurst,

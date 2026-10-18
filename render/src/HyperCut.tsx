@@ -2,9 +2,10 @@ import React, {useMemo} from 'react';
 import {AbsoluteFill, Freeze, Img, OffthreadVideo, Sequence, staticFile, useCurrentFrame} from 'remotion';
 import {AroundLayer} from './Around';
 import {Captions} from './Captions';
+import {StageLayer, stageFootageFilter} from './Stage';
 import {BackgroundFill, backgroundFilter, BehindLayer, replacesBackground} from './Depth';
 import {GraphicBody, GraphicView} from './Graphics';
-import {aroundAt, depthAt, isAroundType, isVisualType, sceneAt, SPLIT, SPLIT_AREA, VISUAL_AREA, VISUAL_IN} from './layout';
+import {aroundAt, depthAt, isAroundType, isStageType, isVisualType, PULL_BACK, sceneAt, SPLIT, SPLIT_AREA, VISUAL_AREA, VISUAL_IN} from './layout';
 import {normalizePlan, type CompositionProps, type EditPlan, type Graphic} from './plan';
 import {buildTimeline, frameToSource, isKept, mediaRuns, type Timeline, type TimelineSegment} from './timing';
 
@@ -94,20 +95,26 @@ const VideoSegment: React.FC<{
 	const placed: React.CSSProperties = {position: 'absolute', left: rect.left, top: rect.top, width: rect.width, height: rect.height};
 	if (part === 'cutout') {
 		if (!depth?.cutout || !matteSrc) return null;
-		const lifted = replacesBackground(depth.background.kind);
+		const lifted = replacesBackground(depth.background.kind) || depth.pull > 0;
+		// Stage graphics pull the speaker back about the bottom of the frame under the face, and cards move
+		// them aside (ADR 0611).
+		const pullScale = 1 - PULL_BACK * depth.pull;
 		return (
 			<AbsoluteFill style={{opacity}}>
 				<div style={{position: 'absolute', left: 0, top: panel.top, width, height: panel.height, overflow: 'hidden'}}>
-					<AbsoluteFill style={{transform: `scale(${zoom * punch})`, transformOrigin: `${origin.x}px ${origin.y}px`}}>
-						<OffthreadVideo
-							src={matteSrc}
-							transparent
-							muted
-							startFrom={Math.round(seg.start * fps)}
-							playbackRate={tl.speed}
-							// A soft shadow so a speaker over a new background doesn't look pasted on.
-							style={{...placed, filter: lifted ? 'drop-shadow(0 18px 36px rgba(0,0,0,0.45))' : undefined}}
-						/>
+					<AbsoluteFill style={{transform: pullScale < 1 ? `translateX(${depth.shift}px) scale(${pullScale})` : undefined, transformOrigin: `${origin.x}px ${panel.height}px`}}>
+						{/* A pulled-back speaker holds still: punch-ins fade out with the pull. */}
+						<AbsoluteFill style={{transform: `scale(${1 + (zoom * punch - 1) * (1 - depth.pull)})`, transformOrigin: `${origin.x}px ${origin.y}px`}}>
+							<OffthreadVideo
+								src={matteSrc}
+								transparent
+								muted
+								startFrom={Math.round(seg.start * fps)}
+								playbackRate={tl.speed}
+								// A soft shadow so a speaker over a new background doesn't look pasted on.
+								style={{...placed, filter: lifted ? 'drop-shadow(0 18px 36px rgba(0,0,0,0.45))' : undefined}}
+							/>
+						</AbsoluteFill>
 					</AbsoluteFill>
 				</div>
 			</AbsoluteFill>
@@ -124,7 +131,7 @@ const VideoSegment: React.FC<{
 						startFrom={Math.round(seg.start * fps)}
 						playbackRate={tl.speed}
 						volume={volume}
-						style={{...placed, filter: backgroundFilter(kind)}}
+						style={{...placed, filter: backgroundFilter(kind) ?? (depth ? stageFootageFilter(depth.stage) : undefined)}}
 					/>
 				</AbsoluteFill>
 				{depth && replacesBackground(kind) ? (
@@ -148,9 +155,10 @@ const Behind: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string}> = ({p
 	if (t === null) return null;
 	const scene = sceneAt(plan, t);
 	const depth = depthAt(plan, t, scene.mode, true);
-	if (!depth?.behind.length && !depth?.around.length) return null;
+	if (!depth?.behind.length && !depth?.around.length && !depth?.stage.length) return null;
 	return (
 		<>
+			{depth.stage.length ? <StageLayer graphics={depth.stage} t={t} plan={plan} face={scene.face} pull={depth.pull} shift={depth.shift} /> : null}
 			{depth.behind.length ? (
 				<BehindLayer
 					graphics={depth.behind}
@@ -240,7 +248,8 @@ const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string; hasM
 	// Graphics drawn behind the speaker are not ours; the rest of the behind layer (no cut-out, or a split
 	// or visual stretch) is placed in front, off the face, like any other graphic.
 	const behind = depthAt(plan, t, mode, hasMatte)?.behind ?? [];
-	const active = plan.graphics.filter((g) => t >= g.start && t < g.end && !behind.includes(g) && !isAroundType(g.type));
+	// Stage graphics are only drawn behind a cut-out speaker (Behind); without one they are left out.
+	const active = plan.graphics.filter((g) => t >= g.start && t < g.end && !behind.includes(g) && !isAroundType(g.type) && !isStageType(g.type));
 	// Effects around the speaker: their near half here, in front of the cut-out; without one, all of them
 	// in front (kept off the face either way). Only in speaker stretches, and only when depth is on.
 	const around = mode === 'speaker' && plan.style.depth.enabled ? aroundAt(plan, t) : [];

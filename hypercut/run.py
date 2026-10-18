@@ -108,6 +108,21 @@ def place_new_titles(job_dir: str | Path) -> None:
         plan_mod.save(place_titles(plan, out), path)
 
 
+def draw_new_around(job_dir: str | Path, draw=None, illustrate=None) -> None:
+    """Draw the graphics added or changed in the editor before a render: orbit / fly-out items (ADR 0610),
+    cards and scenes (ADR 0611)."""
+    from hypercut.analyze.analyze import draw_around
+    from hypercut.analyze.stage import draw_stage
+
+    path = Path(job_dir) / "plan.json"
+    plan = plan_mod.load(path)
+    if not plan.style.depth.enabled:
+        return
+    icons = draw_around(plan.graphics, plan.style, draw)
+    if draw_stage(plan.graphics, plan.style, illustrate) or icons:
+        plan_mod.save(plan, path)
+
+
 def render_plan(job_dir: str | Path, out_name: str = "output.mp4", render_dir: Path = RENDER_DIR) -> Path:
     """Render `plan.json` + `normalized.mp4` in `job_dir` with the Remotion project's npm script.
     A `matte.webm` next to the video is picked up by the render script."""
@@ -117,6 +132,10 @@ def render_plan(job_dir: str | Path, out_name: str = "output.mp4", render_dir: P
         place_new_titles(job_dir)
     except Exception as e:
         log.warning("speaker cut-out failed, rendering without green-screen effects: %s", e)
+    try:
+        draw_new_around(job_dir)
+    except Exception as e:
+        log.warning("drawing effects around the speaker failed, rendering built-in icons: %s", e)
     out = job_dir / out_name
     cmd = [
         "npm", "run", "render", "--",

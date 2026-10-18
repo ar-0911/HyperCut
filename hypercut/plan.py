@@ -90,16 +90,30 @@ GraphicType = Literal[
     "media",
     # Effects AROUND the cut-out speaker (green-screen effects, ADR 0610): drawn partly behind and partly
     # in front of the speaker, never over the face. Only with `style.depth.enabled`; `layer` is ignored.
-    "orbit",  # props: {"items": [emoji or 1-2 word labels]}: a ring circling the speaker's shoulders
-    "fly_out",  # props: {"items": [...]}: things that burst from behind the head toward the camera
+    # orbit / fly_out props: {"items": [objects, 1-3 words], "art": {item: {"viewBox", "body"}}}, art being
+    # Claude-drawn sticker SVG per item (missing: the renderer uses a built-in icon or the word)
+    "orbit",  # drawn graphics circling the speaker's shoulders
+    "fly_out",  # drawn graphics bursting from behind the head toward the camera
     "particles",  # props: {"kind": "sparkles" | "bokeh" | "confetti" | "embers", "color"}: depth-layered
+    # Stage graphics (ADR 0611): what is said, drawn behind the cut-out speaker, only where it calls for one.
+    # card_stack props: {"cards": [{"title": 1-3 words, "brief": what to draw, "viewBox", "defs", "layers"}]}:
+    #   1-3 illustrated cards sliding out from behind the speaker into the free side of the frame.
+    "card_stack",
+    # scene props: {"title", "brief", "viewBox", "defs", "layers"}: a drawn world replacing the room; the
+    #   speaker is pulled back a little so it shows.
+    "scene",
+    # chart props: {"headline", "kind": "line" | "bars", "values": [numbers], "labels": [str], "unit"}: an
+    #   animated chart panel behind the pulled-back speaker, for numbers that are actually said.
+    "chart",
 ]
 
 # Effects around the cut-out speaker; analyze only proposes them when green-screen effects are on.
 AROUND_GRAPHIC_TYPES: tuple[str, ...] = ("orbit", "fly_out", "particles")
+# Stage graphics behind the cut-out speaker (ADR 0611); also only with green-screen effects on.
+STAGE_GRAPHIC_TYPES: tuple[str, ...] = ("card_stack", "scene", "chart")
 # Graphic types the analyze stage's main list offers; "media" only comes from the user's own uploads.
 GENERATED_GRAPHIC_TYPES: tuple[str, ...] = tuple(
-    t for t in get_args(GraphicType) if t != "media" and t not in AROUND_GRAPHIC_TYPES
+    t for t in get_args(GraphicType) if t != "media" and t not in AROUND_GRAPHIC_TYPES + STAGE_GRAPHIC_TYPES
 )
 
 
@@ -186,6 +200,10 @@ class GraphicsStyle(_Model):
     density: Literal["minimal", "balanced", "heavy"] = "balanced"
     theme: Literal["clean", "bold", "playful", "cinematic"] = "bold"
     accent_color: str = "#FFE600"
+    # Stage graphics (ADR 0611): a second colour for tags and chart details (default: the accent) and the
+    # dark colour of panels and card labels.
+    secondary_color: str | None = None
+    panel_color: str = "#0E1330"
 
 
 class Pacing(_Model):

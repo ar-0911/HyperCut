@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {aroundElements, faceBox, faceClearance, passElements, rand} from './Around';
+import {aroundElements, artFor, faceBox, faceClearance, PARTICLE_COUNT, passElements, rand} from './Around';
+import {builtinIcon} from './icons';
 import {depthAt, modeAt} from './layout';
 import {normalizePlan, type Graphic} from './plan';
 
@@ -45,7 +46,7 @@ describe('effects around the speaker', () => {
 		const box = faceBox(face, W, H);
 		expect(faceClearance({x: face.x, y: face.y, size: 100}, box)).toBe(0);
 		expect(faceClearance({x: 100, y: 1700, size: 100}, box)).toBe(1);
-		const onFace = {key: 'k', x: face.x, y: face.y, size: 80, depth: 0.9, opacity: 1, rotate: 0, content: {kind: 'item' as const, text: 'x'}};
+		const onFace = {key: 'k', x: face.x, y: face.y, size: 80, depth: 0.9, opacity: 1, rotate: 0, content: {kind: 'item' as const, art: {viewBox: '0 0 100 100', body: ''}}};
 		expect(passElements([onFace], 'front', box)).toEqual([]);
 		expect(passElements([onFace], 'all', box)).toEqual([]);
 		for (let t = 2; t < 7; t += 0.1) {
@@ -58,10 +59,22 @@ describe('effects around the speaker', () => {
 		}
 	});
 
+	it('items are drawn graphics: Claude\'s drawing, else a built-in icon, never the raw text', () => {
+		const drawn = {viewBox: '0 0 400 400', body: '<circle r="9"/>'};
+		const fx = g('orbit', {items: ['stack of coins', 'rocket launch', '🔥'], art: {'stack of coins': drawn, 'rocket launch': null}});
+		expect(artFor(fx, 'stack of coins', 0, '#f00')).toEqual(drawn);
+		const rocket = artFor(fx, 'rocket launch', 1, '#f00');
+		expect(rocket.viewBox).toBe('0 0 100 100');
+		expect(rocket.body).toBe(builtinIcon('rocket', '#f00'));
+		expect(rocket.body).toContain('#f00');
+		expect(artFor(fx, '🔥', 2, '#f00').body).not.toContain('🔥');
+		expect(builtinIcon('supper', '#f00')).toBe(builtinIcon('zzz', '#f00', 0)); // no match inside words
+	});
+
 	it('particles are a pure function of time', () => {
 		const p = g('particles', {kind: 'confetti'});
 		expect(aroundElements(p, 4, face, W, H)).toEqual(aroundElements(p, 4, face, W, H));
-		expect(aroundElements(p, 4, face, W, H)).toHaveLength(34);
+		expect(aroundElements(p, 4, face, W, H)).toHaveLength(PARTICLE_COUNT.confetti);
 		expect(rand('x', 1)).toBeGreaterThanOrEqual(0);
 		expect(rand('x', 1)).toBeLessThan(1);
 	});

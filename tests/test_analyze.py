@@ -238,24 +238,63 @@ def test_behind_titles_skip_split_and_visual_stretches():
     assert [g.props["text"] for g in out] == ["A"]
 
 
-def test_effects_around_the_speaker_only_when_on(sample, fake_llm):
-    answer = {**GOOD, "around": [{"type": "orbit", "start": 1.0, "end": 2.5, "items": ["🔥", "big money talk", "", "💡"]}]}
+def test_stage_graphics_only_when_on(sample, fake_llm, monkeypatch):
+    from hypercut.analyze import visuals
+
+    drawn = []
+    monkeypatch.setattr(visuals, "illustrate", lambda briefs, *a: drawn.append((briefs, a)) or [
+        {"viewBox": "0 0 1000 800", "defs": "", "layers": ["<g/>"]} for _ in briefs])
+    answer = {**GOOD, "stage": [{"type": "card_stack", "start": 1.0, "end": 9.0, "cards": [
+        {"title": "Registered nurse today", "brief": "a nurse with a clipboard"}, {"title": ""}]}]}
     calls = fake_llm(answer)
-    assert not any(g.type == "orbit" for g in run(sample).graphics)
-    assert "AROUND the speaker" not in calls[0]
+    assert not any(g.type == "card_stack" for g in run(sample).graphics)
+    assert '"stage"' not in calls[0]
 
     p = run(sample, style=Style(depth={"enabled": True}))
-    assert "AROUND the speaker" in calls[1]
-    orbit = next(g for g in p.graphics if g.type == "orbit")
-    assert (orbit.id, orbit.props["items"]) == ("o1", ["🔥", "big money", "💡"])
-    assert not any(g.type == "orbit" for g in run(sample, style=Style(depth={"enabled": True, "around": False})).graphics)
+    assert '"stage"' in calls[1]
+    card = next(g for g in p.graphics if g.type == "card_stack")
+    assert card.id == "s1" and card.end == 1.0 + 5.5
+    assert [c["title"] for c in card.props["cards"]] == ["Registered nurse today"]
+    assert card.props["cards"][0]["layers"] == ["<g/>"]  # drawn
+    assert "a nurse with a clipboard" in drawn[-1][0][0]
+    off = run(sample, style=Style(depth={"enabled": True, "around": False}))
+    assert not any(g.type == "card_stack" for g in off.graphics)
+
+
+def test_stage_graphics_are_cleaned():
+    from hypercut.analyze.stage import add_stage, parse_stage
+    from hypercut.plan import Graphic, LayoutSpan
+
+    items = [
+        {"type": "chart", "start": 1, "end": 3, "headline": "20 years of growth", "kind": "pie",
+         "values": [1, "2", "x", 8], "labels": ["a"]},
+        {"type": "scene", "start": 2, "end": 4, "brief": "a beach"},  # overlaps the chart
+        {"type": "chart", "start": 5, "end": 7, "values": [3]},  # one value: nothing to chart
+        {"type": "scene", "start": 8, "end": 9, "brief": ""},
+        {"type": "scene", "start": 10, "end": 20, "title": "Morning", "brief": "a kitchen"},
+        {"type": "orbit", "start": 21, "end": 23, "items": ["a"]},
+    ]
+    out = parse_stage(items, duration=30, limit=5)
+    assert [(g.type, g.start, g.end) for g in out] == [("chart", 1, 3), ("scene", 10, 15)]
+    assert out[0].props == {"headline": "20 years of", "kind": "line", "values": [1.0, 2.0, 8.0],
+                            "labels": ["a", "", ""], "unit": ""}
+    from hypercut.plan import EditPlan, Source
+
+    title = Graphic(id="b1", type="kinetic_text", start=11, end=12, props={"text": "X"}, layer="behind")
+    card = Graphic(id="g1", type="stat_card", start=11, end=12, props={})
+    panel = Graphic(id="v1", type="illustration", start=0, end=4, props={})
+    plan = EditPlan(source=Source(path="v", width=1920, height=1080, fps=30, duration=30),
+                    graphics=[title, card, panel], layout=[LayoutSpan(start=0, end=6, mode="split")])
+    add_stage(plan, out)
+    assert [g.id for g in plan.graphics] == ["s1", "s2"]  # the panel, the card and the title made way
+    assert [(s.start, s.end, s.mode) for s in plan.layout] == [(0, 1, "split"), (3, 6, "split")]  # speaker full frame under the chart
 
 
 def test_effects_around_are_cleaned_and_capped():
     from hypercut.analyze.analyze import _around
 
     items = [
-        {"type": "orbit", "start": 1.0, "end": 20.0, "items": ["A"]},
+        {"type": "orbit", "start": 1.0, "end": 20.0, "items": ["A", "stack of gold coins today"]},
         {"type": "fly_out", "start": 2.0, "end": 3.0, "items": ["x"]},  # overlaps the orbit
         {"type": "particles", "start": 7.5, "end": 9.0, "kind": "glitter"},
         {"type": "lasers", "start": 10, "end": 11},
@@ -264,7 +303,7 @@ def test_effects_around_are_cleaned_and_capped():
     ]
     out = _around(items, duration=30, limit=2)
     assert [(g.type, g.start, g.end, g.props) for g in out] == [
-        ("orbit", 1.0, 7.0, {"items": ["A"]}),  # capped at 6 s
+        ("orbit", 1.0, 7.0, {"items": ["A", "stack of gold"]}),  # capped at 6 s, 3 words an item
         ("particles", 7.5, 9.0, {"kind": "sparkles"}),  # unknown kind -> sparkles; the limit drops the last
     ]
 
@@ -277,3 +316,23 @@ def test_effects_around_skip_split_and_visual_stretches():
           Graphic(id="", type="orbit", start=6, end=7, props={"items": ["A"]})]
     out = add_around([], fx, [LayoutSpan(start=5, end=8, mode="visual")])
     assert [(g.id, g.type) for g in out] == [("o1", "particles")]
+
+
+def test_drawn_graphics_are_keyed_by_item():
+    from hypercut.analyze.analyze import draw_around
+    from hypercut.plan import Graphic
+
+    asked = []
+
+    def draw(names, accent):
+        asked.append(names)
+        return [None if n == "cloud" else {"viewBox": "0 0 400 400", "body": f"<g>{n}</g>"} for n in names]
+
+    orbit = Graphic(id="o1", type="orbit", start=0, end=3, props={"items": ["rocket", "cloud"]})
+    fly = Graphic(id="o2", type="fly_out", start=4, end=6, props={"items": ["rocket"]})
+    assert draw_around([orbit, fly], Style(), draw)
+    assert asked == [["cloud", "rocket"]]  # each name drawn once
+    assert list(orbit.props["art"]) == ["rocket"] and fly.props["art"]["rocket"]["body"] == "<g>rocket</g>"
+    orbit.props["items"] = ["rocket", "moon"]  # renamed in the editor: only the new one is drawn
+    draw_around([orbit, fly], Style(), draw)
+    assert asked[-1] == ["moon"] and set(orbit.props["art"]) == {"rocket", "moon"}

@@ -4,6 +4,7 @@ from typing import Any
 
 from hypercut import llm
 from hypercut.analyze import cuts as cutting
+from hypercut.analyze import stage
 from hypercut.analyze.visuals import merge_graphics, plan_visuals
 from hypercut.plan import (
     AROUND_GRAPHIC_TYPES, GENERATED_GRAPHIC_TYPES, BackgroundSpan, EditPlan, Graphic, Hook, HookCandidate, Source, Style, Transcript, Zoom,
@@ -19,7 +20,6 @@ ZOOMS_PER_MIN = {"none": 0, "low": 2, "medium": 4, "high": 8}
 EASES = ("linear", "ease_in_out", "snap")
 ANCHORS = ("auto", "top", "center", "bottom")
 BEHIND_PER_MIN = 3  # big titles behind the speaker per minute, with green-screen effects on
-AROUND_PER_MIN = 3  # effects around the speaker per minute, with green-screen effects on
 PARTICLE_KINDS = ("sparkles", "bokeh", "confetti", "embers")
 MAX_AROUND_SECONDS = {"orbit": 6.0, "fly_out": 3.5, "particles": 12.0}
 BACKGROUNDS = ("original", "blur", "dim", "gradient")
@@ -63,12 +63,7 @@ Also return these keys in the same object:
   ],
   "backgrounds": [  // optional stretches where the background changes, for emphasis; the rest stays "{background}"
     {{"start": <s>, "end": <s>, "kind": "original"|"blur"|"dim"|"gradient"}}
-  ],
-  "around": [  // at most {max_around} effects that happen AROUND the speaker, passing behind and in front of them (never over the face), on moments that suit them; not overlapping each other
-    {{"type": "orbit", "start": <s>, "end": <s>, "items": ["<2-5 emoji or 1-2 word labels for what is said>"]}},  // a ring of things circling the speaker's shoulders, 2.5-5 s
-    {{"type": "fly_out", "start": <s>, "end": <s>, "items": ["<2-4 emoji or words>"]}},  // things bursting out from behind the head toward the camera, 1.5-3 s, for a reveal or a big claim
-    {{"type": "particles", "start": <s>, "end": <s>, "kind": "sparkles"|"bokeh"|"confetti"|"embers"}}  // atmosphere drifting around the speaker, 3-10 s; confetti for a win, embers for intensity
-  ]"""
+  ]{stage}"""
 
 
 def analyze(
@@ -96,8 +91,11 @@ def analyze(
     max_zooms = _cap(ZOOMS_PER_MIN[style.camera.zoom_frequency], minutes)
     depth = style.depth.enabled
     max_behind = _cap(BEHIND_PER_MIN, minutes) if depth and style.depth.behind_titles else 0
-    max_around = _cap(AROUND_PER_MIN, minutes) if depth and style.depth.around else 0
-    extra = DEPTH_PROMPT.format(max_behind=max_behind, max_around=max_around, background=style.depth.background) if depth else ""
+    max_stage = _cap(stage.STAGE_PER_MIN, minutes) if depth and style.depth.around else 0
+    extra = DEPTH_PROMPT.format(
+        max_behind=max_behind, background=style.depth.background,
+        stage=stage.PROMPT.format(max_stage=max_stage) if max_stage else "",
+    ) if depth else ""
     raw = llm.ask_json(
         PROMPT.format(
             words="\n".join(f"{i} {w.start:.2f} {w.text}" for i, w in enumerate(words)),
@@ -136,7 +134,8 @@ def analyze(
     if depth:
         plan.backgrounds = _backgrounds(raw.get("backgrounds"), source.duration)
         plan.graphics = add_behind(plan.graphics, _behind(raw.get("behind"), source.duration, max_behind), plan.layout)
-        plan.graphics = add_around(plan.graphics, _around(raw.get("around"), source.duration, max_around), plan.layout)
+        stage.add_stage(plan, stage.parse_stage(raw.get("stage"), source.duration, max_stage))
+        stage.draw_stage(plan.graphics, style)
     return plan
 
 
@@ -146,8 +145,34 @@ def around_props(kind: str, item: dict) -> dict | None:
         k = item.get("kind")
         return {"kind": k if k in PARTICLE_KINDS else "sparkles"}
     items = item.get("items")
-    items = [" ".join(str(x).split()[:2])[:16] for x in items if str(x).strip()] if isinstance(items, list) else []
+    items = [" ".join(str(x).split()[:3])[:24] for x in items if str(x).strip()] if isinstance(items, list) else []
     return {"items": items[:5]} if items else None
+
+
+def draw_around(graphics: list[Graphic], style: Style, draw=None) -> bool:
+    """Draw the orbit and fly-out items that have no graphic yet into `props.art` ({item text: {"viewBox",
+    "body"}}), in place. Keyed by the text, so an item renamed in the editor is drawn again; a failed drawing
+    stays missing and the renderer falls back to a built-in icon or the word. True if anything was drawn."""
+    from hypercut.analyze.visuals import draw_icons
+
+    def missing(g: Graphic) -> list[str]:
+        art = g.props.get("art") if isinstance(g.props.get("art"), dict) else {}
+        return [str(x) for x in g.props.get("items") or [] if str(x).strip() and str(x) not in art]
+
+    need = [g for g in graphics if g.type in ("orbit", "fly_out") and missing(g)]
+    names = sorted({n for g in need for n in missing(g)})
+    if not names:
+        return False
+    drawn = dict(zip(names, (draw or draw_icons)(names, style.graphics.accent_color)))
+    changed = False
+    for g in need:
+        art = dict(g.props.get("art") or {}) if isinstance(g.props.get("art"), dict) else {}
+        for n in missing(g):
+            if drawn.get(n):
+                art[n] = drawn[n]
+                changed = True
+        g.props = {**g.props, "art": art}
+    return changed
 
 
 def _around(items: Any, duration: float, limit: int) -> list[Graphic]:
