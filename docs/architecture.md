@@ -47,7 +47,7 @@ finished plan.
 | 4 | analyze | `hypercut/analyze` | transcript + style | `hook`, `segments`, `graphics`, `zooms` | Claude + FFmpeg loudness |
 | 5 | reframe | `hypercut/reframe` | `normalized.mp4` | `Reframe` | MediaPipe face detection |
 | 6 | render | `render/` | `plan.json` + video | `output.mp4` | Remotion (React, TypeScript) |
-| 7 | matte (only when asked) | `hypercut/matte` | `normalized.mp4` + reframe | `matte.webm` (speaker cut-out) | MediaPipe selfie segmentation + FFmpeg |
+| 7 | matte (only when asked) | `hypercut/matte` | `normalized.mp4` + reframe | `matte.webm` (speaker cut-out) | MediaPipe selfie segmentation + MODNet + FFmpeg |
 
 The API (`api/`, FastAPI) runs these stages as a job per upload and stores everything under
 `media/<job_id>/`. The web app (`web/`, Next.js) uploads, shows the hook candidates, takes the style
@@ -147,14 +147,17 @@ dropped by a running median; a shot with no face is centred (decision 0505).
 **Matte.** Only when the plan asks for green-screen effects (`style.depth.enabled`), `matte(video, source,
 reframe, out)` cuts the speaker out of every frame and writes `matte.webm`: VP9 with an alpha channel, frame
 for frame with `normalized.mp4`, the speaker's own pixels where they are and transparent elsewhere. FFmpeg
-decodes a 640 px wide copy for two MediaPipe selfie segmentation models (multi-class for a clean silhouette,
-plain selfie for what the speaker holds); `refine` keeps only the person at the reframe's main face, adds back
-held objects inside the silhouette's convex hull and averages with the previous frame except across a cut;
-the mask is piped back to FFmpeg, which scales it up and merges it with the untouched full-size frames.
-About 4 s per second of video on 4 CPUs. `run_pipeline` starts it while analyze runs; the API makes it on
-demand when the editor turns the effects on, and a render makes it if missing. Models come from
-storage.googleapis.com into `~/.cache/hypercut`. CLI `python -m hypercut.matte normalized.mp4 --plan plan.json`.
-See decision 0901.
+decodes a 1280 px wide copy. Two MediaPipe selfie segmentation models see a 640 px copy of it (multi-class
+for a clean silhouette, plain selfie for what the speaker holds); `refine` keeps only the person at the
+reframe's main face, adds back held objects inside the silhouette's convex hull and averages with the previous
+frame except across a cut. MODNet portrait matting (ONNX, optional) draws the hair and soft edges, limited to
+that speaker and filled with MediaPipe's solid body (`with_hair`); a guided filter then snaps the edge to the
+1280 px picture and a short opacity ramp trims the rim of old background (`snap_edge`). The alpha is piped
+back to FFmpeg, which scales it up and merges it with the untouched full-size frames. About 12 s per second
+of video on 4 CPUs with MODNet, 4 s without (no onnxruntime, or the model can't be downloaded). `run_pipeline`
+starts it while analyze runs; the API makes it on demand when the editor turns the effects on, and a render
+makes it if missing. Models come from storage.googleapis.com and huggingface.co into `~/.cache/hypercut`.
+CLI `python -m hypercut.matte normalized.mp4 --plan plan.json`. See decisions 0901 and 0902.
 
 **Render.** A Remotion composition (`HyperCut`, props `{plan, videoSrc}`) draws, per output frame: the
 cropped and zoomed source frame, the caption line for the current words (styled and animated by
