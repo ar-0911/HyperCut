@@ -120,3 +120,18 @@ def test_green_screen_ops():
     assert not off.style.depth.enabled
     s = assistant.summarize(plan2, [])
     assert s["depth"].startswith("on") and "bg0: media" in s["backgrounds"]
+
+
+def test_around_ops():
+    ops = [
+        {"op": "around", "type": "orbit", "start": 12, "end": 30, "items": ["🚀", "growth hacks now"]},
+        {"op": "around", "type": "particles", "start": 2, "end": 4, "kind": "confetti"},
+        {"op": "around", "type": "fly_out", "start": 5, "end": 6, "items": []},  # nothing to show
+        {"op": "around", "type": "lasers", "start": 5, "end": 6},
+    ]
+    plan, changes = assistant.apply_ops(_plan(), ops, playhead=0, assets=[])
+    assert plan.style.depth.enabled and len(changes) == 2
+    o1, o2 = (next(g for g in plan.graphics if g.id == i) for i in ("o1", "o2"))
+    assert o1.type == "orbit" and o1.props == {"items": ["🚀", "growth hacks"]} and o1.end - o1.start == 6.0
+    assert o2.type == "particles" and o2.props == {"kind": "confetti"}
+    assert all(l.mode == "speaker" for l in plan.layout if l.start < o1.end and o1.start < l.end)

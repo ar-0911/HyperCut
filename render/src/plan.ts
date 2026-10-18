@@ -18,6 +18,11 @@ export const GRAPHIC_TYPES = [
 	'illustration',
 	// Footage or a picture the user imported (B-roll). props: {src, kind: 'image' | 'video', fit, trim_start, duration, label}
 	'media',
+	// Effects around the cut-out speaker (ADR 0610), passing behind and in front of them, never over the face.
+	// orbit / fly_out props: {items: string[]} (emoji or 1-2 words); particles props: {kind: sparkles|bokeh|confetti|embers}
+	'orbit',
+	'fly_out',
+	'particles',
 ] as const;
 export type GraphicType = (typeof GRAPHIC_TYPES)[number];
 export type Anchor = 'auto' | 'top' | 'center' | 'bottom';
@@ -35,7 +40,7 @@ export type BackgroundKind = 'original' | 'blur' | 'dim' | 'color' | 'gradient' 
 /** What is behind the cut-out speaker for a stretch of source time (green-screen effects, ADR 0901). */
 export type BackgroundSpan = Span & {kind: BackgroundKind; color?: string | null; src?: string | null; parallax: number};
 /** Green-screen effects: off unless the user asked for them. */
-export type Depth = {enabled: boolean; background: BackgroundKind; behind_titles: boolean};
+export type Depth = {enabled: boolean; background: BackgroundKind; behind_titles: boolean; around: boolean};
 export type LayoutMode = 'speaker' | 'split' | 'visual';
 /** How the frame is arranged for a stretch of source time. Outside every span: speaker. */
 export type LayoutSpan = Span & {mode: LayoutMode};
@@ -122,7 +127,7 @@ export const DEFAULT_STYLE: Style = {
 	pacing: {remove_fillers: true, max_silence: 0.35, keep_pause: 0.15, speed: 1},
 	camera: {zoom_frequency: 'medium', zoom_scale: 1.15},
 	transitions: {style: 'smooth', length: 0.2, fade_in: 0, fade_out: 0.8},
-	depth: {enabled: false, background: 'original', behind_titles: true},
+	depth: {enabled: false, background: 'original', behind_titles: true, around: true},
 };
 
 /**

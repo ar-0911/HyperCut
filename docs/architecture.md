@@ -90,8 +90,8 @@ schema so a bad answer can never reach the renderer. Claude answers `{"preset", 
 are deep-merged onto the preset. Invalid output is retried once, then the preset is used as is. An empty
 prompt returns `bold_creator` with no Claude call. API: `get_preset(name)`, `style_from_prompt(prompt)`,
 CLI `python -m hypercut.style "prompt"` (see decision 0301). `style.depth` (green-screen effects) is off in
-every preset and only turned on when the prompt asks for something behind the speaker, a changed background
-or a depth look; a keyword check overrules Claude if it turns it on for a prompt that never asked (decision 0901).
+every preset and only turned on when the prompt asks for something behind or around the speaker, a changed
+background or a depth look; a keyword check overrules Claude if it turns it on for a prompt that never asked (decision 0901).
 
 **Analyze.** `analyze(transcript, source, style, audio_wav=None, strategy="cold_open")`. One Claude call
 gets the transcript as `index time word` lines and the style, and returns as JSON:
@@ -122,7 +122,9 @@ share the panel with a visual are dropped.
 
 With `style.depth.enabled` the same main call also returns a few big titles to place behind the speaker's
 head (`kinetic_text` with `layer: "behind"`, ids `b1`..., about three a minute, only in speaker stretches)
-and optional `backgrounds` stretches (blur, dim, gradient) for emphasis (decision 0901).
+and optional `backgrounds` stretches (blur, dim, gradient) for emphasis (decision 0901), plus a few effects
+around the speaker (`orbit`, `fly_out`, `particles`, ids `o1`..., about three a minute, with
+`style.depth.around`), capped in length, never overlapping, only in speaker stretches (decision 0610).
 
 **Reframe.** `reframe(video, source)` samples ~5 frames/s with OpenCV and takes the largest MediaPipe face per
 frame. The track is smoothed (exponential, with a dead zone so the crop ignores small movements), clamped so the
@@ -179,11 +181,13 @@ by a colour, gradient or imported picture/clip (`plan.backgrounds`, else `style.
 parallax drift), then graphics with `layer: "behind"` (big titles around the head, or any visual filling the
 frame), then the cut-out speaker on top, then the usual overlays. The cut-out pass is only mounted on frames
 that need it. Without a cut-out, or in split and visual stretches, behind graphics are placed in front like
-any other graphic, off the face.
+any other graphic, off the face. Effects around the speaker (`orbit`, `fly_out`, `particles`, decision 0610)
+are pure functions of time giving each element a depth: the far ones are drawn before the cut-out, the near
+ones after it, and near ones fade out before they reach the face; without a cut-out all are drawn in front.
 Run it with `npm run render -- --plan plan.json --video normalized.mp4 --out out.mp4 [--assets DIR] [--matte matte.webm]` in
 `render/` (`REMOTION_BROWSER` selects a Chromium; imported files are read from the video's folder unless
 `--assets` says otherwise). See ADRs [0601](decisions/0601-render-architecture.md) to
-[0609](decisions/0609-green-screen-layers.md).
+[0610](decisions/0610-effects-around-the-speaker.md).
 
 **API.** `uvicorn api.main:app` serves a job per upload. `POST /jobs` (multipart `video`, `style`,
 `hook_strategy`) saves to `media/<job_id>/` and returns an id; a background thread runs
@@ -221,8 +225,9 @@ the playhead on click). All edits are pure functions of the plan in `web/lib/tim
 renderer's own `buildTimeline`, with undo/redo in `web/lib/history.ts`; something inside a cold-open hook
 shows twice and both copies move together. A Style tab in the bin sets speed, pauses (re-cut on the
 server), cut style, end fade, the caption font and look, and the green-screen switch with its background; the
-inspector can put any graphic behind the speaker, and turning either on asks the API for the cut-out, which
-the preview uses once it exists (decision 0805, 0901). Picking a hook or editing a word still goes through
+inspector can put any graphic behind the speaker, the bin adds effects around the speaker (orbit, fly out,
+particles, decision 0610), and turning any of them on asks the API for the cut-out, which the preview uses once
+it exists (decision 0805, 0901). Picking a hook or editing a word still goes through
 `web/lib/rehook.ts`. Save and Render `PUT` the plan first. `npm test` in `web/` runs vitest (API client, hook
 logic, timeline edits) and a production build. See
 ADRs [0801](decisions/0801-nextjs-app-and-shared-composition.md) to [0805](decisions/0805-style-tab.md).

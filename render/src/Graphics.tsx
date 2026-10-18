@@ -292,8 +292,9 @@ const Illustration: React.FC<TemplateProps> = ({graphic, elapsed, remaining, pro
 	);
 };
 
-// Imported media is drawn by the composition (it needs the output timeline to play clips), not a template.
-const TEMPLATES: Record<Exclude<Graphic['type'], 'media'>, React.FC<TemplateProps>> = {
+// Imported media is drawn by the composition (it needs the output timeline to play clips), and effects
+// around the speaker by Around.tsx (they need the face and the cut-out), not a template.
+const TEMPLATES: Record<Exclude<Graphic['type'], 'media' | 'orbit' | 'fly_out' | 'particles'>, React.FC<TemplateProps>> = {
 	kinetic_text: KineticText,
 	stat_card: StatCard,
 	emoji_burst: EmojiBurst,
@@ -320,7 +321,7 @@ export const GraphicBody: React.FC<{
 	boxHeight: number;
 	mode: LayoutMode;
 }> = ({graphic, t, style, width, height, boxWidth, boxHeight, mode}) => {
-	const Template = graphic.type === 'media' ? undefined : TEMPLATES[graphic.type];
+	const Template = (TEMPLATES as Partial<Record<Graphic['type'], React.FC<TemplateProps>>>)[graphic.type];
 	if (!Template) return null;
 	const dur = graphic.end - graphic.start;
 	const grow = mode === 'visual' && graphic.type !== 'illustration' ? VISUAL_TEXT_SCALE : 1;

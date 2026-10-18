@@ -24,6 +24,7 @@ from hypercut import edit, llm
 from hypercut import plan as plan_mod
 from hypercut.analyze import cuts as cutting
 from hypercut.analyze import visuals
+from hypercut.analyze.analyze import MAX_AROUND_SECONDS, around_props
 from hypercut.plan import EditPlan
 
 TEXT_TYPES = ("kinetic_text", "stat_card", "list_build", "lower_third", "emoji_burst")
@@ -83,6 +84,7 @@ lower_third {{"title","subtitle"}}; emoji_burst {{"emoji"}}
 - {{"op": "pacing", "speed": 0.7-1.3, "keep_pause": 0.08 (tight) | 0.15 (natural) | 0.3 (relaxed)}}  slow down or \
 speed up the whole reel; keep_pause is how much pause stays around each cut (re-cuts the video)
 - {{"op": "behind_text", "start": s, "end": e, "text": "1-3 words"}}  a big title BEHIND the speaker's head (green-screen look; turns the effects on and keeps the speaker full frame there)
+- {{"op": "around", "type": "orbit" | "fly_out" | "particles", "start": s, "end": e, "items": ["emoji or 1-2 words"], "kind": "sparkles" | "bokeh" | "confetti" | "embers"}}  an effect happening AROUND the speaker, passing behind and in front of them (never over the face): orbit = a ring of items circling the shoulders, fly_out = items bursting from behind the head toward the camera, particles = drifting atmosphere (kind); turns the green-screen effects on and keeps the speaker full frame there
 - {{"op": "layer", "key": "g1", "layer": "behind" | "front"}}  put a graphic behind the speaker or back in front
 - {{"op": "background", "kind": "original" | "blur" | "dim" | "color" | "gradient" | "media", "start": s, "end": e, "color": "#RRGGBB", "asset": "<file name, for media>", "parallax": 0-1}}  change what is behind the speaker (turns the effects on); without start/end it applies to the whole reel; parallax drifts a replaced background for a 3D feel
 - {{"op": "depth", "enabled": false}}  turn all green-screen effects off
@@ -276,6 +278,14 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
                 edit.set_layout(plan, *span, "speaker")
                 plan.style.depth.enabled = True
                 changes.append(f"Added {text!r} behind the speaker as {g.id}")
+        elif kind == "around" and op.get("type") in plan_mod.AROUND_GRAPHIC_TYPES:
+            props = around_props(op["type"], op)
+            span = span_of(op, 3.0, MAX_AROUND_SECONDS[op["type"]]) if props else None
+            if span:
+                g = edit.add_graphic(plan, op["type"], *span, props, prefix="o")
+                edit.set_layout(plan, *span, "speaker")
+                plan.style.depth.enabled = True
+                changes.append(f"Added {op['type'].replace('_', ' ')} around the speaker as {g.id}")
         elif kind == "layer" and isinstance(by_key.get(op.get("key")), plan_mod.Graphic) and op.get("layer") in ("front", "behind"):
             g = by_key[op["key"]]
             g.layer = op["layer"]

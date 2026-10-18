@@ -5,7 +5,7 @@
 // between them, so the editor and the final render can never disagree about where something is.
 
 import {groupWords} from '@render/captions';
-import {isVisualType} from '@render/layout';
+import {isAroundType, isVisualType} from '@render/layout';
 import type {EditPlan, Graphic, GraphicType, LayoutMode, Segment} from '@render/plan';
 import {buildTimeline, frameToSource, sourceToFrames, type Timeline} from '@render/timing';
 
@@ -93,6 +93,9 @@ export const GRAPHIC_NAMES: Record<GraphicType, string> = {
 	lower_third: 'Name tag',
 	emoji_burst: 'Emoji',
 	progress_bar: 'Progress bar',
+	orbit: 'Orbit',
+	fly_out: 'Fly out',
+	particles: 'Particles',
 };
 
 export function graphicLabel(g: Graphic): string {
@@ -106,7 +109,11 @@ export function graphicLabel(g: Graphic): string {
 					? str(p.title)
 					: g.type === 'emoji_burst'
 						? str(p.emoji)
-						: str(p.title) || str(p.text);
+						: g.type === 'orbit' || g.type === 'fly_out'
+							? (Array.isArray(p.items) ? p.items.map(str).join(' ') : '')
+							: g.type === 'particles'
+								? str(p.kind)
+								: str(p.title) || str(p.text);
 	return text || GRAPHIC_NAMES[g.type];
 }
 
@@ -265,6 +272,9 @@ export const NEW_PROPS: Partial<Record<GraphicType, Record<string, unknown>>> = 
 	lower_third: {title: 'Your name', subtitle: 'What you do'},
 	emoji_burst: {emoji: '🔥'},
 	progress_bar: {},
+	orbit: {items: ['🔥', '💡', '🚀']},
+	fly_out: {items: ['💰', '📈', '🔥']},
+	particles: {kind: 'sparkles'},
 };
 
 export type Asset = {name: string; kind: 'image' | 'video'; label: string; duration?: number};
@@ -293,10 +303,12 @@ export function spanAt(plan: EditPlan, at: number, len: number): [number, number
 export function dropOnTimeline(plan: EditPlan, payload: BinPayload, at: number, base?: EditPlan | null): {plan: EditPlan; ref: ItemRef | null} {
 	switch (payload.kind) {
 		case 'graphic': {
-			const len = payload.type === 'progress_bar' ? reelDuration(plan) - at : payload.type === 'emoji_burst' ? 1.2 : 2.5;
+			const len = payload.type === 'progress_bar' ? reelDuration(plan) - at : payload.type === 'emoji_burst' ? 1.2 : payload.type === 'particles' ? 5 : 2.5;
 			const [start, end] = spanAt(plan, at, len);
 			const g: Graphic = {id: newGraphicId(plan, 'u'), type: payload.type, start, end, props: {...(NEW_PROPS[payload.type] ?? {})}, anchor: 'auto'};
-			return {plan: {...plan, graphics: [...plan.graphics, g]}, ref: {kind: 'graphic', id: g.id}};
+			// Effects around the speaker need the speaker cut out, so adding one turns green-screen effects on.
+			const style = isAroundType(payload.type) ? {...plan.style, depth: {...plan.style.depth, enabled: true}} : plan.style;
+			return {plan: {...plan, style, graphics: [...plan.graphics, g]}, ref: {kind: 'graphic', id: g.id}};
 		}
 		case 'asset': {
 			const a = payload.asset;
