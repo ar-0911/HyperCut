@@ -129,9 +129,11 @@ def test_around_ops():
         {"op": "around", "type": "fly_out", "start": 5, "end": 6, "items": []},  # nothing to show
         {"op": "around", "type": "lasers", "start": 5, "end": 6},
     ]
-    plan, changes = assistant.apply_ops(_plan(), ops, playhead=0, assets=[])
+    icons = lambda names, accent: [{"viewBox": "0 0 400 400", "body": "<g/>"} for _ in names]  # noqa: E731
+    plan, changes = assistant.apply_ops(_plan(), ops, playhead=0, assets=[], draw_icons=icons)
     assert plan.style.depth.enabled and len(changes) == 2
     o1, o2 = (next(g for g in plan.graphics if g.id == i) for i in ("o1", "o2"))
-    assert o1.type == "orbit" and o1.props == {"items": ["🚀", "growth hacks"]} and o1.end - o1.start == 6.0
+    assert o1.type == "orbit" and o1.props["items"] == ["🚀", "growth hacks now"] and o1.end - o1.start == 6.0
+    assert set(o1.props["art"]) == {"🚀", "growth hacks now"}
     assert o2.type == "particles" and o2.props == {"kind": "confetti"}
     assert all(l.mode == "speaker" for l in plan.layout if l.start < o1.end and o1.start < l.end)

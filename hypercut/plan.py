@@ -90,8 +90,10 @@ GraphicType = Literal[
     "media",
     # Effects AROUND the cut-out speaker (green-screen effects, ADR 0610): drawn partly behind and partly
     # in front of the speaker, never over the face. Only with `style.depth.enabled`; `layer` is ignored.
-    "orbit",  # props: {"items": [emoji or 1-2 word labels]}: a ring circling the speaker's shoulders
-    "fly_out",  # props: {"items": [...]}: things that burst from behind the head toward the camera
+    # orbit / fly_out props: {"items": [objects, 1-3 words], "art": {item: {"viewBox", "body"}}}, art being
+    # Claude-drawn sticker SVG per item (missing: the renderer uses a built-in icon or the word)
+    "orbit",  # drawn graphics circling the speaker's shoulders
+    "fly_out",  # drawn graphics bursting from behind the head toward the camera
     "particles",  # props: {"kind": "sparkles" | "bokeh" | "confetti" | "embers", "color"}: depth-layered
 ]
 

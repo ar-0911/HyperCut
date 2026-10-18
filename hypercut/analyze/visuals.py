@@ -254,6 +254,58 @@ def illustrate(briefs: list[str]) -> list[dict | None]:
     return results
 
 
+ICON_VIEWBOX = "0 0 400 400"
+ICONS_PER_CALL = 6
+
+ICON_PROMPT = """Draw one small sticker graphic per item. They float around a person in a short vertical video \
+(orbiting their shoulders or flying out from behind their head), so each must read instantly at 150 px.
+
+Rules for every SVG:
+- Root: <svg xmlns="http://www.w3.org/2000/svg" viewBox="{viewbox}">. One object, centred, filling about \
+80% of the square, on a transparent background (no backdrop shape, no frame).
+- Bold flat-vector sticker style: simple chunky shapes, thick dark outlines (#111111, 10-14px, round \
+joins), flat fills (no gradients, no <defs>), one lighter highlight shape, a slight 3/4 view for depth. \
+Palette: {palette}, plus white, #111111 and one complementary colour. No text unless the item is a number \
+or symbol (then large and bold, font-family Montserrat, Arial).
+- Not allowed: <script>, <style>, <image>, <foreignObject>, <defs>, gradients, filters, animation \
+elements, external links, event attributes, copies of real logos.
+- Keep each SVG under 2500 characters.
+
+Items:
+{items}
+
+Return {{"svgs": [{{"i": <item index>, "svg": "<svg ...>...</svg>"}}, ...]}}"""
+
+
+def draw_icons(items: list[str], palette: str = "#FFD60A") -> list[dict | None]:
+    """Draw each item (e.g. "rocket", "stack of coins") as a small sticker SVG for the effects around the
+    speaker (ADR 0610). Each result is {"viewBox", "body"} or None when drawing failed."""
+    batches = [list(range(i, min(i + ICONS_PER_CALL, len(items)))) for i in range(0, len(items), ICONS_PER_CALL)]
+    results: list[dict | None] = [None] * len(items)
+
+    def draw(idx: list[int]) -> None:
+        text = "\n".join(f"{j}: {items[k]}" for j, k in enumerate(idx))
+        try:
+            raw = llm.ask_json(ICON_PROMPT.format(viewbox=ICON_VIEWBOX, palette=palette, items=text), system=ILLUSTRATOR_SYSTEM, timeout=600)
+        except llm.LLMError as e:
+            log.warning("icon batch failed: %s", e)
+            return
+        for item in raw.get("svgs") or []:
+            if not isinstance(item, dict) or not isinstance(item.get("i"), int) or not 0 <= item["i"] < len(idx):
+                continue
+            try:
+                layers = svg_layers(str(item.get("svg") or ""))
+            except ValueError as e:
+                log.warning("icon %d rejected: %s", idx[item["i"]], e)
+                continue
+            # Several icons share the frame, so ids in <defs> could clash: icons are drawn without them.
+            results[idx[item["i"]]] = {"viewBox": layers["viewBox"], "body": "".join(layers["layers"])}
+
+    with ThreadPoolExecutor(max_workers=PARALLEL_CALLS) as pool:
+        list(pool.map(draw, batches))
+    return results
+
+
 def svg_layers(svg: str) -> dict:
     """Sanitize an SVG and split it into {"viewBox", "defs", "layers"} for the renderer.
 

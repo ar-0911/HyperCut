@@ -247,7 +247,7 @@ def test_effects_around_the_speaker_only_when_on(sample, fake_llm):
     p = run(sample, style=Style(depth={"enabled": True}))
     assert "AROUND the speaker" in calls[1]
     orbit = next(g for g in p.graphics if g.type == "orbit")
-    assert (orbit.id, orbit.props["items"]) == ("o1", ["🔥", "big money", "💡"])
+    assert (orbit.id, orbit.props["items"]) == ("o1", ["🔥", "big money talk", "💡"])
     assert not any(g.type == "orbit" for g in run(sample, style=Style(depth={"enabled": True, "around": False})).graphics)
 
 
@@ -255,7 +255,7 @@ def test_effects_around_are_cleaned_and_capped():
     from hypercut.analyze.analyze import _around
 
     items = [
-        {"type": "orbit", "start": 1.0, "end": 20.0, "items": ["A"]},
+        {"type": "orbit", "start": 1.0, "end": 20.0, "items": ["A", "stack of gold coins today"]},
         {"type": "fly_out", "start": 2.0, "end": 3.0, "items": ["x"]},  # overlaps the orbit
         {"type": "particles", "start": 7.5, "end": 9.0, "kind": "glitter"},
         {"type": "lasers", "start": 10, "end": 11},
@@ -264,7 +264,7 @@ def test_effects_around_are_cleaned_and_capped():
     ]
     out = _around(items, duration=30, limit=2)
     assert [(g.type, g.start, g.end, g.props) for g in out] == [
-        ("orbit", 1.0, 7.0, {"items": ["A"]}),  # capped at 6 s
+        ("orbit", 1.0, 7.0, {"items": ["A", "stack of gold"]}),  # capped at 6 s, 3 words an item
         ("particles", 7.5, 9.0, {"kind": "sparkles"}),  # unknown kind -> sparkles; the limit drops the last
     ]
 
@@ -277,3 +277,23 @@ def test_effects_around_skip_split_and_visual_stretches():
           Graphic(id="", type="orbit", start=6, end=7, props={"items": ["A"]})]
     out = add_around([], fx, [LayoutSpan(start=5, end=8, mode="visual")])
     assert [(g.id, g.type) for g in out] == [("o1", "particles")]
+
+
+def test_drawn_graphics_are_keyed_by_item():
+    from hypercut.analyze.analyze import draw_around
+    from hypercut.plan import Graphic
+
+    asked = []
+
+    def draw(names, accent):
+        asked.append(names)
+        return [None if n == "cloud" else {"viewBox": "0 0 400 400", "body": f"<g>{n}</g>"} for n in names]
+
+    orbit = Graphic(id="o1", type="orbit", start=0, end=3, props={"items": ["rocket", "cloud"]})
+    fly = Graphic(id="o2", type="fly_out", start=4, end=6, props={"items": ["rocket"]})
+    assert draw_around([orbit, fly], Style(), draw)
+    assert asked == [["cloud", "rocket"]]  # each name drawn once
+    assert list(orbit.props["art"]) == ["rocket"] and fly.props["art"]["rocket"]["body"] == "<g>rocket</g>"
+    orbit.props["items"] = ["rocket", "moon"]  # renamed in the editor: only the new one is drawn
+    draw_around([orbit, fly], Style(), draw)
+    assert asked[-1] == ["moon"] and set(orbit.props["art"]) == {"rocket", "moon"}

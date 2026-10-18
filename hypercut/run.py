@@ -108,6 +108,16 @@ def place_new_titles(job_dir: str | Path) -> None:
         plan_mod.save(place_titles(plan, out), path)
 
 
+def draw_new_around(job_dir: str | Path, draw=None) -> None:
+    """Draw the graphics of orbit / fly-out items added or renamed in the editor, before a render (ADR 0610)."""
+    from hypercut.analyze.analyze import draw_around
+
+    path = Path(job_dir) / "plan.json"
+    plan = plan_mod.load(path)
+    if plan.style.depth.enabled and draw_around(plan.graphics, plan.style, draw):
+        plan_mod.save(plan, path)
+
+
 def render_plan(job_dir: str | Path, out_name: str = "output.mp4", render_dir: Path = RENDER_DIR) -> Path:
     """Render `plan.json` + `normalized.mp4` in `job_dir` with the Remotion project's npm script.
     A `matte.webm` next to the video is picked up by the render script."""
@@ -117,6 +127,10 @@ def render_plan(job_dir: str | Path, out_name: str = "output.mp4", render_dir: P
         place_new_titles(job_dir)
     except Exception as e:
         log.warning("speaker cut-out failed, rendering without green-screen effects: %s", e)
+    try:
+        draw_new_around(job_dir)
+    except Exception as e:
+        log.warning("drawing effects around the speaker failed, rendering built-in icons: %s", e)
     out = job_dir / out_name
     cmd = [
         "npm", "run", "render", "--",

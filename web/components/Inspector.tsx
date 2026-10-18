@@ -64,13 +64,16 @@ function GraphicFields({plan, g, onChange}: {plan: EditPlan; g: Graphic; onChang
 		case 'fly_out':
 			return (
 				<>
-					<Field label="Emoji or short words, one per line">
+					<Field label="Things to draw, one per line">
 						<textarea
 							value={(Array.isArray(g.props.items) ? g.props.items : []).join('\n')}
 							onChange={(e) => set({items: e.target.value.split('\n')})}
 						/>
 					</Field>
-					<p className="hint">Passes behind and in front of the speaker, never over the face.</p>
+					<p className="hint">
+						Passes behind and in front of the speaker, never over the face. New items show a stock icon here and are
+						drawn to match when you render.
+					</p>
 				</>
 			);
 		case 'particles':

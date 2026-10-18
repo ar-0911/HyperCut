@@ -110,7 +110,7 @@ export function graphicLabel(g: Graphic): string {
 					: g.type === 'emoji_burst'
 						? str(p.emoji)
 						: g.type === 'orbit' || g.type === 'fly_out'
-							? (Array.isArray(p.items) ? p.items.map(str).join(' ') : '')
+							? (Array.isArray(p.items) ? p.items.map(str).join(', ') : '')
 							: g.type === 'particles'
 								? str(p.kind)
 								: str(p.title) || str(p.text);
@@ -272,8 +272,8 @@ export const NEW_PROPS: Partial<Record<GraphicType, Record<string, unknown>>> = 
 	lower_third: {title: 'Your name', subtitle: 'What you do'},
 	emoji_burst: {emoji: '🔥'},
 	progress_bar: {},
-	orbit: {items: ['🔥', '💡', '🚀']},
-	fly_out: {items: ['💰', '📈', '🔥']},
+	orbit: {items: ['rocket', 'rising chart', 'light bulb']},
+	fly_out: {items: ['stack of coins', 'trophy', 'star']},
 	particles: {kind: 'sparkles'},
 };
 

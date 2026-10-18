@@ -97,3 +97,21 @@ def test_ensure_matte(tmp_path, monkeypatch):
     assert run.ensure_matte(job, force=True) == job / "matte.webm" and len(made) == 1
     run.ensure_matte(job, force=True)
     assert len(made) == 1  # made once
+
+
+def test_items_added_in_the_editor_are_drawn_before_render(tmp_path):
+    from hypercut import plan as plan_mod
+    from hypercut.plan import Graphic
+
+    job = tmp_path / "j"
+    job.mkdir()
+    orbit = Graphic(id="u1", type="orbit", start=0, end=3, props={"items": ["rocket"]})
+    plan = EditPlan(source=SOURCE, graphics=[orbit])
+    (job / "plan.json").write_text(plan.model_dump_json())
+    draw = lambda names, accent: [{"viewBox": "0 0 400 400", "body": "<g/>"} for _ in names]  # noqa: E731
+    run.draw_new_around(job, draw)
+    assert "art" not in plan_mod.load(job / "plan.json").graphics[0].props  # effects off: nothing drawn
+    plan.style.depth.enabled = True
+    (job / "plan.json").write_text(plan.model_dump_json())
+    run.draw_new_around(job, draw)
+    assert plan_mod.load(job / "plan.json").graphics[0].props["art"]["rocket"]["body"] == "<g/>"
