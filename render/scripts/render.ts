@@ -43,21 +43,30 @@ export function findBrowser(env = process.env): string | undefined {
 }
 
 /** File names of the imported media a plan uses. Plain names only: nothing outside the asset folder. */
-export function mediaFiles(plan: {graphics: {type: string; props: Record<string, unknown>}[]}): string[] {
+export function mediaFiles(plan: {
+	graphics: {type: string; props: Record<string, unknown>}[];
+	backgrounds?: {kind: string; src?: string | null}[];
+	style?: {depth?: {enabled: boolean}};
+}): string[] {
 	const names = new Set<string>();
-	for (const g of plan.graphics) {
-		if (g.type !== 'media') continue;
-		const name = String(g.props.src ?? '');
+	const add = (raw: unknown) => {
+		const name = String(raw ?? '');
 		if (!name || name !== path.basename(name) || name.startsWith('.')) throw new Error(`bad media file name: ${JSON.stringify(name)}`);
 		names.add(name);
-	}
+	};
+	for (const g of plan.graphics) if (g.type === 'media') add(g.props.src);
+	// Background pictures and clips behind the cut-out speaker (only drawn with green-screen effects on).
+	if (plan.style?.depth?.enabled) for (const b of plan.backgrounds ?? []) if (b.kind === 'media' && b.src) add(b.src);
 	return [...names];
 }
+
+/** The speaker cut-out made by `python -m hypercut.matte` (ADR 0901). */
+export const MATTE_FILE = 'matte.webm';
 
 async function main() {
 	const args = parseArgs(process.argv.slice(2));
 	if (!args.plan || !args.video || !args.out) {
-		console.error('usage: npm run render -- --plan <plan.json> --video <file> --out <mp4> [--assets <dir>] [--composition HyperCut] [--concurrency N]');
+		console.error('usage: npm run render -- --plan <plan.json> --video <file> --out <mp4> [--assets <dir>] [--matte <webm>] [--composition HyperCut] [--concurrency N]');
 		process.exit(2);
 	}
 	const planPath = path.resolve(args.plan);
@@ -87,11 +96,23 @@ async function main() {
 		if (!fs.existsSync(from)) throw new Error(`imported file not found: ${from}`);
 		if (!fs.existsSync(path.join(publicDir, name))) place(from, name);
 	}
+	// Green-screen effects need the speaker cut-out; it sits next to the video unless --matte says otherwise.
+	// Without it the reel renders without those effects.
+	let matteSrc: string | undefined;
+	if (plan.style.depth.enabled) {
+		const matte = path.resolve(args.matte ?? path.join(path.dirname(videoPath), MATTE_FILE));
+		if (fs.existsSync(matte)) {
+			place(matte, MATTE_FILE);
+			matteSrc = MATTE_FILE;
+		} else {
+			console.warn(`no speaker cut-out at ${matte}; rendering without green-screen effects`);
+		}
+	}
 
 	try {
 		const browserExecutable = findBrowser() ?? null;
 		const serveUrl = await bundle({entryPoint: path.join(root, 'src/index.ts'), publicDir});
-		const inputProps = {plan, videoSrc: videoName};
+		const inputProps = {plan, videoSrc: videoName, matteSrc};
 		const composition = await selectComposition({
 			serveUrl,
 			id: args.composition ?? 'HyperCut',

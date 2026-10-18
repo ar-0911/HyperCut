@@ -1,8 +1,9 @@
 import React, {useMemo} from 'react';
 import {AbsoluteFill, Freeze, Img, OffthreadVideo, Sequence, staticFile, useCurrentFrame} from 'remotion';
 import {Captions} from './Captions';
+import {BackgroundFill, backgroundFilter, BehindLayer, replacesBackground} from './Depth';
 import {GraphicBody, GraphicView} from './Graphics';
-import {isVisualType, sceneAt, SPLIT, SPLIT_AREA, VISUAL_AREA, VISUAL_IN} from './layout';
+import {depthAt, isVisualType, sceneAt, SPLIT, SPLIT_AREA, VISUAL_AREA, VISUAL_IN} from './layout';
 import {normalizePlan, type CompositionProps, type EditPlan, type Graphic} from './plan';
 import {buildTimeline, frameToSource, isKept, mediaRuns, type Timeline, type TimelineSegment} from './timing';
 
@@ -57,20 +58,28 @@ export const AUDIO_EASE = 3;
 /**
  * The speaker, cropped into its panel and zoomed. Source pixels are never altered beyond scale/crop.
  * `tail` extra frames keep playing past the segment's end, fading out over the next one (smooth cuts).
+ *
+ * With green-screen effects (ADR 0901) the segment is drawn twice: `part="full"` is the footage with its
+ * background treated (blurred, dimmed) or covered by a replacement, and carries the sound; `part="cutout"`
+ * is the same frames of the speaker cut-out video, drawn on top once anything is behind the speaker.
  */
-const VideoSegment: React.FC<{plan: EditPlan; tl: Timeline; seg: TimelineSegment; src: string; tail: number; last: boolean}> = ({
-	plan,
-	tl,
-	seg,
-	src,
-	tail,
-	last,
-}) => {
+const VideoSegment: React.FC<{
+	plan: EditPlan;
+	tl: Timeline;
+	seg: TimelineSegment;
+	src: string;
+	tail: number;
+	last: boolean;
+	part?: 'full' | 'cutout';
+	matteSrc?: string;
+	assetBase?: string;
+}> = ({plan, tl, seg, src, tail, last, part = 'full', matteSrc, assetBase}) => {
 	const local = useCurrentFrame();
 	const {fps, width} = plan.output;
 	const tr = plan.style.transitions;
 	const t = seg.start + (local / fps) * tl.speed;
-	const {panel, rect, zoom, origin} = sceneAt(plan, t);
+	const {mode, panel, rect, zoom, origin} = sceneAt(plan, t);
+	const depth = depthAt(plan, t, mode, Boolean(matteSrc));
 	const punch = tr.style === 'zoom' && seg.index % 2 === 1 ? ALT_PUNCH : 1;
 	const opacity = local < seg.frames ? 1 : 1 - (local - seg.frames + 1) / (tail + 1);
 	const fadeOutFrames = last ? Math.round(tr.fade_out * fps) : 0;
@@ -81,6 +90,29 @@ const VideoSegment: React.FC<{plan: EditPlan; tl: Timeline; seg: TimelineSegment
 		const out = (seg.frames - f) / (last ? Math.max(1, fadeOutFrames) : AUDIO_EASE);
 		return Math.max(0, Math.min(1, head, out));
 	};
+	const placed: React.CSSProperties = {position: 'absolute', left: rect.left, top: rect.top, width: rect.width, height: rect.height};
+	if (part === 'cutout') {
+		if (!depth?.cutout || !matteSrc) return null;
+		const lifted = replacesBackground(depth.background.kind);
+		return (
+			<AbsoluteFill style={{opacity}}>
+				<div style={{position: 'absolute', left: 0, top: panel.top, width, height: panel.height, overflow: 'hidden'}}>
+					<AbsoluteFill style={{transform: `scale(${zoom * punch})`, transformOrigin: `${origin.x}px ${origin.y}px`}}>
+						<OffthreadVideo
+							src={matteSrc}
+							transparent
+							muted
+							startFrom={Math.round(seg.start * fps)}
+							playbackRate={tl.speed}
+							// A soft shadow so a speaker over a new background doesn't look pasted on.
+							style={{...placed, filter: lifted ? 'drop-shadow(0 18px 36px rgba(0,0,0,0.45))' : undefined}}
+						/>
+					</AbsoluteFill>
+				</div>
+			</AbsoluteFill>
+		);
+	}
+	const kind = depth?.background.kind ?? 'original';
 	return (
 		<AbsoluteFill style={{background: local < seg.frames ? '#000' : 'transparent', opacity}}>
 			<div style={{position: 'absolute', left: 0, top: panel.top, width, height: panel.height, overflow: 'hidden', background: '#000'}}>
@@ -91,11 +123,39 @@ const VideoSegment: React.FC<{plan: EditPlan; tl: Timeline; seg: TimelineSegment
 						startFrom={Math.round(seg.start * fps)}
 						playbackRate={tl.speed}
 						volume={volume}
-						style={{position: 'absolute', left: rect.left, top: rect.top, width: rect.width, height: rect.height}}
+						style={{...placed, filter: backgroundFilter(kind)}}
 					/>
 				</AbsoluteFill>
+				{depth && replacesBackground(kind) ? (
+					<BackgroundFill
+						bg={depth.background}
+						accent={plan.style.graphics.accent_color}
+						seconds={t}
+						mediaSrc={(name) => mediaSrc(name, assetBase)}
+						backdrop={<Backdrop frame={Math.round(t * fps)} fps={fps} accent={depth.background.color || plan.style.graphics.accent_color} />}
+					/>
+				) : null}
 			</div>
 		</AbsoluteFill>
+	);
+};
+
+/** Graphics behind the speaker (green-screen effects), between the footage and the cut-out speaker. */
+const Behind: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string}> = ({plan, tl, assetBase}) => {
+	const frame = useCurrentFrame();
+	const t = frameToSource(tl, frame);
+	if (t === null) return null;
+	const scene = sceneAt(plan, t);
+	const depth = depthAt(plan, t, scene.mode, true);
+	if (!depth?.behind.length) return null;
+	return (
+		<BehindLayer
+			graphics={depth.behind}
+			t={t}
+			plan={plan}
+			face={scene.face}
+			renderMedia={(g) => <MediaFill graphic={g} tl={tl} t={t} frame={frame} assetBase={assetBase} />}
+		/>
 	);
 };
 
@@ -161,7 +221,7 @@ const VisualBox: React.FC<{
 	</div>
 );
 
-const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string}> = ({plan, tl, assetBase}) => {
+const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string; hasMatte: boolean}> = ({plan, tl, assetBase, hasMatte}) => {
 	const frame = useCurrentFrame();
 	const t = frameToSource(tl, frame);
 	// Words in cut time never show, and lines are grouped from what is actually played.
@@ -171,8 +231,11 @@ const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string}> = (
 	const {width, height, fps} = plan.output;
 	const scene = sceneAt(plan, t);
 	const {mode} = scene;
-	const active = plan.graphics.filter((g) => t >= g.start && t < g.end);
-	const visuals = mode === 'speaker' ? [] : active.filter((g) => isVisualType(g.type));
+	// Graphics drawn behind the speaker are not ours; the rest of the behind layer (no cut-out, or a split
+	// or visual stretch) is placed in front, off the face, like any other graphic.
+	const behind = depthAt(plan, t, mode, hasMatte)?.behind ?? [];
+	const active = plan.graphics.filter((g) => t >= g.start && t < g.end && !behind.includes(g));
+	const visuals = mode === 'speaker' ? [] : active.filter((g) => isVisualType(g.type) && g.layer !== 'behind');
 	const media = visuals.filter((g) => g.type === 'media');
 	const boxed = visuals.filter((g) => g.type !== 'media');
 	const placed = active.filter((g) => !visuals.includes(g));
@@ -217,10 +280,12 @@ const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string}> = (
 	);
 };
 
-export const HyperCut: React.FC<CompositionProps> = ({plan: rawPlan, videoSrc, assetBase}) => {
+export const HyperCut: React.FC<CompositionProps> = ({plan: rawPlan, videoSrc, assetBase, matteSrc: rawMatte}) => {
 	const plan = useMemo(() => normalizePlan(rawPlan), [rawPlan]);
 	const tl = useMemo(() => buildTimeline(plan.segments, plan.source.duration, plan.output.fps, plan.style.pacing.speed), [plan]);
 	const src = resolveSrc(videoSrc);
+	// The cut-out is only fetched when the plan asks for green-screen effects.
+	const matteSrc = rawMatte && plan.style.depth.enabled ? resolveSrc(rawMatte) : undefined;
 	const n = tl.segments.length;
 	return (
 		<AbsoluteFill style={{background: '#000'}}>
@@ -229,11 +294,24 @@ export const HyperCut: React.FC<CompositionProps> = ({plan: rawPlan, videoSrc, a
 				const tail = tailFrames(plan, tl, seg.index);
 				return (
 					<Sequence key={seg.index} from={seg.outFrom} durationInFrames={seg.frames + tail} layout="none">
-						<VideoSegment plan={plan} tl={tl} seg={seg} src={src} tail={tail} last={seg.index === n - 1} />
+						<VideoSegment plan={plan} tl={tl} seg={seg} src={src} tail={tail} last={seg.index === n - 1} matteSrc={matteSrc} assetBase={assetBase} />
 					</Sequence>
 				);
 			})}
-			<Overlays plan={plan} tl={tl} assetBase={assetBase} />
+			{matteSrc ? (
+				<>
+					<Behind plan={plan} tl={tl} assetBase={assetBase} />
+					{[...tl.segments].reverse().map((seg) => {
+						const tail = tailFrames(plan, tl, seg.index);
+						return (
+							<Sequence key={`cut${seg.index}`} from={seg.outFrom} durationInFrames={seg.frames + tail} layout="none">
+								<VideoSegment plan={plan} tl={tl} seg={seg} src={src} tail={tail} last={seg.index === n - 1} part="cutout" matteSrc={matteSrc} />
+							</Sequence>
+						);
+					})}
+				</>
+			) : null}
+			<Overlays plan={plan} tl={tl} assetBase={assetBase} hasMatte={Boolean(matteSrc)} />
 			<Fades plan={plan} total={tl.durationInFrames} />
 		</AbsoluteFill>
 	);

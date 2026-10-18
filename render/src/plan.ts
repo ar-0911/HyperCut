@@ -22,12 +22,20 @@ export const GRAPHIC_TYPES = [
 export type GraphicType = (typeof GRAPHIC_TYPES)[number];
 export type Anchor = 'auto' | 'top' | 'center' | 'bottom';
 
+/** front: over the speaker. behind: between the background and the cut-out speaker (needs a matte). */
+export type GraphicLayer = 'front' | 'behind';
 export type Graphic = Span & {
 	id: string;
 	type: GraphicType;
 	props: Record<string, unknown>;
 	anchor: Anchor;
+	layer?: GraphicLayer;
 };
+export type BackgroundKind = 'original' | 'blur' | 'dim' | 'color' | 'gradient' | 'media';
+/** What is behind the cut-out speaker for a stretch of source time (green-screen effects, ADR 0901). */
+export type BackgroundSpan = Span & {kind: BackgroundKind; color?: string | null; src?: string | null; parallax: number};
+/** Green-screen effects: off unless the user asked for them. */
+export type Depth = {enabled: boolean; background: BackgroundKind; behind_titles: boolean};
 export type LayoutMode = 'speaker' | 'split' | 'visual';
 /** How the frame is arranged for a stretch of source time. Outside every span: speaker. */
 export type LayoutSpan = Span & {mode: LayoutMode};
@@ -65,6 +73,7 @@ export type Style = {
 	pacing: Pacing;
 	camera: {zoom_frequency: 'none' | 'low' | 'medium' | 'high'; zoom_scale: number};
 	transitions: Transitions;
+	depth: Depth;
 };
 
 export type EditPlan = {
@@ -78,6 +87,8 @@ export type EditPlan = {
 	zooms: Zoom[];
 	/** Empty: speaker full frame throughout. */
 	layout: LayoutSpan[];
+	/** Only used with style.depth.enabled and a matte. */
+	backgrounds: BackgroundSpan[];
 	reframe: {keys: ReframeKey[]};
 	style: Style;
 };
@@ -85,8 +96,10 @@ export type EditPlan = {
 /**
  * videoSrc: the speaker video. assetBase: where imported media files are fetched from (a URL prefix in
  * the browser preview); omitted in the final render, where they sit next to the video as static files.
+ * matteSrc: the speaker cut-out video (transparent outside the speaker) for green-screen effects; without
+ * it those effects are skipped and graphics meant to go behind the speaker are drawn in front, off the face.
  */
-export type CompositionProps = {plan: EditPlan; videoSrc: string; assetBase?: string};
+export type CompositionProps = {plan: EditPlan; videoSrc: string; assetBase?: string; matteSrc?: string};
 
 export const DEFAULT_CAPTION: CaptionStyle = {
 	font: 'Montserrat',
@@ -109,6 +122,7 @@ export const DEFAULT_STYLE: Style = {
 	pacing: {remove_fillers: true, max_silence: 0.35, keep_pause: 0.15, speed: 1},
 	camera: {zoom_frequency: 'medium', zoom_scale: 1.15},
 	transitions: {style: 'smooth', length: 0.2, fade_in: 0, fade_out: 0.8},
+	depth: {enabled: false, background: 'original', behind_titles: true},
 };
 
 /**
@@ -133,9 +147,10 @@ export function normalizePlan(raw: unknown): EditPlan {
 		transcript: {language: 'en', words: [], ...(r.transcript ?? {})},
 		hook: {strategy: 'cold_open', chosen: 0, candidates: [], ...(r.hook ?? {})},
 		segments: (r.segments ?? []).map((g: object) => ({reason: 'body' as const, ...g})),
-		graphics: (r.graphics ?? []).map((g: object) => ({props: {}, anchor: 'auto' as const, ...g})),
+		graphics: (r.graphics ?? []).map((g: object) => ({props: {}, anchor: 'auto' as const, layer: 'front' as const, ...g})),
 		zooms: (r.zooms ?? []).map((z: object) => ({scale: 1.15, ease: 'ease_in_out' as const, ...z})),
 		layout: (r.layout ?? []).map((l: object) => ({mode: 'speaker' as const, ...l})),
+		backgrounds: (r.backgrounds ?? []).map((b: object) => ({kind: 'blur' as const, parallax: 0, ...b})),
 		reframe: {keys: [], ...(r.reframe ?? {})},
 		style: {
 			...DEFAULT_STYLE,
@@ -145,6 +160,7 @@ export function normalizePlan(raw: unknown): EditPlan {
 			pacing: {...DEFAULT_STYLE.pacing, ...(style.pacing ?? {})},
 			camera: {...DEFAULT_STYLE.camera, ...(style.camera ?? {})},
 			transitions: {...DEFAULT_STYLE.transitions, ...(style.transitions ?? {})},
+			depth: {...DEFAULT_STYLE.depth, ...(style.depth ?? {})},
 		},
 	};
 }

@@ -155,6 +155,16 @@
         "fit": "cover",
         "label": "product shot"
       }
+    },
+    {
+      "id": "b1",
+      "type": "kinetic_text",
+      "start": 9.2,
+      "end": 11.0,
+      "props": {
+        "text": "10 HOURS"
+      },
+      "layer": "behind"
     }
   ],
   "zooms": [
@@ -188,6 +198,11 @@
     "transitions": {
       "style": "smooth",
       "fade_out": 0.8
+    },
+    "depth": {
+      "enabled": true,
+      "background": "original",
+      "behind_titles": true
     }
   },
   "layout": [
@@ -200,6 +215,14 @@
       "start": 7.5,
       "end": 9.0,
       "mode": "visual"
+    }
+  ],
+  "backgrounds": [
+    {
+      "start": 9.0,
+      "end": 12.0,
+      "kind": "blur",
+      "parallax": 0
     }
   ]
 }

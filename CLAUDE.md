@@ -21,6 +21,7 @@ and is what the TypeScript renderer and web app read. Change the schema only wit
 | style | `hypercut/style/` | prompt text | `Style` (named presets + prompt-to-style via `hypercut.llm`) |
 | analyze | `hypercut/analyze/` | transcript + style | `hook`, `segments` (cuts fillers/silence), `graphics`, `zooms` via `hypercut.llm` |
 | reframe | `hypercut/reframe/` | normalized mp4 | `Reframe` keys (MediaPipe face track, smoothed) |
+| matte | `hypercut/matte/` | normalized mp4 + reframe | `matte.webm` speaker cut-out, only when green-screen effects are asked for |
 | render | `render/` (Remotion, TypeScript) | edit plan JSON + source video | final mp4 |
 | api | `api/` (FastAPI) | uploads to local `media/` | runs the stages as a job, serves results |
 | web | `web/` (Next.js) | api | upload, pick hook, style prompt, preview, download |
@@ -47,7 +48,7 @@ needs a change, keep it small and additive.
   record in `docs/decisions/` (what, alternatives, why, consequences) and update your stage's section of
   `docs/architecture.md`.
 - Decision numbers are reserved per stage so parallel work never collides: ingest 0101+, transcribe 0201+,
-  style 0301+, analyze 0401+, reframe 0501+, render 0601+, api 0701+, web 0801+. Shared or cross-cutting
+  style 0301+, analyze 0401+, reframe 0501+, render 0601+, api 0701+, web 0801+, matte 0901+. Shared or cross-cutting
   decisions use the next free number below 0100.
 - In `docs/architecture.md`, edit only your stage's paragraph(s). Don't edit `docs/decisions/README.md`;
   the lead adds the index rows when the work lands.

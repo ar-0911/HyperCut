@@ -96,3 +96,27 @@ def test_more_pause_recuts():
     p = _plan()
     plan, changes = assistant.apply_ops(p, [{"op": "pacing", "keep_pause": 0.3}], playhead=0, assets=[])
     assert plan.style.pacing.keep_pause == 0.3 and any("Re-cut" in c for c in changes)
+
+
+def test_green_screen_ops():
+    assets = [{"name": "asset-0123456789ab.jpg", "kind": "image", "label": "beach"}]
+    ops = [
+        {"op": "behind_text", "start": 12, "end": 14, "text": "BIG NEWS today folks"},
+        {"op": "layer", "key": "v1", "layer": "behind"},
+        {"op": "background", "kind": "media", "asset": "asset-0123456789ab.jpg", "start": 2, "end": 6, "parallax": 0.5},
+        {"op": "background", "kind": "media", "asset": "missing.jpg"},
+        {"op": "background", "kind": "blur"},
+    ]
+    plan, changes = assistant.apply_ops(_plan(), ops, playhead=0, assets=assets)
+    assert plan.style.depth.enabled and plan.style.depth.background == "blur"
+    b = next(g for g in plan.graphics if g.id == "b1")
+    assert b.layer == "behind" and b.props["text"] == "BIG NEWS today" and (b.start, b.end) == (10, 12)
+    assert next(g for g in plan.graphics if g.id == "v1").layer == "behind"
+    assert plan.backgrounds == []  # the reel-wide blur came last and replaced the stretch
+    plan2, _ = assistant.apply_ops(_plan(), ops[2:3], playhead=0, assets=assets)
+    bg = plan2.backgrounds[0]
+    assert (bg.kind, bg.src, bg.parallax, bg.start, bg.end) == ("media", "asset-0123456789ab.jpg", 0.5, 0, 4)
+    off, _ = assistant.apply_ops(plan, [{"op": "depth", "enabled": False}], playhead=0, assets=[])
+    assert not off.style.depth.enabled
+    s = assistant.summarize(plan2, [])
+    assert s["depth"].startswith("on") and "bg0: media" in s["backgrounds"]

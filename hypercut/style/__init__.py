@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 
 from pydantic import ValidationError
 
@@ -14,7 +15,7 @@ from hypercut import llm
 from hypercut.plan import Style
 from hypercut.style.presets import DEFAULT_PRESET, DESCRIPTIONS, PRESETS
 
-__all__ = ["DEFAULT_PRESET", "PRESETS", "get_preset", "list_presets", "style_from_prompt"]
+__all__ = ["DEFAULT_PRESET", "asks_for_depth", "PRESETS", "get_preset", "list_presets", "style_from_prompt"]
 
 log = logging.getLogger(__name__)
 
@@ -53,10 +54,27 @@ def style_from_prompt(prompt: str) -> Style:
             if preset not in PRESETS:
                 raise ValueError(f"unknown preset {preset!r}")
             fallback = preset
-            return _merge(get_preset(preset), answer.get("changes") or {})
+            style = _merge(get_preset(preset), answer.get("changes") or {})
+            if style.depth.enabled and not asks_for_depth(prompt):
+                style.depth.enabled = False  # the user never asked for it (ADR 0901)
+            return style
         except (llm.LLMError, ValidationError, ValueError, TypeError, AttributeError) as e:
             log.warning("style attempt %d/%d failed: %s", attempt, ATTEMPTS, e)
     return get_preset(fallback)
+
+
+# Words a request for green-screen effects can't do without. A second check on Claude's answer, because
+# these effects must never switch on by themselves (ADR 0901).
+DEPTH_WORDS = re.compile(
+    r"background|backdrop|behind|green ?screen|chroma|cut ?out|matte|3 ?d\b|depth|parallax|bokeh|blur|"
+    r"pop(?:s|ping)? out|spotlight|segment|remove (?:the|my) (?:room|wall)|replace (?:the|my) (?:room|wall)",
+    re.IGNORECASE,
+)
+
+
+def asks_for_depth(prompt: str) -> bool:
+    """Whether a style prompt could be asking for green-screen effects."""
+    return bool(DEPTH_WORDS.search(prompt or ""))
 
 
 def _merge(base: Style, changes: dict) -> Style:
@@ -93,6 +111,10 @@ Style JSON schema (use only these fields and allowed values; colors are #RRGGBB)
 {schema}
 
 User request: {user_prompt}
+
+Green-screen effects (`depth`) stay off unless the request explicitly asks for them: text or graphics
+behind the speaker, removing, replacing, blurring or dimming the background, a green-screen, cut-out or 3D
+depth look. Then set depth.enabled true and pick depth.background (original keeps the real room).
 
 Answer exactly: {{"preset": "<preset name>", "changes": {{...partial style, same nesting as the schema, omit `name`...}}}}
 Use an empty "changes" object if the preset already fits."""

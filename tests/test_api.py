@@ -272,3 +272,20 @@ def test_recut_rebuilds_segments_without_saving(client, fake_stages):
     assert spans[0][1] == 2.3 and spans[1][0] == 3.7  # the 2 s pause is cut, keeping 0.3 s each side
     assert client.get(f"/jobs/{job_id}").json()["plan"]["segments"] != r.json()["segments"]
     assert client.post("/jobs/000000000000/recut", json=plan).status_code == 404
+
+
+def test_matte_endpoint_makes_the_cut_out_once(client, fake_stages, monkeypatch):
+    made = []
+
+    def matte(mp4, source, reframe, out):
+        made.append(out)
+        Path(out).write_bytes(b"webm")
+
+    monkeypatch.setattr(run, "matte", matte)
+    job_id = _submit(client)
+    _wait(client, job_id)
+    r = client.post(f"/jobs/{job_id}/matte")
+    assert r.status_code == 202
+    body = _wait(client, job_id, key="matte")
+    assert body["matte"] == "done" and "matte.webm" in body["files"]
+    assert client.post(f"/jobs/{job_id}/matte").json()["matte"] == "done" and len(made) == 1

@@ -3,7 +3,7 @@ import type {Asset} from '@/lib/timeline';
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/+$/, '');
 
-export const STAGES = ['ingest', 'transcribe', 'style', 'analyze'] as const;
+export const STAGES = ['ingest', 'transcribe', 'style', 'analyze', 'matte'] as const;
 export type Stage = (typeof STAGES)[number];
 
 export type Job = {
@@ -13,6 +13,9 @@ export type Job = {
 	error: string | null;
 	render: 'running' | 'done' | 'error' | null;
 	render_error: string | null;
+	/** The speaker cut-out for green-screen effects (made only when the user asks for those). */
+	matte?: 'running' | 'done' | 'error' | null;
+	matte_error?: string | null;
 	style: string;
 	hook_strategy: 'cold_open' | 'trim';
 	filename?: string;
@@ -75,6 +78,11 @@ export const savePlan = (id: string, plan: EditPlan) =>
 export const startRender = (id: string) => request<{id: string; render: string}>(`/jobs/${id}/render`, {method: 'POST'});
 
 export const restorePlan = (id: string) => request<EditPlan>(`/jobs/${id}/plan/restore`, {method: 'POST'});
+
+/** Start cutting the speaker out of the video (green-screen effects); a no-op once it exists. */
+export function requestMatte(id: string) {
+	return request<{id: string; matte: 'running' | 'done'}>(`/jobs/${id}/matte`, {method: 'POST'});
+}
 
 export function uploadAsset(id: string, file: File) {
 	const form = new FormData();

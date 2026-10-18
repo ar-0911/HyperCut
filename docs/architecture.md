@@ -47,6 +47,7 @@ finished plan.
 | 4 | analyze | `hypercut/analyze` | transcript + style | `hook`, `segments`, `graphics`, `zooms` | Claude + FFmpeg loudness |
 | 5 | reframe | `hypercut/reframe` | `normalized.mp4` | `Reframe` | MediaPipe face detection |
 | 6 | render | `render/` | `plan.json` + video | `output.mp4` | Remotion (React, TypeScript) |
+| 7 | matte (only when asked) | `hypercut/matte` | `normalized.mp4` + reframe | `matte.webm` (speaker cut-out) | MediaPipe selfie segmentation + FFmpeg |
 
 The API (`api/`, FastAPI) runs these stages as a job per upload and stores everything under
 `media/<job_id>/`. The web app (`web/`, Next.js) uploads, shows the hook candidates, takes the style
@@ -88,7 +89,9 @@ starting from the closest preset and changing only what the prompt asks for, the
 schema so a bad answer can never reach the renderer. Claude answers `{"preset", "changes"}`; the changes
 are deep-merged onto the preset. Invalid output is retried once, then the preset is used as is. An empty
 prompt returns `bold_creator` with no Claude call. API: `get_preset(name)`, `style_from_prompt(prompt)`,
-CLI `python -m hypercut.style "prompt"` (see decision 0301).
+CLI `python -m hypercut.style "prompt"` (see decision 0301). `style.depth` (green-screen effects) is off in
+every preset and only turned on when the prompt asks for something behind the speaker, a changed background
+or a depth look; a keyword check overrules Claude if it turns it on for a prompt that never asked (decision 0901).
 
 **Analyze.** `analyze(transcript, source, style, audio_wav=None, strategy="cold_open")`. One Claude call
 gets the transcript as `index time word` lines and the style, and returns as JSON:
@@ -117,6 +120,10 @@ reveals in order (graphic type `illustration`). Code also enforces the mix: no v
 visual-only beats in a row, visual-only under 30% of the time. Text graphics from the main call that would
 share the panel with a visual are dropped.
 
+With `style.depth.enabled` the same main call also returns a few big titles to place behind the speaker's
+head (`kinetic_text` with `layer: "behind"`, ids `b1`..., about three a minute, only in speaker stretches)
+and optional `backgrounds` stretches (blur, dim, gradient) for emphasis (decision 0901).
+
 **Reframe.** `reframe(video, source)` samples ~5 frames/s with OpenCV and takes the largest MediaPipe face per
 frame. The track is smoothed (exponential, with a dead zone so the crop ignores small movements), clamped so the
 full-height 9:16 window stays inside the frame, and stored as normalized crop-center keyframes. `cy` is the
@@ -130,6 +137,18 @@ decision 0501. Small faces in wide shots are found by also searching full-height
 cuts are checked on every frame, and in each shot the crop follows the face with the strongest track across
 the shot rather than the biggest face-like thing in each frame (a shirt pattern, hands), with stray points
 dropped by a running median; a shot with no face is centred (decision 0505).
+
+**Matte.** Only when the plan asks for green-screen effects (`style.depth.enabled`), `matte(video, source,
+reframe, out)` cuts the speaker out of every frame and writes `matte.webm`: VP9 with an alpha channel, frame
+for frame with `normalized.mp4`, the speaker's own pixels where they are and transparent elsewhere. FFmpeg
+decodes a 640 px wide copy for two MediaPipe selfie segmentation models (multi-class for a clean silhouette,
+plain selfie for what the speaker holds); `refine` keeps only the person at the reframe's main face, adds back
+held objects inside the silhouette's convex hull and averages with the previous frame except across a cut;
+the mask is piped back to FFmpeg, which scales it up and merges it with the untouched full-size frames.
+About 4 s per second of video on 4 CPUs. `run_pipeline` starts it while analyze runs; the API makes it on
+demand when the editor turns the effects on, and a render makes it if missing. Models come from
+storage.googleapis.com into `~/.cache/hypercut`. CLI `python -m hypercut.matte normalized.mp4 --plan plan.json`.
+See decision 0901.
 
 **Render.** A Remotion composition (`HyperCut`, props `{plan, videoSrc}`) draws, per output frame: the
 cropped and zoomed source frame, the caption line for the current words (styled and animated by
@@ -154,11 +173,17 @@ next to the video. `pacing.speed` slows or speeds the whole reel (segments last 
 plays at that rate, B-roll at normal speed). `transitions.style` is `hard`, `smooth` (each segment overlaps
 the next by `length` and crossfades) or `zoom` (alternate segments punched in); audio eases at every cut,
 and `fade_in`/`fade_out` fade picture and sound at the ends. Caption fonts are ten bundled Google fonts
-(`src/fonts.ts`). See decision 0608.
-Run it with `npm run render -- --plan plan.json --video normalized.mp4 --out out.mp4 [--assets DIR]` in
+(`src/fonts.ts`). See decision 0608. Green-screen effects (decision 0609) need the `matteSrc` prop (the
+cut-out video): the video layer then draws the footage with its background kept, blurred, dimmed or covered
+by a colour, gradient or imported picture/clip (`plan.backgrounds`, else `style.depth.background`, with optional
+parallax drift), then graphics with `layer: "behind"` (big titles around the head, or any visual filling the
+frame), then the cut-out speaker on top, then the usual overlays. The cut-out pass is only mounted on frames
+that need it. Without a cut-out, or in split and visual stretches, behind graphics are placed in front like
+any other graphic, off the face.
+Run it with `npm run render -- --plan plan.json --video normalized.mp4 --out out.mp4 [--assets DIR] [--matte matte.webm]` in
 `render/` (`REMOTION_BROWSER` selects a Chromium; imported files are read from the video's folder unless
 `--assets` says otherwise). See ADRs [0601](decisions/0601-render-architecture.md) to
-[0608](decisions/0608-speed-transitions-and-fonts.md).
+[0609](decisions/0609-green-screen-layers.md).
 
 **API.** `uvicorn api.main:app` serves a job per upload. `POST /jobs` (multipart `video`, `style`,
 `hook_strategy`) saves to `media/<job_id>/` and returns an id; a background thread runs
@@ -176,7 +201,9 @@ names a file the job does not have is rejected. `POST /jobs/{id}/assistant` runs
 plan it is sent and returns the edited plan without saving it. CORS allows `HYPERCUT_WEB_ORIGINS` (default
 `http://localhost:3000`). `python -m api.import_job FOLDER [--plan plan_split.json]` turns a CLI run's folder
 into a web job. `POST /jobs/{id}/recut` re-cuts a plan for new pacing with the job's audio and returns it
-unsaved (decision 0703). See ADRs [0701](decisions/0701-job-server-design.md) to
+unsaved (decision 0703). `POST /jobs/{id}/matte` makes the speaker cut-out once in the background (job
+field `matte`); the editor calls it when green-screen effects get turned on, and renders make it if it is
+missing. See ADRs [0701](decisions/0701-job-server-design.md) to
 [0703](decisions/0703-recut-endpoint.md).
 
 **Web.** `web/` is a Next.js 14 App Router app (client components, no server code) that talks to the API at
@@ -193,7 +220,9 @@ to trim, snap to word starts and other edges, and anything in the bin drags onto
 the playhead on click). All edits are pure functions of the plan in `web/lib/timeline.ts`, built on the
 renderer's own `buildTimeline`, with undo/redo in `web/lib/history.ts`; something inside a cold-open hook
 shows twice and both copies move together. A Style tab in the bin sets speed, pauses (re-cut on the
-server), cut style, end fade and the caption font and look (decision 0805). Picking a hook or editing a word still goes through
+server), cut style, end fade, the caption font and look, and the green-screen switch with its background; the
+inspector can put any graphic behind the speaker, and turning either on asks the API for the cut-out, which
+the preview uses once it exists (decision 0805, 0901). Picking a hook or editing a word still goes through
 `web/lib/rehook.ts`. Save and Render `PUT` the plan first. `npm test` in `web/` runs vitest (API client, hook
 logic, timeline edits) and a production build. See
 ADRs [0801](decisions/0801-nextjs-app-and-shared-composition.md) to [0805](decisions/0805-style-tab.md).

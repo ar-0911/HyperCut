@@ -1,14 +1,18 @@
 """python -m hypercut.run VIDEO [--style 'prompt'] [--strategy trim] [--out DIR] [--render]
 
 Runs the whole pipeline on one file without the server: ingest -> (transcribe, reframe) -> style
--> analyze (with per-beat layouts and illustrations unless --no-visuals), then writes plan.json (and output.mp4 with --render). The API calls `run_pipeline` too.
+-> analyze (with per-beat layouts and illustrations unless --no-visuals) [-> matte, when the style asks
+for green-screen effects], then writes plan.json (and output.mp4 with --render). The API calls
+`run_pipeline` too.
 """
 
 from __future__ import annotations
 
 import argparse
+import logging
 import subprocess
 import sys
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
@@ -16,6 +20,7 @@ from typing import Callable
 from hypercut import plan as plan_mod
 from hypercut.analyze import analyze
 from hypercut.ingest import ingest
+from hypercut.matte import MATTE_FILE, matte, needs_matte, place_titles
 from hypercut.plan import EditPlan
 from hypercut.reframe import reframe
 from hypercut.style import style_from_prompt
@@ -23,6 +28,8 @@ from hypercut.transcribe import transcribe
 
 ROOT = Path(__file__).resolve().parent.parent
 RENDER_DIR = ROOT / "render"
+
+log = logging.getLogger(__name__)
 
 
 def run_pipeline(
@@ -41,26 +48,75 @@ def run_pipeline(
     source, mp4, wav = ingest(video, job_dir)
 
     note("transcribe")
-    # Face tracking needs only the video, so it runs while Whisper works on the audio.
-    with ThreadPoolExecutor(max_workers=1) as pool:
+    # Face tracking needs only the video and the style only the prompt, so both run while Whisper works.
+    with ThreadPoolExecutor(max_workers=3) as pool:
         track = pool.submit(reframe, str(mp4), source)
+        styled = pool.submit(style_from_prompt, style_prompt)
         transcript = transcribe(wav)
         reframe_result = track.result()
 
-    note("style")
-    style = style_from_prompt(style_prompt)
+        note("style")
+        style = styled.result()
+        # Green-screen effects only when the style prompt asked for them (ADR 0901): the speaker cut-out
+        # is made while Claude plans the edit.
+        cutout = None
+        if style.depth.enabled:
+            cutout = pool.submit(matte, mp4, source, reframe_result, job_dir / MATTE_FILE)
 
-    note("analyze")
-    plan = analyze(transcript, source, style, audio_wav=str(wav), strategy=strategy, visuals=visuals)
+        note("analyze")
+        plan = analyze(transcript, source, style, audio_wav=str(wav), strategy=strategy, visuals=visuals)
+        if cutout is not None:
+            note("matte")
+            try:
+                cutout.result()
+            except Exception as e:  # the reel still renders, just without the cut-out effects
+                log.warning("speaker cut-out failed, rendering without green-screen effects: %s", e)
+                cutout = None
     plan = plan.model_copy(update={"reframe": reframe_result})
+    if cutout is not None:
+        place_titles(plan, job_dir / MATTE_FILE)
     plan = EditPlan.model_validate(plan.model_dump())  # fail here, not in the renderer
     plan_mod.save(plan, job_dir / "plan.json")
     return plan
 
 
+_matte_lock = threading.Lock()  # one cut-out at a time: the editor and a render may both ask
+
+
+def ensure_matte(job_dir: str | Path, force: bool = False) -> Path | None:
+    """Make the speaker cut-out for the job if its plan asks for green-screen effects (or `force`, when
+    the editor has turned them on in an unsaved plan) and there is none yet. Returns its path, or None
+    if not needed."""
+    job_dir = Path(job_dir)
+    plan = plan_mod.load(job_dir / "plan.json")
+    if not (force or needs_matte(plan)):
+        return None
+    out = job_dir / MATTE_FILE
+    with _matte_lock:
+        if not out.is_file():
+            matte(job_dir / "normalized.mp4", plan.source, plan.reframe, out)
+    return out
+
+
+def place_new_titles(job_dir: str | Path) -> None:
+    """Give titles put behind the speaker in the editor their height from the cut-out, before a render."""
+    job_dir = Path(job_dir)
+    path, out = job_dir / "plan.json", job_dir / MATTE_FILE
+    plan = plan_mod.load(path)
+    unplaced = any(g.layer == "behind" and g.type == "kinetic_text" and "y" not in g.props for g in plan.graphics)
+    if needs_matte(plan) and out.is_file() and unplaced:
+        plan_mod.save(place_titles(plan, out), path)
+
+
 def render_plan(job_dir: str | Path, out_name: str = "output.mp4", render_dir: Path = RENDER_DIR) -> Path:
-    """Render `plan.json` + `normalized.mp4` in `job_dir` with the Remotion project's npm script."""
+    """Render `plan.json` + `normalized.mp4` in `job_dir` with the Remotion project's npm script.
+    A `matte.webm` next to the video is picked up by the render script."""
     job_dir = Path(job_dir).resolve()
+    try:
+        ensure_matte(job_dir)
+        place_new_titles(job_dir)
+    except Exception as e:
+        log.warning("speaker cut-out failed, rendering without green-screen effects: %s", e)
     out = job_dir / out_name
     cmd = [
         "npm", "run", "render", "--",

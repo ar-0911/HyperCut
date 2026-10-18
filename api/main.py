@@ -18,6 +18,7 @@ from api import assets, jobs
 from hypercut import plan as plan_mod
 from hypercut import assistant, llm, run
 from hypercut.analyze import cuts as cutting
+from hypercut.matte import MATTE_FILE
 from hypercut.plan import EditPlan
 
 app = FastAPI(title="HyperCut")
@@ -61,7 +62,8 @@ def _editable(job_id: str) -> dict:
 
 
 def _media_names(plan: EditPlan) -> set[str]:
-    return {str(g.props.get("src", "")) for g in plan.graphics if g.type == "media"}
+    names = {str(g.props.get("src", "")) for g in plan.graphics if g.type == "media"}
+    return names | {b.src for b in plan.backgrounds if b.kind == "media" and b.src}
 
 
 def _process(job_id: str, video: Path, style: str, strategy: str) -> None:
@@ -83,6 +85,19 @@ def _render(job_id: str) -> None:
             jobs.write(job_id, render="done")
         except Exception as e:
             jobs.write(job_id, render="error", render_error=str(e))
+
+
+_matte_jobs: set[str] = set()  # jobs whose cut-out is being made by this server process
+
+
+def _make_matte(job_id: str) -> None:
+    try:
+        run.ensure_matte(jobs.job_dir(job_id), force=True)
+        jobs.write(job_id, matte="done", matte_error=None)
+    except Exception as e:
+        jobs.write(job_id, matte="error", matte_error=str(e))
+    finally:
+        _matte_jobs.discard(job_id)
 
 
 @app.post("/jobs", status_code=202)
@@ -220,6 +235,25 @@ def render_job(job_id: str, background: BackgroundTasks):
     jobs.write(job_id, render="running", render_error=None)
     background.add_task(_render, job_id)
     return {"id": job_id, "render": "running"}
+
+
+@app.post("/jobs/{job_id}/matte", status_code=202)
+def make_matte(job_id: str, background: BackgroundTasks):
+    """Cut the speaker out of the video for green-screen effects (ADR 0901), once. The editor asks for it
+    when the user turns the effects on; a render makes it itself if it is still missing."""
+    state = _job(job_id)
+    if state["status"] != "done":
+        raise HTTPException(409, f"job is {state['status']}; wait for the plan first")
+    if (jobs.job_dir(job_id) / MATTE_FILE).is_file():
+        jobs.write(job_id, matte="done", matte_error=None)
+        return {"id": job_id, "matte": "done"}
+    with _assets_lock:
+        start = job_id not in _matte_jobs
+        _matte_jobs.add(job_id)
+    if start:
+        jobs.write(job_id, matte="running", matte_error=None)
+        background.add_task(_make_matte, job_id)
+    return {"id": job_id, "matte": "running"}
 
 
 @app.get("/jobs/{job_id}/files/{name}")

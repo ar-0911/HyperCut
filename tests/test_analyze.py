@@ -207,3 +207,32 @@ def test_pauses_too_short_to_matter_are_not_cut():
     # 0.5 s gap minus 0.15 s kept each side leaves 0.2 s: not worth a jump cut. A 1 s gap is cut.
     t = Transcript(words=[Word(start=0, end=1, text="a"), Word(start=1.5, end=2, text="b"), Word(start=3, end=4, text="c")])
     assert cut_ranges(t, 4, max_silence=0.35, keep_pause=0.15) == [(2.15, 2.85)]
+
+
+def test_green_screen_titles_and_backgrounds_only_when_on(sample, fake_llm):
+    answer = {
+        **GOOD,
+        "behind": [{"start": 1.0, "end": 2.0, "text": "TEN HOURS A WEEK"}, {"start": 6.5, "end": 7.0, "text": "split"}],
+        "backgrounds": [{"start": 6.0, "end": 9.0, "kind": "dim"}, {"start": 1, "end": 2, "kind": "lava"}],
+    }
+    calls = fake_llm(answer)
+    off = run(sample)
+    assert "behind" not in calls[0] and off.backgrounds == [] and all(g.layer == "front" for g in off.graphics)
+
+    style = Style(depth={"enabled": True})
+    p = run(sample, style=style)
+    assert "BEHIND the speaker" in calls[1]
+    behind = [g for g in p.graphics if g.layer == "behind"]
+    assert [(g.id, g.props["text"]) for g in behind] == [("b1", "TEN HOURS A")]  # 3 words max
+    assert not any(g.type == "stat_card" and g.start < 2.0 for g in p.graphics)  # the overlapped card made room
+    assert [(b.kind, b.start) for b in p.backgrounds] == [("dim", 6.0)]
+
+
+def test_behind_titles_skip_split_and_visual_stretches():
+    from hypercut.analyze.analyze import add_behind
+    from hypercut.plan import Graphic, LayoutSpan
+
+    titles = [Graphic(id="", type="kinetic_text", start=1, end=2, props={"text": "A"}, layer="behind"),
+              Graphic(id="", type="kinetic_text", start=6, end=7, props={"text": "B"}, layer="behind")]
+    out = add_behind([], titles, [LayoutSpan(start=5, end=8, mode="split")])
+    assert [g.props["text"] for g in out] == ["A"]

@@ -1,6 +1,6 @@
 // Pure geometry: reframe interpolation, crop rectangle, zoom curve, graphic placement, layout modes.
 
-import type {Anchor, EditPlan, Graphic, GraphicType, LayoutMode, LayoutSpan, ReframeKey, Zoom} from './plan';
+import type {Anchor, BackgroundSpan, EditPlan, Graphic, GraphicType, LayoutMode, LayoutSpan, ReframeKey, Zoom} from './plan';
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
@@ -157,7 +157,9 @@ export function layoutAt(spans: LayoutSpan[], t: number): {mode: LayoutMode; ent
  */
 export function modeAt(spans: LayoutSpan[], graphics: Graphic[], t: number): {mode: LayoutMode; enter: number} {
 	const l = layoutAt(spans, t);
-	const vis = graphics.filter((g) => isVisualType(g.type));
+	// Graphics behind the speaker never open a panel: they are drawn behind the speaker, or (without a
+	// cut-out) in front of them off the face.
+	const vis = graphics.filter((g) => isVisualType(g.type) && g.layer !== 'behind');
 	const active = vis.filter((g) => t >= g.start && t < g.end);
 	if (!active.length) return {mode: 'speaker', enter: Infinity};
 	// A visual during a speaker span opens the split panel rather than covering the speaker's face.
@@ -242,4 +244,23 @@ export function sceneAt(plan: EditPlan, t: number): Scene {
 					(SPLIT - captionY('speaker', plan.style.caption.position)) * (panel.top / (SPLIT * height))
 				: captionY(mode, plan.style.caption.position),
 	};
+}
+
+/** What is behind the cut-out speaker at source time t: the span covering t, else the style default. */
+export function backgroundAt(plan: EditPlan, t: number): BackgroundSpan {
+	const span = plan.backgrounds.find((b) => t >= b.start && t < b.end);
+	return span ?? {start: 0, end: plan.source.duration, kind: plan.style.depth.background, parallax: 0};
+}
+
+/**
+ * Green-screen state at source time t (ADR 0901). Null when the effects are off: not asked for, no cut-out
+ * video, or a full-frame visual covering the speaker. `behind` lists the graphics drawn behind the
+ * speaker (only where the speaker fills the frame); `cutout` says whether the cut-out speaker must be
+ * drawn on top this frame (a replaced or treated background, or something behind them).
+ */
+export function depthAt(plan: EditPlan, t: number, mode: LayoutMode, hasMatte: boolean): {background: BackgroundSpan; behind: Graphic[]; cutout: boolean} | null {
+	if (!hasMatte || !plan.style.depth.enabled || mode === 'visual') return null;
+	const background = backgroundAt(plan, t);
+	const behind = mode === 'speaker' ? plan.graphics.filter((g) => g.layer === 'behind' && t >= g.start && t < g.end) : [];
+	return {background, behind, cutout: background.kind !== 'original' || behind.length > 0};
 }

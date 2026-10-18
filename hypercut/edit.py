@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from hypercut.plan import EditPlan, Graphic, LayoutSpan, Segment, Zoom
+from hypercut.plan import BackgroundSpan, EditPlan, Graphic, LayoutSpan, Segment, Zoom
 
 # Graphics that fill the split panel or the whole frame; only one shows well at a time.
 VISUAL_TYPES = {"illustration", "kinetic_text", "stat_card", "list_build", "media"}
@@ -151,6 +151,21 @@ def set_layout(plan: EditPlan, start: float, end: float, mode: str) -> None:
     if mode != "speaker":
         out.append(LayoutSpan(start=start, end=end, mode=mode))
     plan.layout = sorted(out, key=lambda s: s.start)
+
+
+def set_background(plan: EditPlan, start: float, end: float, new: BackgroundSpan) -> None:
+    """Make source [start, end) use background `new`, trimming or splitting the spans it overlaps."""
+    out: list[BackgroundSpan] = []
+    for span in plan.backgrounds:
+        if span.end <= start + EPS or span.start >= end - EPS:
+            out.append(span)
+            continue
+        if span.start < start - EPS:
+            out.append(span.model_copy(update={"end": start}))
+        if span.end > end + EPS:
+            out.append(span.model_copy(update={"start": end}))
+    out.append(new.model_copy(update={"start": start, "end": end}))
+    plan.backgrounds = sorted(out, key=lambda s: s.start)
 
 
 def new_id(plan: EditPlan, prefix: str) -> str:
