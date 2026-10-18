@@ -273,7 +273,7 @@ export function depthAt(
 	t: number,
 	mode: LayoutMode,
 	hasMatte: boolean,
-): {background: BackgroundSpan; behind: Graphic[]; around: Graphic[]; stage: Graphic[]; pull: number; cutout: boolean} | null {
+): {background: BackgroundSpan; behind: Graphic[]; around: Graphic[]; stage: Graphic[]; pull: number; shift: number; cutout: boolean} | null {
 	if (!hasMatte || !plan.style.depth.enabled || mode === 'visual') return null;
 	const background = backgroundAt(plan, t);
 	const speaker = mode === 'speaker';
@@ -282,19 +282,39 @@ export function depthAt(
 	const around = speaker ? aroundAt(plan, t) : [];
 	const stage = speaker ? plan.graphics.filter((g) => isStageType(g.type) && active(g)) : [];
 	const pull = speaker ? pullAt(plan, t) : 0;
+	const shift = speaker && pull > 0 ? shiftAt(plan, t, sceneAt(plan, t).face.x) : 0;
 	const cutout = background.kind !== 'original' || behind.length > 0 || around.length > 0 || stage.length > 0 || pull > 0;
-	return {background, behind, around, stage, pull, cutout};
+	return {background, behind, around, stage, pull, shift, cutout};
 }
 
-/** 0..1: how far the speaker is pulled back for a scene or chart at source time t, eased in and out. */
+/** 0..1 eased presence of a stage graphic at t: in over PULL_IN, out over PULL_IN. */
+const presence = (g: Graphic, t: number) => {
+	if (t < g.start || t >= g.end) return 0;
+	const x = Math.min(1, (t - g.start) / PULL_IN, (g.end - t) / PULL_IN);
+	return x * x * (3 - 2 * x);
+};
+
+/** 0..1: how far the speaker is pulled back for a stage graphic at source time t, eased in and out. */
 export function pullAt(plan: EditPlan, t: number): number {
-	let k = 0;
-	for (const g of plan.graphics) {
-		if ((g.type !== 'scene' && g.type !== 'chart') || t < g.start || t >= g.end) continue;
-		const x = Math.min(1, (t - g.start) / PULL_IN, (g.end - t) / PULL_IN);
-		k = Math.max(k, x * x * (3 - 2 * x));
-	}
-	return k;
+	return Math.max(0, ...plan.graphics.filter((g) => isStageType(g.type)).map((g) => presence(g, t)));
+}
+
+/** The side of the frame cards go to: away from the face, the right when the face is centred. */
+export const freeSide = (faceX: number, width: number): 'left' | 'right' => (faceX > width / 2 ? 'left' : 'right');
+
+/** Where the face goes while cards are up: a third of the way in from the side away from the cards. */
+export const CARD_FACE_X = 0.34;
+
+/**
+ * Pixels the speaker moves sideways at t: while cards are up, away from them so they have room (the
+ * reframe keeps the face near the centre, so there is rarely a free side otherwise).
+ */
+export function shiftAt(plan: EditPlan, t: number, faceX: number): number {
+	const {width} = plan.output;
+	const cards = plan.graphics.find((g) => g.type === 'card_stack' && t >= g.start && t < g.end);
+	if (!cards) return 0;
+	const target = freeSide(faceX, width) === 'left' ? (1 - CARD_FACE_X) * width : CARD_FACE_X * width;
+	return (target - faceX) * presence(cards, t);
 }
 
 /** Effects around the speaker active at source time t (drawn in speaker stretches only). */

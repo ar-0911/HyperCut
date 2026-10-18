@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {depthAt, modeAt, PULL_BACK, pullAt} from './layout';
+import {CARD_FACE_X, depthAt, modeAt, PULL_BACK, pullAt, shiftAt} from './layout';
 import {normalizePlan} from './plan';
 import {cardBoxes, chartPoints, freeSide, pulledFace, scopeIds, splitHeadline, stageFootageFilter} from './Stage';
 
@@ -8,7 +8,7 @@ const chart = {id: 's1', type: 'chart', start: 2, end: 6, props: {headline: '20 
 const cards = {id: 's2', type: 'card_stack', start: 8, end: 11, props: {cards: [{title: 'Nurse'}]}};
 
 describe('stage graphics', () => {
-	it('need depth on and a cut-out, never open a panel, and pull the speaker back for charts', () => {
+	it('need depth on and a cut-out, never open a panel, and pull the speaker back', () => {
 		const on = normalizePlan({...base, graphics: [chart, cards], style: {depth: {enabled: true}}});
 		const d = depthAt(on, 4, 'speaker', true)!;
 		expect(d.stage.map((g) => g.id)).toEqual(['s1']);
@@ -20,7 +20,12 @@ describe('stage graphics', () => {
 		expect(pullAt(on, 2)).toBe(0);
 		expect(pullAt(on, 2.2)).toBeGreaterThan(0);
 		expect(pullAt(on, 2.2)).toBeLessThan(1);
-		expect(pullAt(on, 9)).toBe(0); // cards don't pull the speaker back
+		expect(depthAt(on, 4, 'speaker', true)!.shift).toBe(0); // only cards move the speaker aside
+		// Cards pull the speaker back and move them away from the side the cards go to.
+		expect(pullAt(on, 9)).toBe(1);
+		expect(shiftAt(on, 9, 540)).toBeCloseTo(CARD_FACE_X * 1080 - 540); // face centred: cards right, speaker left
+		expect(shiftAt(on, 9, 800)).toBeCloseTo((1 - CARD_FACE_X) * 1080 - 800);
+		expect(shiftAt(on, 12, 540)).toBe(0);
 		const off = normalizePlan({...base, graphics: [chart]});
 		expect(depthAt(off, 4, 'speaker', true)).toBeNull();
 	});
@@ -39,6 +44,7 @@ describe('stage graphics', () => {
 		expect(f.scale).toBeCloseTo(1 - PULL_BACK);
 		expect(f.y).toBeCloseTo(1920 - 1320 * (1 - PULL_BACK));
 		expect(pulledFace({x: 600, y: 600}, 1920, 0).y).toBe(600);
+		expect(pulledFace({x: 600, y: 600}, 1920, 1, -200).x).toBe(400);
 	});
 
 	it('charts, headlines and drawings', () => {
@@ -51,6 +57,6 @@ describe('stage graphics', () => {
 		);
 		const g = (type: string) => ({id: 'x', type, start: 0, end: 1, props: {}, anchor: 'auto'}) as never;
 		expect(stageFootageFilter([g('card_stack')])).toContain('blur');
-		expect(stageFootageFilter([g('chart')])).toBeUndefined();
+		expect(stageFootageFilter([])).toBeUndefined();
 	});
 });

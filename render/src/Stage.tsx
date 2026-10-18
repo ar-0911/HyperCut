@@ -5,7 +5,7 @@
 import React from 'react';
 import {AbsoluteFill} from 'remotion';
 import {captionFamily} from './fonts';
-import {PULL_BACK} from './layout';
+import {freeSide, PULL_BACK} from './layout';
 import type {EditPlan, Graphic} from './plan';
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
@@ -35,10 +35,11 @@ const ArtSvg: React.FC<{art: Art; prefix: string; width: number; height: number;
 	</svg>
 );
 
-/** Where the face is once the speaker is pulled back by `pull` (0..1) about the bottom of the frame. */
-export function pulledFace(face: {x: number; y: number}, height: number, pull: number) {
+/** Where the face is once the speaker is pulled back by `pull` (0..1) about the bottom of the frame and
+ * moved `shift` px sideways. */
+export function pulledFace(face: {x: number; y: number}, height: number, pull: number, shift = 0) {
 	const s = 1 - PULL_BACK * pull;
-	return {x: face.x, y: height - (height - face.y) * s, scale: s};
+	return {x: face.x + shift, y: height - (height - face.y) * s, scale: s};
 }
 
 type Colors = {accent: string; second: string; panel: string; font: string};
@@ -49,8 +50,7 @@ const colorsOf = (plan: EditPlan): Colors => ({
 	font: `"${captionFamily(plan.style.caption.font)}", Inter, sans-serif`,
 });
 
-/** The side of the frame away from the speaker's face, where cards go. */
-export const freeSide = (faceX: number, width: number): 'left' | 'right' => (faceX > width / 2 ? 'left' : 'right');
+export {freeSide};
 
 /** Card boxes (output px) for n cards on one side: stacked down the free side, upper frame first. */
 export function cardBoxes(n: number, side: 'left' | 'right', width: number, height: number) {
@@ -62,9 +62,8 @@ export function cardBoxes(n: number, side: 'left' | 'right', width: number, heig
 	return Array.from({length: n}, (_, i) => ({x, y: top0 + i * (h + gap), w, h}));
 }
 
-const Cards: React.FC<{g: Graphic; t: number; width: number; height: number; face: {x: number; y: number}; c: Colors}> = ({g, t, width, height, face, c}) => {
+const Cards: React.FC<{g: Graphic; t: number; width: number; height: number; face: {x: number; y: number}; side: 'left' | 'right'; c: Colors}> = ({g, t, width, height, face, side, c}) => {
 	const cards = (Array.isArray(g.props.cards) ? g.props.cards : []).filter((x): x is Record<string, unknown> => !!x && typeof x === 'object').slice(0, 3);
-	const side = freeSide(face.x, width);
 	const boxes = cardBoxes(cards.length, side, width, height);
 	const dir = side === 'left' ? 1 : -1;
 	return (
@@ -117,7 +116,8 @@ const Cards: React.FC<{g: Graphic; t: number; width: number; height: number; fac
 								color: '#fff',
 								fontFamily: c.font,
 								fontWeight: 800,
-								fontSize: Math.min(0.037 * width, (b.w * 1.5) / Math.max(8, title.length)),
+								// Fit one line: the label's room after the padding and the dot, at about 0.66 em a capital.
+								fontSize: Math.min(0.037 * width, (b.w - 0.1 * width) / (Math.max(1, title.length) * 0.66)),
 								textTransform: 'uppercase',
 								letterSpacing: 0.5,
 								whiteSpace: 'nowrap',
@@ -326,18 +326,26 @@ const Chart: React.FC<{g: Graphic; t: number; width: number; height: number; c: 
 	);
 };
 
-/** CSS filter for the real footage while cards are up: out of focus, so the cards and the speaker read in
- * front of it. Scenes and charts cover the footage (the pulled-back speaker would leave a ghost of itself). */
+/** CSS filter for the real footage under stage graphics. It is covered by the scene or the studio backdrop
+ * (the pulled-back speaker would leave a ghost of itself), but shows through while they fade in and out. */
 export function stageFootageFilter(stage: Graphic[]): string | undefined {
-	return stage.some((g) => g.type === 'card_stack') ? 'blur(12px) brightness(0.7) saturate(0.85)' : undefined;
+	return stage.length ? 'blur(16px) brightness(0.6) saturate(0.8)' : undefined;
 }
 
 /** Stage graphics at source time t, drawn behind the cut-out speaker. `face` is the face before pull-back. */
-export const StageLayer: React.FC<{graphics: Graphic[]; t: number; plan: EditPlan; face: {x: number; y: number}; pull: number}> = ({graphics, t, plan, face, pull}) => {
+export const StageLayer: React.FC<{graphics: Graphic[]; t: number; plan: EditPlan; face: {x: number; y: number}; pull: number; shift: number}> = ({
+	graphics,
+	t,
+	plan,
+	face,
+	pull,
+	shift,
+}) => {
 	const {width, height} = plan.output;
 	const c = colorsOf(plan);
-	const f = pulledFace(face, height, pull);
-	const studio = graphics.some((g) => g.type === 'chart') && !graphics.some((g) => g.type === 'scene');
+	const f = pulledFace(face, height, pull, shift);
+	const side = freeSide(face.x, width);
+	const studio = !graphics.some((g) => g.type === 'scene');
 	return (
 		<AbsoluteFill>
 			{studio ? (
@@ -359,7 +367,7 @@ export const StageLayer: React.FC<{graphics: Graphic[]; t: number; plan: EditPla
 				) : g.type === 'chart' ? (
 					<Chart key={g.id} g={g} t={t} width={width} height={height} c={c} />
 				) : g.type === 'card_stack' ? (
-					<Cards key={g.id} g={g} t={t} width={width} height={height} face={f} c={c} />
+					<Cards key={g.id} g={g} t={t} width={width} height={height} face={f} side={side} c={c} />
 				) : null,
 			)}
 		</AbsoluteFill>

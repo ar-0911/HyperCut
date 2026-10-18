@@ -189,9 +189,9 @@ any other graphic, off the face. Effects around the speaker (`orbit`, `fly_out`,
 are pure functions of time giving each element a depth: the far ones are drawn before the cut-out, the near
 ones after it, and near ones fade out before they reach the face; without a cut-out all are drawn in front.
 Items are the drawn stickers, or a built-in icon (`src/icons.ts`) when there is no drawing. Stage graphics
-(`src/Stage.tsx`, decision 0611) are drawn in the behind layer: cards slide out from behind the speaker into
-the free side, a scene replaces the room, a chart builds over a studio backdrop; for scenes and charts the
-cut-out is pulled back to 74% about the bottom of the frame.
+(`src/Stage.tsx`, decision 0611) are drawn in the behind layer: cards slide out from behind the speaker down
+one side, a scene replaces the room, a chart builds over a studio backdrop; the cut-out is pulled back to 74%
+about the bottom of the frame (and moved aside for cards).
 Run it with `npm run render -- --plan plan.json --video normalized.mp4 --out out.mp4 [--assets DIR] [--matte matte.webm]` in
 `render/` (`REMOTION_BROWSER` selects a Chromium; imported files are read from the video's folder unless
 `--assets` says otherwise). See ADRs [0601](decisions/0601-render-architecture.md) to

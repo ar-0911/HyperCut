@@ -7,18 +7,22 @@ Status: accepted, 2026-10-18
 for one:
 
 - `card_stack` (`props.cards`: 1-3 `{title, brief}` plus the drawing): illustrated cards that start behind
-  the speaker's head and slide out in 3D into the side of the frame away from the face, one after another.
-  When the speaker names things: roles, steps, products, places. The footage behind goes out of focus.
+  the speaker's head and slide out in 3D down one side of the frame, one after another, while the speaker
+  is pulled back and moved to the other third. When the speaker names things: roles, steps, products,
+  places.
 - `scene` (`title`, `brief` plus the drawing): a drawn world, tall 1080x1920, replacing the room, with a
   slow push-in and the edges falling off into the panel colour. For an intro or a change of topic.
 - `chart` (`headline`, `kind`: line or bars, `values`, `labels`, `unit`): a headline with its number in white
   and its words in the accent, over a dark panel where the line draws on (or the bars grow) and the last value
   pops in a tag. Over a dark studio backdrop. Only for numbers that are actually said.
 
-For a scene or a chart the speaker is pulled back: scaled to 74% about the bottom of the frame under the face,
-eased over 0.45 s, so the graphic shows above and around them. The speaker's pixels are still the original
-pixels, only smaller. A scene or the chart's backdrop covers the real footage, so the full-size speaker never
-shows as a ghost behind the smaller one.
+For every stage graphic the speaker is pulled back: scaled to 74% about the bottom of the frame under the
+face, eased over 0.45 s, so the graphic shows above and around them; for cards they also move sideways so the
+face sits a third of the way in from the other side (the reframe keeps the face centred, so in a close-up
+there is no free side otherwise; the first test reel had the cards hidden behind the speaker's hair). Camera
+punch-ins fade out while pulled back. The speaker's pixels are still the original pixels, only smaller and
+moved. A scene, or a dark studio backdrop for cards and charts, covers the real footage, so the full-size
+speaker never shows as a ghost behind the smaller one.
 
 Analyze asks for them in the main call (`"stage"`, at most two a minute, "most reels need 1-3, [] when
 nothing calls for it"), drops overlaps and those outside speaker stretches, caps cards at 5.5 s and scenes and
@@ -39,5 +43,6 @@ backgrounds: costly, and generated pictures next to real footage look fake. Char
 data would not animate and could not be edited as numbers.
 
 **Consequences.** Without a cut-out (not made yet, or it failed) stage graphics are not drawn at all, since
-they would cover the speaker. Each card or scene costs a share of an illustrator call. In close-ups the cards
-can be partly hidden by the speaker; the free side of the frame is where they fit.
+they would cover the speaker. Each card or scene costs a share of an illustrator call. Cards and charts
+always sit on the same studio backdrop, which gives the reel a consistent look but hides the real room for
+those few seconds.

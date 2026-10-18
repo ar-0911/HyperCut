@@ -96,13 +96,15 @@ const VideoSegment: React.FC<{
 	if (part === 'cutout') {
 		if (!depth?.cutout || !matteSrc) return null;
 		const lifted = replacesBackground(depth.background.kind) || depth.pull > 0;
-		// A scene or chart pulls the speaker back about the bottom of the frame under the face (ADR 0611).
+		// Stage graphics pull the speaker back about the bottom of the frame under the face, and cards move
+		// them aside (ADR 0611).
 		const pullScale = 1 - PULL_BACK * depth.pull;
 		return (
 			<AbsoluteFill style={{opacity}}>
 				<div style={{position: 'absolute', left: 0, top: panel.top, width, height: panel.height, overflow: 'hidden'}}>
-					<AbsoluteFill style={{transform: pullScale < 1 ? `scale(${pullScale})` : undefined, transformOrigin: `${origin.x}px ${panel.height}px`}}>
-						<AbsoluteFill style={{transform: `scale(${zoom * punch})`, transformOrigin: `${origin.x}px ${origin.y}px`}}>
+					<AbsoluteFill style={{transform: pullScale < 1 ? `translateX(${depth.shift}px) scale(${pullScale})` : undefined, transformOrigin: `${origin.x}px ${panel.height}px`}}>
+						{/* A pulled-back speaker holds still: punch-ins fade out with the pull. */}
+						<AbsoluteFill style={{transform: `scale(${1 + (zoom * punch - 1) * (1 - depth.pull)})`, transformOrigin: `${origin.x}px ${origin.y}px`}}>
 							<OffthreadVideo
 								src={matteSrc}
 								transparent
@@ -156,7 +158,7 @@ const Behind: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string}> = ({p
 	if (!depth?.behind.length && !depth?.around.length && !depth?.stage.length) return null;
 	return (
 		<>
-			{depth.stage.length ? <StageLayer graphics={depth.stage} t={t} plan={plan} face={scene.face} pull={depth.pull} /> : null}
+			{depth.stage.length ? <StageLayer graphics={depth.stage} t={t} plan={plan} face={scene.face} pull={depth.pull} shift={depth.shift} /> : null}
 			{depth.behind.length ? (
 				<BehindLayer
 					graphics={depth.behind}
