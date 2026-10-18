@@ -5,9 +5,10 @@ import {useRef, useState, type DragEvent} from 'react';
 import {fileUrl} from '@/lib/api';
 import {GRAPHIC_NAMES, LAYOUT_NAMES, graphicLabel, removedGraphics, type Asset, type BinPayload} from '@/lib/timeline';
 import {chooseHook, editWord} from '@/lib/rehook';
+import StylePanel from './StylePanel';
 import {DRAG_TYPE} from './Timeline';
 
-type Tab = 'add' | 'media' | 'hook' | 'captions';
+type Tab = 'add' | 'media' | 'style' | 'hook' | 'captions';
 
 const ADDABLE: GraphicType[] = ['kinetic_text', 'stat_card', 'list_build', 'lower_third', 'emoji_burst', 'progress_bar'];
 const ICONS: Partial<Record<GraphicType, string>> = {
@@ -45,6 +46,7 @@ export default function Bin({
 	onChange,
 	onUpload,
 	onDeleteAsset,
+	onRecut,
 }: {
 	jobId: string;
 	plan: EditPlan;
@@ -54,6 +56,7 @@ export default function Bin({
 	onChange: (plan: EditPlan) => void;
 	onUpload: (files: File[]) => Promise<void>;
 	onDeleteAsset: (name: string) => void;
+	onRecut: (plan: EditPlan) => Promise<void>;
 }) {
 	const [tab, setTab] = useState<Tab>('add');
 	const [uploading, setUploading] = useState(0);
@@ -78,6 +81,7 @@ export default function Bin({
 					[
 						['add', 'Add'],
 						['media', 'Media'],
+						['style', 'Style'],
 						['hook', 'Hook'],
 						['captions', 'Captions'],
 					] as [Tab, string][]
@@ -174,6 +178,8 @@ export default function Bin({
 					)}
 				</>
 			)}
+
+			{tab === 'style' && <StylePanel plan={plan} onChange={onChange} onRecut={onRecut} />}
 
 			{tab === 'hook' &&
 				(hook.candidates.length === 0 ? (

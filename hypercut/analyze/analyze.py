@@ -39,7 +39,10 @@ Return one JSON object:
   ],
   "zooms": [  // at most {max_zooms} punch-ins on emphasised words or topic changes; 1-3 s each
     {{"start": <s>, "end": <s>, "ease": "ease_in_out"|"snap"|"linear"}}
-  ]
+  ],
+  "ending": {{"word": <index of the last word to keep>, "why": "<...>"}}  // where the video should end: \
+the last word of a complete sentence that lands as a conclusion (a payoff, a recommendation, a call to action), \
+never a trailing fragment, a half sentence or a line cut off by the recording
 }}
 Graphic props: kinetic_text {{"text"}}; stat_card {{"value","label"}}; emoji_burst {{"emoji"}}; \
 list_build {{"items": [..]}}; lower_third {{"title","subtitle"}}; progress_bar {{}}.
@@ -90,10 +93,16 @@ def analyze(
 
     silences = cutting.detect_silences(audio_wav, style.pacing.max_silence) if audio_wav else []
     cuts = cutting.cut_ranges(
-        transcript, source.duration, style.pacing.max_silence, style.pacing.remove_fillers, silences
+        transcript, source.duration, style.pacing.max_silence, style.pacing.remove_fillers, silences,
+        keep_pause=style.pacing.keep_pause,
     )
     hook_span = (candidates[0].start, candidates[0].end) if candidates else None
     plan.segments = cutting.build_segments(source.duration, cuts, hook_span, strategy)
+    ending = raw.get("ending")
+    preferred = _num(ending.get("word")) if isinstance(ending, dict) else None
+    last = cutting.ending_word(transcript, int(preferred) if preferred is not None and preferred == int(preferred) else None)
+    if last is not None:
+        plan.segments = cutting.end_at(plan.segments, transcript, last)
     if visuals:
         layout, art = plan_visuals(transcript, plan.segments, source.duration, style, hook_span)
         plan.layout = layout

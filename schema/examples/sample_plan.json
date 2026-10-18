@@ -180,7 +180,15 @@
     ]
   },
   "style": {
-    "name": "bold_creator"
+    "name": "bold_creator",
+    "pacing": {
+      "speed": 1.0,
+      "keep_pause": 0.15
+    },
+    "transitions": {
+      "style": "smooth",
+      "fade_out": 0.8
+    }
   },
   "layout": [
     {

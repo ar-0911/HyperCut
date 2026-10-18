@@ -151,9 +151,59 @@ def test_silencedetect_cuts_extra_silence(sample, monkeypatch, fake_llm):
     fake_llm({})
     monkeypatch.setattr(cuts, "detect_silences", lambda wav, d: [(0.9, 1.5)])
     p = run(sample, audio_wav="x.wav")
-    assert any(abs(s.end - 0.98) < 1e-6 for s in p.segments)
+    assert any(abs(s.end - 1.05) < 1e-6 for s in p.segments)  # 0.9 + the default 0.15 s kept pause
 
 
 def test_cut_helpers():
     assert cuts.is_filler("Um,") and not cuts.is_filler("umbrella")
     assert cuts.subtract((0, 10), [(2, 3), (3, 5)]) == [(0, 2), (5, 10)]
+
+
+def _words(*items):
+    return Transcript(words=[Word(text=t, start=s, end=s + 0.3) for t, s in items])
+
+
+def test_ending_prefers_claudes_pick_and_falls_back_to_the_last_sentence():
+    tr = _words(("Hello", 0), ("there.", 1), ("It", 4), ("works.", 5), ("And", 8), ("I'd", 8.5), ("go.", 9))
+    assert cuts.ending_word(tr, preferred=3) == 3
+    assert cuts.ending_word(tr, preferred=1) == 6  # 1.3 s is not in the back half: use the last sentence end
+    assert cuts.ending_word(tr, preferred=4) == 6  # "And" does not end a sentence
+    assert cuts.ending_word(_words(("no", 0), ("stop", 5))) is None
+
+
+def test_end_at_trims_after_the_last_word_and_keeps_the_hook():
+    from hypercut.plan import Segment
+
+    tr = _words(("It", 4), ("works.", 5), ("And", 8))
+    segs = [Segment(start=8, end=9, reason="hook"), Segment(start=0, end=6.5), Segment(start=7, end=9.5)]
+    out = cuts.end_at(segs, tr, 1)
+    assert [(s.start, s.end, s.reason) for s in out] == [(8, 9, "hook"), (0, 5.7, "body")]
+
+
+def test_analyze_ends_on_the_chosen_sentence(sample, fake_llm):
+    words = sample.transcript.words
+    last = max(i for i, w in enumerate(words) if cuts.SENTENCE_END.search(w.text))
+    fake_llm({"ending": {"word": last}})
+    p = run(sample)
+    body = [s for s in p.segments if s.reason == "body"]
+    assert body[-1].end <= words[last].end + cuts.END_TAIL + 1e-6
+
+
+def test_recut_keeps_hook_and_ending(sample):
+    p = run(sample)
+    p.segments = cuts.end_at(p.segments, p.transcript, len(p.transcript.words) - 2)
+    end_before = [s for s in p.segments if s.reason == "body"][-1].end
+    p.style.pacing.keep_pause = 0.3
+    q = cuts.recut(p)
+    assert [s for s in q.segments if s.reason == "hook"] == [s for s in p.segments if s.reason == "hook"]
+    assert [s for s in q.segments if s.reason == "body"][-1].end <= end_before + 0.3
+    assert q.output_duration() >= p.output_duration()  # more pause kept, never less footage
+
+
+def test_pauses_too_short_to_matter_are_not_cut():
+    from hypercut.analyze.cuts import cut_ranges
+    from hypercut.plan import Transcript, Word
+
+    # 0.5 s gap minus 0.15 s kept each side leaves 0.2 s: not worth a jump cut. A 1 s gap is cut.
+    t = Transcript(words=[Word(start=0, end=1, text="a"), Word(start=1.5, end=2, text="b"), Word(start=3, end=4, text="c")])
+    assert cut_ranges(t, 4, max_silence=0.35, keep_pause=0.15) == [(2.15, 2.85)]

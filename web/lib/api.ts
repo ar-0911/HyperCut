@@ -93,3 +93,7 @@ export const askAssistant = (id: string, body: {instruction: string; plan: EditP
 		headers: {'Content-Type': 'application/json'},
 		body: JSON.stringify(body),
 	});
+
+/** Rebuild the cuts from the plan's pacing (how much pause to keep). Returns the new plan; nothing is saved. */
+export const recutPlan = (id: string, plan: EditPlan) =>
+	request<EditPlan>(`/jobs/${id}/recut`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(plan)});

@@ -81,3 +81,18 @@ def test_assist_calls_claude_once(monkeypatch):
     result = assistant.assist(_plan(), "remove the rocket illustration", playhead=3)
     assert result.message == "Removed the rocket." and "v1" not in {g.id for g in result.plan.graphics}
     assert len(calls) == 1 and "remove the rocket illustration" in calls[0]
+
+
+def test_pacing_and_transition_ops():
+    ops = [{"op": "pacing", "speed": 0.8}, {"op": "transitions", "style": "zoom", "fade_out": 1.2},
+           {"op": "caption_style", "changes": {"font": "Bebas Neue"}}]
+    plan, changes = assistant.apply_ops(_plan(), ops, playhead=0, assets=[])
+    assert plan.style.pacing.speed == 0.8 and plan.style.transitions.style == "zoom"
+    assert plan.style.transitions.fade_out == 1.2 and plan.style.caption.font == "Bebas Neue"
+    assert plan.output_duration() == 22 / 0.8
+
+
+def test_more_pause_recuts():
+    p = _plan()
+    plan, changes = assistant.apply_ops(p, [{"op": "pacing", "keep_pause": 0.3}], playhead=0, assets=[])
+    assert plan.style.pacing.keep_pause == 0.3 and any("Re-cut" in c for c in changes)

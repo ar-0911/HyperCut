@@ -131,3 +131,19 @@ describe('edits', () => {
 		expect(snap(4.5, [1, 4, 9], 0.1)).toBe(4.5);
 	});
 });
+
+describe('speed', () => {
+	const slow: EditPlan = {...plan, style: {...plan.style, pacing: {...plan.style.pacing, speed: 0.5}}};
+
+	it('stretches the reel and every block', () => {
+		expect(reelDuration(slow)).toBeCloseTo(42);
+		const items = buildItems(slow);
+		const v1 = items.find((i) => i.key === 'g:v1')!;
+		expect(v1.pieces[0].from).toBeCloseTo(8);
+		expect(v1.pieces[0].to).toBeCloseTo(12);
+	});
+
+	it('trims in reel seconds', () => {
+		expect(trimItem(slow, {kind: 'graphic', id: 'v1'}, 'end', 2).graphics[0].end).toBe(5);
+	});
+});

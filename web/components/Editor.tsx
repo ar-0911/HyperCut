@@ -10,6 +10,7 @@ import {
 	deleteAsset,
 	fileUrl,
 	getJob,
+	recutPlan,
 	restorePlan,
 	savePlan,
 	startRender,
@@ -265,6 +266,15 @@ export default function Editor({job}: {job: Job}) {
 					onChange={change}
 					onUpload={upload}
 					onDeleteAsset={removeAsset}
+					onRecut={async (next) => {
+						setError(null);
+						try {
+							change(await recutPlan(job.id, next));
+							setSelected(null);
+						} catch (e) {
+							setError((e as Error).message);
+						}
+					}}
 				/>
 				<div className="player">
 					<Player

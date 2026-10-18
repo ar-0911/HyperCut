@@ -19,21 +19,23 @@ export type TimelineSegment = {
 
 export type Timeline = {
 	fps: number;
+	/** Playback speed: one output second shows `speed` source seconds. */
+	speed: number;
 	segments: TimelineSegment[];
 	durationInFrames: number;
 };
 
-/** Frame-exact timeline: each segment gets round(duration * fps) frames (at least 1), no drift. */
-export function buildTimeline(segments: Segment[], sourceDuration: number, fps: number): Timeline {
+/** Frame-exact timeline: each segment gets round(duration * fps / speed) frames (at least 1), no drift. */
+export function buildTimeline(segments: Segment[], sourceDuration: number, fps: number, speed = 1): Timeline {
 	const kept: Segment[] = segments.length ? segments : [{start: 0, end: sourceDuration, reason: 'body'}];
 	let cursor = 0;
 	const out: TimelineSegment[] = kept.map((s, index) => {
-		const frames = Math.max(1, Math.round((s.end - s.start) * fps));
+		const frames = Math.max(1, Math.round(((s.end - s.start) * fps) / speed));
 		const seg = {index, start: s.start, end: s.end, outFrom: cursor, frames, reason: s.reason};
 		cursor += frames;
 		return seg;
 	});
-	return {fps, segments: out, durationInFrames: cursor};
+	return {fps, speed, segments: out, durationInFrames: cursor};
 }
 
 export function segmentAtFrame(tl: Timeline, frame: number): TimelineSegment | null {
@@ -47,14 +49,14 @@ export function segmentAtFrame(tl: Timeline, frame: number): TimelineSegment | n
 export function frameToSource(tl: Timeline, frame: number): number | null {
 	const seg = segmentAtFrame(tl, frame);
 	if (!seg) return null;
-	return Math.min(seg.end, seg.start + (frame - seg.outFrom) / tl.fps);
+	return Math.min(seg.end, seg.start + ((frame - seg.outFrom) / tl.fps) * tl.speed);
 }
 
 /** Every output frame (fractional) at which a source time is on screen. Empty if it was cut. */
 export function sourceToFrames(tl: Timeline, t: number): number[] {
 	const hits: number[] = [];
 	for (const s of tl.segments) {
-		if (t >= s.start && t <= s.end) hits.push(s.outFrom + (t - s.start) * tl.fps);
+		if (t >= s.start && t <= s.end) hits.push(s.outFrom + ((t - s.start) * tl.fps) / tl.speed);
 	}
 	return hits;
 }
@@ -69,8 +71,8 @@ export function clipSpan(tl: Timeline, span: Span): OutputSpan[] {
 		const b = Math.min(span.end, s.end);
 		if (b > a) {
 			res.push({
-				startFrame: s.outFrom + (a - s.start) * tl.fps,
-				endFrame: s.outFrom + (b - s.start) * tl.fps,
+				startFrame: s.outFrom + ((a - s.start) * tl.fps) / tl.speed,
+				endFrame: s.outFrom + ((b - s.start) * tl.fps) / tl.speed,
 				segmentIndex: s.index,
 			});
 		}
@@ -86,7 +88,7 @@ export type MediaRun = {
 	/** Output frame the run starts at, and its length. */
 	from: number;
 	frames: number;
-	/** Seconds into the graphic (source time since graphic.start) at which the run starts. */
+	/** Seconds into the clip at which the run starts (output seconds since the block's first frame). */
 	offset: number;
 };
 
@@ -102,14 +104,14 @@ export function mediaRuns(tl: Timeline, span: Span): MediaRun[] {
 		const a = Math.max(span.start, s.start);
 		const b = Math.min(span.end, s.end);
 		if (b <= a) continue;
-		const from = s.outFrom + (a - s.start) * tl.fps;
-		const to = s.outFrom + (b - s.start) * tl.fps;
+		const from = s.outFrom + ((a - s.start) * tl.fps) / tl.speed;
+		const to = s.outFrom + ((b - s.start) * tl.fps) / tl.speed;
 		const prev = runs[runs.length - 1];
 		if (prev && Math.abs(prev.from + prev.frames - from) < 1 && a >= prev.lastEnd - 1e-6) {
 			prev.frames = to - prev.from;
 			prev.lastEnd = b;
 		} else {
-			runs.push({from, frames: to - from, offset: a - span.start, lastEnd: b});
+			runs.push({from, frames: to - from, offset: (a - span.start) / tl.speed, lastEnd: b});
 		}
 	}
 	return runs.map(({from, frames, offset}) => ({from: Math.round(from), frames: Math.max(1, Math.round(frames)), offset}));

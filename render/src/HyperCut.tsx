@@ -49,20 +49,48 @@ const MediaFill: React.FC<{graphic: Graphic; tl: Timeline; t: number; frame: num
 	);
 };
 
-/** The speaker, cropped into its panel and zoomed. Source pixels are never altered beyond scale/crop. */
-const VideoSegment: React.FC<{plan: EditPlan; seg: TimelineSegment; src: string}> = ({plan, seg, src}) => {
+/** Extra punch-in on every other piece in the "zoom" transition style, so jump cuts read as intentional. */
+export const ALT_PUNCH = 1.08;
+/** Frames of sound eased in and out at every cut, so cuts never click. */
+export const AUDIO_EASE = 3;
+
+/**
+ * The speaker, cropped into its panel and zoomed. Source pixels are never altered beyond scale/crop.
+ * `tail` extra frames keep playing past the segment's end, fading out over the next one (smooth cuts).
+ */
+const VideoSegment: React.FC<{plan: EditPlan; tl: Timeline; seg: TimelineSegment; src: string; tail: number; last: boolean}> = ({
+	plan,
+	tl,
+	seg,
+	src,
+	tail,
+	last,
+}) => {
 	const local = useCurrentFrame();
 	const {fps, width} = plan.output;
-	const t = seg.start + local / fps;
+	const tr = plan.style.transitions;
+	const t = seg.start + (local / fps) * tl.speed;
 	const {panel, rect, zoom, origin} = sceneAt(plan, t);
+	const punch = tr.style === 'zoom' && seg.index % 2 === 1 ? ALT_PUNCH : 1;
+	const opacity = local < seg.frames ? 1 : 1 - (local - seg.frames + 1) / (tail + 1);
+	const fadeOutFrames = last ? Math.round(tr.fade_out * fps) : 0;
+	// Sound eases in and out over a few frames at each cut (the kept pause around cuts makes that silent
+	// anyway, but it removes clicks); the last segment fades out with the picture.
+	const volume = (f: number) => {
+		const head = seg.index === 0 ? 1 : (f + 1) / AUDIO_EASE;
+		const out = (seg.frames - f) / (last ? Math.max(1, fadeOutFrames) : AUDIO_EASE);
+		return Math.max(0, Math.min(1, head, out));
+	};
 	return (
-		<AbsoluteFill style={{background: '#000'}}>
-			<div style={{position: 'absolute', left: 0, top: panel.top, width, height: panel.height, overflow: 'hidden'}}>
+		<AbsoluteFill style={{background: local < seg.frames ? '#000' : 'transparent', opacity}}>
+			<div style={{position: 'absolute', left: 0, top: panel.top, width, height: panel.height, overflow: 'hidden', background: '#000'}}>
 				{/* Zoom about the face, so a punch-in moves toward the subject, not the frame center. */}
-				<AbsoluteFill style={{transform: `scale(${zoom})`, transformOrigin: `${origin.x}px ${origin.y}px`}}>
+				<AbsoluteFill style={{transform: `scale(${zoom * punch})`, transformOrigin: `${origin.x}px ${origin.y}px`}}>
 					<OffthreadVideo
 						src={src}
 						startFrom={Math.round(seg.start * fps)}
+						playbackRate={tl.speed}
+						volume={volume}
 						style={{position: 'absolute', left: rect.left, top: rect.top, width: rect.width, height: rect.height}}
 					/>
 				</AbsoluteFill>
@@ -70,6 +98,30 @@ const VideoSegment: React.FC<{plan: EditPlan; seg: TimelineSegment; src: string}
 		</AbsoluteFill>
 	);
 };
+
+/** Black over everything at the very start and end (fade in / fade out of the reel). */
+const Fades: React.FC<{plan: EditPlan; total: number}> = ({plan, total}) => {
+	const frame = useCurrentFrame();
+	const {fps} = plan.output;
+	const {fade_in, fade_out} = plan.style.transitions;
+	const inK = fade_in > 0 ? 1 - Math.min(1, frame / (fade_in * fps)) : 0;
+	const outK = fade_out > 0 ? Math.min(1, Math.max(0, (frame - (total - fade_out * fps)) / (fade_out * fps))) : 0;
+	const k = Math.max(inK, outK);
+	return k > 0 ? <AbsoluteFill style={{background: '#000', opacity: k}} /> : null;
+};
+
+/** Frames a smooth cut lets segment i run on past its end, limited by the source and the next segment. */
+export function tailFrames(plan: EditPlan, tl: Timeline, i: number): number {
+	const tr = plan.style.transitions;
+	const seg = tl.segments[i];
+	const next = tl.segments[i + 1];
+	if (tr.style !== 'smooth' || !next) return 0;
+	const want = Math.round(tr.length * plan.output.fps);
+	const room = Math.floor(((plan.source.duration - seg.end) * plan.output.fps) / tl.speed) - 1;
+	// A split (one source piece continuing into the next) needs no transition.
+	if (Math.abs(next.start - seg.end) < 1e-3) return 0;
+	return Math.max(0, Math.min(want, room, next.frames - 1));
+}
 
 /** Dark gradient with a slow accent glow drifting across it; a pure function of the frame. */
 const Backdrop: React.FC<{frame: number; fps: number; accent: string}> = ({frame, fps, accent}) => {
@@ -167,16 +219,22 @@ const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string}> = (
 
 export const HyperCut: React.FC<CompositionProps> = ({plan: rawPlan, videoSrc, assetBase}) => {
 	const plan = useMemo(() => normalizePlan(rawPlan), [rawPlan]);
-	const tl = useMemo(() => buildTimeline(plan.segments, plan.source.duration, plan.output.fps), [plan]);
+	const tl = useMemo(() => buildTimeline(plan.segments, plan.source.duration, plan.output.fps, plan.style.pacing.speed), [plan]);
 	const src = resolveSrc(videoSrc);
+	const n = tl.segments.length;
 	return (
 		<AbsoluteFill style={{background: '#000'}}>
-			{tl.segments.map((seg) => (
-				<Sequence key={seg.index} from={seg.outFrom} durationInFrames={seg.frames} layout="none">
-					<VideoSegment plan={plan} seg={seg} src={src} />
-				</Sequence>
-			))}
+			{/* Drawn last to first, so a segment's fading tail lies over the start of the next one. */}
+			{[...tl.segments].reverse().map((seg) => {
+				const tail = tailFrames(plan, tl, seg.index);
+				return (
+					<Sequence key={seg.index} from={seg.outFrom} durationInFrames={seg.frames + tail} layout="none">
+						<VideoSegment plan={plan} tl={tl} seg={seg} src={src} tail={tail} last={seg.index === n - 1} />
+					</Sequence>
+				);
+			})}
 			<Overlays plan={plan} tl={tl} assetBase={assetBase} />
+			<Fades plan={plan} total={tl.durationInFrames} />
 		</AbsoluteFill>
 	);
 };
@@ -184,7 +242,7 @@ export const HyperCut: React.FC<CompositionProps> = ({plan: rawPlan, videoSrc, a
 /** Size, fps and length come from the plan, so the same composition renders any plan. */
 export const calculateMetadata = ({props}: {props: CompositionProps}) => {
 	const plan = normalizePlan(props.plan);
-	const tl = buildTimeline(plan.segments, plan.source.duration, plan.output.fps);
+	const tl = buildTimeline(plan.segments, plan.source.duration, plan.output.fps, plan.style.pacing.speed);
 	return {
 		durationInFrames: tl.durationInFrames,
 		fps: plan.output.fps,

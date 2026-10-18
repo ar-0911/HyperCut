@@ -126,3 +126,12 @@ button.danger { border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
 .tl-playhead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--accent); pointer-events: none; z-index: 3; }
 .tl-playhead::before { content: ''; position: absolute; top: 0; left: -5px; border: 6px solid transparent; border-top-color: var(--accent); }
 .tl-drop { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--fg); opacity: 0.6; pointer-events: none; z-index: 3; }
+
+/* style tab */
+.range-labels, .field > .range-labels { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+.fonts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.font { font-size: 1.05rem; padding: 8px 6px; border-radius: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.font.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.color { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; margin: 8px 0 0; }
+.color input { width: 32px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; }
+.style-panel .row { gap: 10px; }

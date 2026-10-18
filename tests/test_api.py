@@ -254,3 +254,21 @@ def test_import_job_cli(tmp_path, monkeypatch):
     assert state["status"] == "done" and state["assets"] == []
     assert (jobs.job_dir(job_id) / "normalized.mp4").read_bytes() == b"video"
     assert plan_mod.load(jobs.job_dir(job_id) / "plan.json").source == SOURCE
+
+
+def test_recut_rebuilds_segments_without_saving(client, fake_stages):
+    from hypercut.plan import Segment, Transcript, Word
+
+    job_id = _done_job(client, fake_stages)
+    plan = client.get(f"/jobs/{job_id}").json()["plan"]
+    words = [Word(start=1, end=2, text="One."), Word(start=4, end=5, text="Two.")]
+    plan["transcript"] = Transcript(words=words).model_dump(mode="json")
+    plan["hook"] = Hook().model_dump(mode="json")
+    plan["segments"] = [Segment(start=0, end=10).model_dump(mode="json")]
+    plan["style"]["pacing"]["keep_pause"] = 0.3
+    r = client.post(f"/jobs/{job_id}/recut", json=plan)
+    assert r.status_code == 200
+    spans = [(s["start"], s["end"]) for s in r.json()["segments"]]
+    assert spans[0][1] == 2.3 and spans[1][0] == 3.7  # the 2 s pause is cut, keeping 0.3 s each side
+    assert client.get(f"/jobs/{job_id}").json()["plan"]["segments"] != r.json()["segments"]
+    assert client.post("/jobs/000000000000/recut", json=plan).status_code == 404

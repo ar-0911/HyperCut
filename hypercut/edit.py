@@ -20,24 +20,34 @@ MIN_SPAN = 0.1
 
 @dataclass
 class Piece:
-    """One kept segment placed on the reel: source [start, end) plays at reel [out, out + end - start)."""
+    """One kept segment placed on the reel: source [start, end) plays from reel second `out`, at `speed`."""
 
     index: int
     start: float
     end: float
     out: float
+    speed: float = 1.0
 
     @property
     def out_end(self) -> float:
-        return self.out + self.end - self.start
+        return self.reel(self.end)
+
+    def reel(self, t: float) -> float:
+        """Reel second at which source second t (inside this piece) plays."""
+        return self.out + (t - self.start) / self.speed
+
+    def source(self, r: float) -> float:
+        """Source second shown at reel second r (inside this piece)."""
+        return self.start + (r - self.out) * self.speed
 
 
 def pieces(plan: EditPlan) -> list[Piece]:
     segs = plan.segments or [Segment(start=0, end=plan.source.duration)]
+    speed = plan.style.pacing.speed
     out, cursor = [], 0.0
     for i, s in enumerate(segs):
-        out.append(Piece(i, s.start, s.end, cursor))
-        cursor += s.end - s.start
+        out.append(Piece(i, s.start, s.end, cursor, speed))
+        cursor += (s.end - s.start) / speed
     return out
 
 
@@ -47,7 +57,7 @@ def reel_duration(plan: EditPlan) -> float:
 
 def to_reel(plan: EditPlan, t: float) -> list[float]:
     """Every reel time a source time plays at (two for a cold-open hook, none if cut)."""
-    return [p.out + t - p.start for p in pieces(plan) if p.start - EPS <= t < p.end - EPS]
+    return [p.reel(t) for p in pieces(plan) if p.start - EPS <= t < p.end - EPS]
 
 
 def first_reel(plan: EditPlan, start: float, end: float) -> tuple[float, float] | None:
@@ -55,7 +65,7 @@ def first_reel(plan: EditPlan, start: float, end: float) -> tuple[float, float] 
     for p in pieces(plan):
         a, b = max(start, p.start), min(end, p.end)
         if b > a + EPS:
-            return p.out + a - p.start, p.out + b - p.start
+            return p.reel(a), p.reel(b)
     return None
 
 
@@ -65,7 +75,7 @@ def to_source(plan: EditPlan, t: float) -> tuple[float, int]:
     t = min(max(t, 0.0), ps[-1].out_end)
     for p in ps:
         if t < p.out_end - EPS:
-            return p.start + t - p.out, p.index
+            return p.source(t), p.index
     last = ps[-1]
     return last.end, last.index
 
@@ -91,7 +101,7 @@ def _overlaps_reel(plan: EditPlan, start: float, end: float, a: float, b: float)
     for p in pieces(plan):
         s, e = max(start, p.start), min(end, p.end)
         if e > s + EPS:
-            ra, rb = p.out + s - p.start, p.out + e - p.start
+            ra, rb = p.reel(s), p.reel(e)
             if rb > a + EPS and ra < b - EPS:
                 return True
     return False
@@ -116,8 +126,8 @@ def cut(plan: EditPlan, a: float, b: float) -> float:
             kept.append(seg)
             continue
         removed += hi - lo
-        left = (p.start, p.start + lo - p.out)
-        right = (p.start + hi - p.out, p.end)
+        left = (p.start, p.source(lo))
+        right = (p.source(hi), p.end)
         for s, e in (left, right):
             if e - s >= 0.05:
                 kept.append(Segment(start=round(s, 3), end=round(e, 3), reason=seg.reason))
