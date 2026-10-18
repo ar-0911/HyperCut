@@ -1,7 +1,7 @@
 'use client';
 
 import type {EditPlan, Graphic, LayoutMode} from '@render/plan';
-import {isAroundType, isVisualType} from '@render/layout';
+import {isAroundType, isStageType, isVisualType} from '@render/layout';
 import {
 	GRAPHIC_NAMES,
 	LAYOUT_NAMES,
@@ -76,6 +76,66 @@ function GraphicFields({plan, g, onChange}: {plan: EditPlan; g: Graphic; onChang
 					</p>
 				</>
 			);
+		case 'card_stack': {
+			const cards = (Array.isArray(g.props.cards) ? g.props.cards : []) as Record<string, unknown>[];
+			return (
+				<>
+					<Field label="Cards, one title per line (up to 3)">
+						<textarea
+							value={cards.map((c) => String(c.title ?? '')).join('\n')}
+							onChange={(e) =>
+								set({
+									// A card keeps its drawing while its title stays the same; a new title is drawn when you render.
+									cards: e.target.value
+										.split('\n')
+										.slice(0, 3)
+										.map((title) => cards.find((c) => c.title === title) ?? {title, brief: title}),
+								})
+							}
+						/>
+					</Field>
+					<p className="hint">Illustrated cards slide out from behind the speaker into the free side of the frame.</p>
+				</>
+			);
+		}
+		case 'scene':
+			return (
+				<>
+					<Field label="What to draw behind the speaker">
+						<textarea
+							value={String(g.props.brief ?? '')}
+							// A new description is drawn when you render.
+							onChange={(e) => set({brief: e.target.value, layers: []})}
+						/>
+					</Field>
+					<p className="hint">The room is replaced by a drawn scene and the speaker steps back a little so it shows.</p>
+				</>
+			);
+		case 'chart': {
+			const list = (key: string) => (Array.isArray(g.props[key]) ? (g.props[key] as unknown[]).join(', ') : '');
+			return (
+				<>
+					{text('headline', 'Headline')}
+					<Field label="Kind">
+						<select value={g.props.kind === 'bars' ? 'bars' : 'line'} onChange={(e) => set({kind: e.target.value})}>
+							<option value="line">Line</option>
+							<option value="bars">Bars</option>
+						</select>
+					</Field>
+					<Field label="Values, comma separated">
+						<input
+							type="text"
+							value={list('values')}
+							onChange={(e) => set({values: e.target.value.split(',').map((v) => Number(v.trim())).filter((v) => Number.isFinite(v))})}
+						/>
+					</Field>
+					<Field label="Labels, comma separated">
+						<input type="text" value={list('labels')} onChange={(e) => set({labels: e.target.value.split(',').map((v) => v.trim())})} />
+					</Field>
+					{text('unit', 'Unit')}
+				</>
+			);
+		}
 		case 'particles':
 			return (
 				<Field label="Kind">
@@ -171,7 +231,7 @@ export default function Inspector({
 
 			{g && <GraphicFields plan={plan} g={g} onChange={onChange} />}
 
-			{g && g.type !== 'progress_bar' && !isAroundType(g.type) && (
+			{g && g.type !== 'progress_bar' && !isAroundType(g.type) && !isStageType(g.type) && (
 				<label className="check">
 					<input
 						type="checkbox"

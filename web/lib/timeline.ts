@@ -5,7 +5,7 @@
 // between them, so the editor and the final render can never disagree about where something is.
 
 import {groupWords} from '@render/captions';
-import {isAroundType, isVisualType} from '@render/layout';
+import {isAroundType, isStageType, isVisualType} from '@render/layout';
 import type {EditPlan, Graphic, GraphicType, LayoutMode, Segment} from '@render/plan';
 import {buildTimeline, frameToSource, sourceToFrames, type Timeline} from '@render/timing';
 
@@ -96,6 +96,9 @@ export const GRAPHIC_NAMES: Record<GraphicType, string> = {
 	orbit: 'Orbit',
 	fly_out: 'Fly out',
 	particles: 'Particles',
+	card_stack: 'Cards',
+	scene: 'Scene',
+	chart: 'Chart',
 };
 
 export function graphicLabel(g: Graphic): string {
@@ -113,7 +116,11 @@ export function graphicLabel(g: Graphic): string {
 							? (Array.isArray(p.items) ? p.items.map(str).join(', ') : '')
 							: g.type === 'particles'
 								? str(p.kind)
-								: str(p.title) || str(p.text);
+								: g.type === 'card_stack'
+									? (Array.isArray(p.cards) ? p.cards.map((c) => str((c as {title?: unknown})?.title)).join(', ') : '')
+									: g.type === 'chart'
+										? str(p.headline)
+										: str(p.title) || str(p.text) || str(p.brief);
 	return text || GRAPHIC_NAMES[g.type];
 }
 
@@ -275,6 +282,9 @@ export const NEW_PROPS: Partial<Record<GraphicType, Record<string, unknown>>> = 
 	orbit: {items: ['rocket', 'rising chart', 'light bulb']},
 	fly_out: {items: ['stack of coins', 'trophy', 'star']},
 	particles: {kind: 'sparkles'},
+	card_stack: {cards: [{title: 'First thing', brief: 'First thing'}, {title: 'Second thing', brief: 'Second thing'}]},
+	scene: {title: '', brief: 'a bright modern studio with plants and soft daylight'},
+	chart: {headline: '10X GROWTH', kind: 'line', values: [1, 2, 4, 10], labels: ['2021', '2022', '2023', '2024'], unit: 'x'},
 };
 
 export type Asset = {name: string; kind: 'image' | 'video'; label: string; duration?: number};
@@ -303,11 +313,20 @@ export function spanAt(plan: EditPlan, at: number, len: number): [number, number
 export function dropOnTimeline(plan: EditPlan, payload: BinPayload, at: number, base?: EditPlan | null): {plan: EditPlan; ref: ItemRef | null} {
 	switch (payload.kind) {
 		case 'graphic': {
-			const len = payload.type === 'progress_bar' ? reelDuration(plan) - at : payload.type === 'emoji_burst' ? 1.2 : payload.type === 'particles' ? 5 : 2.5;
+			const len =
+				payload.type === 'progress_bar'
+					? reelDuration(plan) - at
+					: payload.type === 'emoji_burst'
+						? 1.2
+						: payload.type === 'particles'
+							? 5
+							: isStageType(payload.type)
+								? 4
+								: 2.5;
 			const [start, end] = spanAt(plan, at, len);
 			const g: Graphic = {id: newGraphicId(plan, 'u'), type: payload.type, start, end, props: {...(NEW_PROPS[payload.type] ?? {})}, anchor: 'auto'};
-			// Effects around the speaker need the speaker cut out, so adding one turns green-screen effects on.
-			const style = isAroundType(payload.type) ? {...plan.style, depth: {...plan.style.depth, enabled: true}} : plan.style;
+			// Effects around and behind the speaker need the speaker cut out, so adding one turns green-screen effects on.
+			const style = isAroundType(payload.type) || isStageType(payload.type) ? {...plan.style, depth: {...plan.style.depth, enabled: true}} : plan.style;
 			return {plan: {...plan, style, graphics: [...plan.graphics, g]}, ref: {kind: 'graphic', id: g.id}};
 		}
 		case 'asset': {

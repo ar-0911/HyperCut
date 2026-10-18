@@ -23,6 +23,12 @@ export const GRAPHIC_TYPES = [
 	'orbit',
 	'fly_out',
 	'particles',
+	// Stage graphics behind the cut-out speaker (ADR 0611). card_stack props: {cards: [{title, brief, viewBox,
+	// defs, layers}]}; scene props: {title, brief, viewBox, defs, layers}; chart props: {headline, kind: line|bars,
+	// values: number[], labels: string[], unit}
+	'card_stack',
+	'scene',
+	'chart',
 ] as const;
 export type GraphicType = (typeof GRAPHIC_TYPES)[number];
 export type Anchor = 'auto' | 'top' | 'center' | 'bottom';
@@ -66,6 +72,10 @@ export type GraphicsStyle = {
 	density: 'minimal' | 'balanced' | 'heavy';
 	theme: 'clean' | 'bold' | 'playful' | 'cinematic';
 	accent_color: string;
+	/** Tags and chart details (ADR 0611); default the accent. */
+	secondary_color?: string | null;
+	/** Dark panels and card labels. */
+	panel_color?: string;
 };
 export type Pacing = {remove_fillers: boolean; max_silence: number; keep_pause: number; speed: number};
 export type TransitionStyle = 'hard' | 'smooth' | 'zoom';
@@ -123,7 +133,7 @@ export const DEFAULT_CAPTION: CaptionStyle = {
 export const DEFAULT_STYLE: Style = {
 	name: 'bold_creator',
 	caption: DEFAULT_CAPTION,
-	graphics: {density: 'balanced', theme: 'bold', accent_color: '#FFE600'},
+	graphics: {density: 'balanced', theme: 'bold', accent_color: '#FFE600', secondary_color: null, panel_color: '#0E1330'},
 	pacing: {remove_fillers: true, max_silence: 0.35, keep_pause: 0.15, speed: 1},
 	camera: {zoom_frequency: 'medium', zoom_scale: 1.15},
 	transitions: {style: 'smooth', length: 0.2, fade_in: 0, fade_out: 0.8},

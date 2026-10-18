@@ -108,13 +108,18 @@ def place_new_titles(job_dir: str | Path) -> None:
         plan_mod.save(place_titles(plan, out), path)
 
 
-def draw_new_around(job_dir: str | Path, draw=None) -> None:
-    """Draw the graphics of orbit / fly-out items added or renamed in the editor, before a render (ADR 0610)."""
+def draw_new_around(job_dir: str | Path, draw=None, illustrate=None) -> None:
+    """Draw the graphics added or changed in the editor before a render: orbit / fly-out items (ADR 0610),
+    cards and scenes (ADR 0611)."""
     from hypercut.analyze.analyze import draw_around
+    from hypercut.analyze.stage import draw_stage
 
     path = Path(job_dir) / "plan.json"
     plan = plan_mod.load(path)
-    if plan.style.depth.enabled and draw_around(plan.graphics, plan.style, draw):
+    if not plan.style.depth.enabled:
+        return
+    icons = draw_around(plan.graphics, plan.style, draw)
+    if draw_stage(plan.graphics, plan.style, illustrate) or icons:
         plan_mod.save(plan, path)
 
 

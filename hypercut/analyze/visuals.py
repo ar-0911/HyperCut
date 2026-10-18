@@ -140,7 +140,7 @@ ILLUSTRATOR_SYSTEM = (
 ILLUSTRATOR_PROMPT = """Draw one SVG illustration per brief.
 
 Rules for every SVG:
-- Root: <svg xmlns="http://www.w3.org/2000/svg" viewBox="{viewbox}">. Landscape-ish 1000x800 canvas.
+- Root: <svg xmlns="http://www.w3.org/2000/svg" viewBox="{viewbox}">. {canvas}
 - Put gradients/clipPaths in one <defs>. Then 4-10 top-level <g> groups, in the order they should \
 animate in: background shape first, then the main subject, then supporting details, then small accents \
 (sparkles, arrows, motion lines). Each top-level group is one animation layer.
@@ -229,7 +229,13 @@ def _constrain(picks: list[dict], beats: list[Beat]) -> list[dict]:
 # --- illustration -------------------------------------------------------------------------------
 
 
-def illustrate(briefs: list[str]) -> list[dict | None]:
+LANDSCAPE = "Landscape-ish 1000x800 canvas."
+PORTRAIT = "Tall 1080x1920 canvas filled edge to edge (a full scene, it is a background); keep the middle third \
+and the bottom half calm, a person stands there."
+PORTRAIT_VIEWBOX = "0 0 1080 1920"
+
+
+def illustrate(briefs: list[str], viewbox: str = VIEWBOX, canvas: str = LANDSCAPE) -> list[dict | None]:
     """Draw every brief (in parallel batches). Each result is illustration props or None on failure."""
     batches = [list(range(i, min(i + ILLUSTRATIONS_PER_CALL, len(briefs)))) for i in range(0, len(briefs), ILLUSTRATIONS_PER_CALL)]
     results: list[dict | None] = [None] * len(briefs)
@@ -237,7 +243,7 @@ def illustrate(briefs: list[str]) -> list[dict | None]:
     def draw(idx: list[int]) -> None:
         text = "\n".join(f"{j}: {briefs[k]}" for j, k in enumerate(idx))
         try:
-            raw = llm.ask_json(ILLUSTRATOR_PROMPT.format(viewbox=VIEWBOX, briefs=text), system=ILLUSTRATOR_SYSTEM, timeout=900)
+            raw = llm.ask_json(ILLUSTRATOR_PROMPT.format(viewbox=viewbox, canvas=canvas, briefs=text), system=ILLUSTRATOR_SYSTEM, timeout=900)
         except llm.LLMError as e:
             log.warning("illustration batch failed: %s", e)
             return

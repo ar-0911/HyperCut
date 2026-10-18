@@ -4,6 +4,7 @@ from typing import Any
 
 from hypercut import llm
 from hypercut.analyze import cuts as cutting
+from hypercut.analyze import stage
 from hypercut.analyze.visuals import merge_graphics, plan_visuals
 from hypercut.plan import (
     AROUND_GRAPHIC_TYPES, GENERATED_GRAPHIC_TYPES, BackgroundSpan, EditPlan, Graphic, Hook, HookCandidate, Source, Style, Transcript, Zoom,
@@ -19,7 +20,6 @@ ZOOMS_PER_MIN = {"none": 0, "low": 2, "medium": 4, "high": 8}
 EASES = ("linear", "ease_in_out", "snap")
 ANCHORS = ("auto", "top", "center", "bottom")
 BEHIND_PER_MIN = 3  # big titles behind the speaker per minute, with green-screen effects on
-AROUND_PER_MIN = 1  # at most, effects around the speaker per minute: only where a moment calls for one
 PARTICLE_KINDS = ("sparkles", "bokeh", "confetti", "embers")
 MAX_AROUND_SECONDS = {"orbit": 6.0, "fly_out": 3.5, "particles": 12.0}
 BACKGROUNDS = ("original", "blur", "dim", "gradient")
@@ -63,12 +63,7 @@ Also return these keys in the same object:
   ],
   "backgrounds": [  // optional stretches where the background changes, for emphasis; the rest stays "{background}"
     {{"start": <s>, "end": <s>, "kind": "original"|"blur"|"dim"|"gradient"}}
-  ],
-  "around": [  // effects that happen AROUND the speaker, passing behind and in front of them (never over the face). Use them like a professional editor: only on the one or two moments that really call for one (a reveal, a big claim, the speaker naming several concrete things); most reels need 0-2, never more than {max_around}; [] when nothing calls for it
-    {{"type": "orbit", "start": <s>, "end": <s>, "items": ["<3-4 concrete objects to draw for what is said, 1-3 words each, e.g. rocket, stack of coins, rising bar chart>"]}},  // drawn graphics circling the speaker's shoulders, 2.5-5 s
-    {{"type": "fly_out", "start": <s>, "end": <s>, "items": ["<2-4 objects to draw>"]}},  // drawn graphics bursting out from behind the head toward the camera, 1.5-3 s, for a reveal or a big claim
-    {{"type": "particles", "start": <s>, "end": <s>, "kind": "sparkles"|"bokeh"|"confetti"|"embers"}}  // atmosphere drifting around the speaker, 3-10 s; confetti for a win, embers for intensity
-  ]"""
+  ]{stage}"""
 
 
 def analyze(
@@ -96,8 +91,11 @@ def analyze(
     max_zooms = _cap(ZOOMS_PER_MIN[style.camera.zoom_frequency], minutes)
     depth = style.depth.enabled
     max_behind = _cap(BEHIND_PER_MIN, minutes) if depth and style.depth.behind_titles else 0
-    max_around = _cap(AROUND_PER_MIN, minutes) if depth and style.depth.around else 0
-    extra = DEPTH_PROMPT.format(max_behind=max_behind, max_around=max_around, background=style.depth.background) if depth else ""
+    max_stage = _cap(stage.STAGE_PER_MIN, minutes) if depth and style.depth.around else 0
+    extra = DEPTH_PROMPT.format(
+        max_behind=max_behind, background=style.depth.background,
+        stage=stage.PROMPT.format(max_stage=max_stage) if max_stage else "",
+    ) if depth else ""
     raw = llm.ask_json(
         PROMPT.format(
             words="\n".join(f"{i} {w.start:.2f} {w.text}" for i, w in enumerate(words)),
@@ -136,8 +134,8 @@ def analyze(
     if depth:
         plan.backgrounds = _backgrounds(raw.get("backgrounds"), source.duration)
         plan.graphics = add_behind(plan.graphics, _behind(raw.get("behind"), source.duration, max_behind), plan.layout)
-        plan.graphics = add_around(plan.graphics, _around(raw.get("around"), source.duration, max_around), plan.layout)
-        draw_around(plan.graphics, style)
+        stage.add_stage(plan, stage.parse_stage(raw.get("stage"), source.duration, max_stage))
+        stage.draw_stage(plan.graphics, style)
     return plan
 
 

@@ -132,6 +132,13 @@ export const isVisualType = (type: GraphicType) => VISUAL_TYPES.includes(type);
 /** Effects around the cut-out speaker (ADR 0610): drawn by Around.tsx, behind and in front of the speaker. */
 export const AROUND_TYPES: readonly GraphicType[] = ['orbit', 'fly_out', 'particles'];
 export const isAroundType = (type: GraphicType) => AROUND_TYPES.includes(type);
+/** Stage graphics (ADR 0611): drawn by Stage.tsx behind the cut-out speaker. */
+export const STAGE_TYPES: readonly GraphicType[] = ['card_stack', 'scene', 'chart'];
+export const isStageType = (type: GraphicType) => STAGE_TYPES.includes(type);
+/** How much a scene or chart shrinks the speaker (about the bottom of the frame under the face), so it shows. */
+export const PULL_BACK = 0.26;
+/** Seconds the speaker takes to pull back and to come forward again. */
+export const PULL_IN = 0.45;
 
 const EPS = 1e-3;
 
@@ -266,13 +273,28 @@ export function depthAt(
 	t: number,
 	mode: LayoutMode,
 	hasMatte: boolean,
-): {background: BackgroundSpan; behind: Graphic[]; around: Graphic[]; cutout: boolean} | null {
+): {background: BackgroundSpan; behind: Graphic[]; around: Graphic[]; stage: Graphic[]; pull: number; cutout: boolean} | null {
 	if (!hasMatte || !plan.style.depth.enabled || mode === 'visual') return null;
 	const background = backgroundAt(plan, t);
 	const speaker = mode === 'speaker';
-	const behind = speaker ? plan.graphics.filter((g) => g.layer === 'behind' && !isAroundType(g.type) && t >= g.start && t < g.end) : [];
+	const active = (g: Graphic) => t >= g.start && t < g.end;
+	const behind = speaker ? plan.graphics.filter((g) => g.layer === 'behind' && !isAroundType(g.type) && !isStageType(g.type) && active(g)) : [];
 	const around = speaker ? aroundAt(plan, t) : [];
-	return {background, behind, around, cutout: background.kind !== 'original' || behind.length > 0 || around.length > 0};
+	const stage = speaker ? plan.graphics.filter((g) => isStageType(g.type) && active(g)) : [];
+	const pull = speaker ? pullAt(plan, t) : 0;
+	const cutout = background.kind !== 'original' || behind.length > 0 || around.length > 0 || stage.length > 0 || pull > 0;
+	return {background, behind, around, stage, pull, cutout};
+}
+
+/** 0..1: how far the speaker is pulled back for a scene or chart at source time t, eased in and out. */
+export function pullAt(plan: EditPlan, t: number): number {
+	let k = 0;
+	for (const g of plan.graphics) {
+		if ((g.type !== 'scene' && g.type !== 'chart') || t < g.start || t >= g.end) continue;
+		const x = Math.min(1, (t - g.start) / PULL_IN, (g.end - t) / PULL_IN);
+		k = Math.max(k, x * x * (3 - 2 * x));
+	}
+	return k;
 }
 
 /** Effects around the speaker active at source time t (drawn in speaker stretches only). */

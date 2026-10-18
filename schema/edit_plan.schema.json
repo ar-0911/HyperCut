@@ -233,7 +233,10 @@
             "media",
             "orbit",
             "fly_out",
-            "particles"
+            "particles",
+            "card_stack",
+            "scene",
+            "chart"
           ],
           "title": "Type",
           "type": "string"
@@ -301,6 +304,23 @@
         "accent_color": {
           "default": "#FFE600",
           "title": "Accent Color",
+          "type": "string"
+        },
+        "secondary_color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Secondary Color"
+        },
+        "panel_color": {
+          "default": "#0E1330",
+          "title": "Panel Color",
           "type": "string"
         }
       },
@@ -602,7 +622,9 @@
           "default": {
             "density": "balanced",
             "theme": "bold",
-            "accent_color": "#FFE600"
+            "accent_color": "#FFE600",
+            "secondary_color": null,
+            "panel_color": "#0E1330"
           }
         },
         "pacing": {
@@ -893,6 +915,8 @@
         "graphics": {
           "accent_color": "#FFE600",
           "density": "balanced",
+          "panel_color": "#0E1330",
+          "secondary_color": null,
           "theme": "bold"
         },
         "pacing": {

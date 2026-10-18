@@ -115,3 +115,8 @@ def test_items_added_in_the_editor_are_drawn_before_render(tmp_path):
     (job / "plan.json").write_text(plan.model_dump_json())
     run.draw_new_around(job, draw)
     assert plan_mod.load(job / "plan.json").graphics[0].props["art"]["rocket"]["body"] == "<g/>"
+    plan.graphics = [Graphic(id="u2", type="scene", start=0, end=3, props={"brief": "a beach"})]
+    (job / "plan.json").write_text(plan.model_dump_json())
+    art = {"viewBox": "0 0 1080 1920", "defs": "", "layers": ["<g/>"]}
+    run.draw_new_around(job, draw, illustrate=lambda briefs, *a: [art for _ in briefs])
+    assert plan_mod.load(job / "plan.json").graphics[0].props["layers"] == ["<g/>"]

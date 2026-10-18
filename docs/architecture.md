@@ -126,7 +126,9 @@ and optional `backgrounds` stretches (blur, dim, gradient) for emphasis (decisio
 around the speaker (`orbit`, `fly_out`, `particles`, ids `o1`..., only where a moment calls for one, at most
 one a minute, with `style.depth.around`), capped in length, never overlapping, only in speaker stretches.
 Orbit and fly-out items are drawn by Claude as small sticker SVGs (`visuals.draw_icons`, `props.art`), and
-items added in the editor are drawn before the render (decision 0610).
+items added in the editor are drawn before the render (decision 0610). Analyze now proposes stage graphics
+instead (`hypercut/analyze/stage.py`, decision 0611): `card_stack`, `scene` and `chart`, ids `s1`..., at most
+two a minute and only where a moment calls for one; cards and scenes are drawn by the illustrator.
 
 **Reframe.** `reframe(video, source)` samples ~5 frames/s with OpenCV and takes the largest MediaPipe face per
 frame. The track is smoothed (exponential, with a dead zone so the crop ignores small movements), clamped so the
@@ -186,11 +188,14 @@ that need it. Without a cut-out, or in split and visual stretches, behind graphi
 any other graphic, off the face. Effects around the speaker (`orbit`, `fly_out`, `particles`, decision 0610)
 are pure functions of time giving each element a depth: the far ones are drawn before the cut-out, the near
 ones after it, and near ones fade out before they reach the face; without a cut-out all are drawn in front.
-Items are the drawn stickers, or a built-in icon (`src/icons.ts`) when there is no drawing.
+Items are the drawn stickers, or a built-in icon (`src/icons.ts`) when there is no drawing. Stage graphics
+(`src/Stage.tsx`, decision 0611) are drawn in the behind layer: cards slide out from behind the speaker into
+the free side, a scene replaces the room, a chart builds over a studio backdrop; for scenes and charts the
+cut-out is pulled back to 74% about the bottom of the frame.
 Run it with `npm run render -- --plan plan.json --video normalized.mp4 --out out.mp4 [--assets DIR] [--matte matte.webm]` in
 `render/` (`REMOTION_BROWSER` selects a Chromium; imported files are read from the video's folder unless
 `--assets` says otherwise). See ADRs [0601](decisions/0601-render-architecture.md) to
-[0610](decisions/0610-effects-around-the-speaker.md).
+[0611](decisions/0611-stage-graphics.md).
 
 **API.** `uvicorn api.main:app` serves a job per upload. `POST /jobs` (multipart `video`, `style`,
 `hook_strategy`) saves to `media/<job_id>/` and returns an id; a background thread runs

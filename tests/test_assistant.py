@@ -137,3 +137,17 @@ def test_around_ops():
     assert set(o1.props["art"]) == {"🚀", "growth hacks now"}
     assert o2.type == "particles" and o2.props == {"kind": "confetti"}
     assert all(l.mode == "speaker" for l in plan.layout if l.start < o1.end and o1.start < l.end)
+
+
+def test_stage_ops():
+    ops = [
+        {"op": "stage", "type": "chart", "start": 12, "end": 30, "headline": "20 YEARS", "values": [1, 5, 20]},
+        {"op": "stage", "type": "card_stack", "start": 2, "end": 5, "cards": [{"title": "Nurse", "brief": "a nurse"}]},
+        {"op": "stage", "type": "scene", "start": 6, "end": 8, "brief": ""},  # nothing to draw
+    ]
+    art = {"viewBox": "0 0 1000 800", "defs": "", "layers": ["<g/>"]}
+    plan, changes = assistant.apply_ops(_plan(), ops, playhead=0, assets=[], draw=lambda briefs, *a: [art for _ in briefs])
+    assert plan.style.depth.enabled and len(changes) == 2
+    chart, cards = (next(g for g in plan.graphics if g.id == i) for i in ("s1", "s2"))
+    assert chart.type == "chart" and chart.props["values"] == [1.0, 5.0, 20.0] and chart.end - chart.start == 5.0
+    assert cards.props["cards"][0]["layers"] == ["<g/>"]
