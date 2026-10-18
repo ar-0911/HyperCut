@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 from pathlib import Path
@@ -9,12 +10,20 @@ from typing import Callable
 
 from hypercut.plan import EditPlan, Reframe, Source
 
+log = logging.getLogger(__name__)
+
 MATTE_FILE = "matte.webm"
 # Width of the frames the segmentation models see (they work at 256 px, so more only costs time) and
 # of the mask FFmpeg scales up to the video's size.
 SEGMENT_WIDTH = 640
 # Person probability mapped to opacity: below LOW is background, above HIGH is the speaker.
 LOW, HIGH = 0.35, 0.75
+# Width of the frames the edge is finished at: the model's mask is snapped to the picture's real edges
+# (hair, shoulders) at this size, and FFmpeg scales the result up to the video's size.
+EDGE_WIDTH = 1280
+GUIDE_RADIUS, GUIDE_EPS = 6, 1e-3  # guided filter: how far an edge may move, how strongly it follows the image
+CHOKE = (0.2, 0.85)  # opacity ramp after snapping: trims the faint rim of old background around the speaker
+HAIR_SIZE = 512  # short side of the frames the hair matting model sees
 SMOOTH = 0.6  # weight of the newest mask in the running average that stops edges flickering
 CUT_IOU = 0.6  # masks overlapping less than this between frames: a hard cut, don't average across it
 
@@ -25,6 +34,8 @@ MODELS = {
     # Plain person/background: keeps what the person holds, but bleeds into busy backgrounds.
     "selfie": "https://storage.googleapis.com/mediapipe-models/image_segmenter/"
     "selfie_segmenter/float16/latest/selfie_segmenter.tflite",
+    # MODNet portrait matting (Apache-2.0): a real alpha matte with hair strands, used for the edge only.
+    "modnet.onnx": "https://huggingface.co/Xenova/modnet/resolve/main/onnx/model.onnx",
 }
 
 # (rgb frame, as a numpy array) -> (person probability from the multi-class model, from the selfie model)
@@ -41,7 +52,7 @@ def _model_path(name: str) -> str:
     import urllib.request
 
     cache = Path(os.environ.get("HYPERCUT_CACHE", Path.home() / ".cache" / "hypercut"))
-    path = cache / Path(MODELS[name]).name
+    path = cache / (name if name.endswith(".onnx") else Path(MODELS[name]).name)
     if not path.exists():
         cache.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".part")
@@ -71,6 +82,33 @@ def mediapipe_segmenter() -> Segmenter:
     # Closed by `matte` when done; left to the garbage collector, MediaPipe complains at interpreter exit.
     segment.close = lambda: (multi.close(), selfie.close())  # type: ignore[attr-defined]
     return segment
+
+
+# (rgb frame) -> alpha 0..1 at the model's own size, any size: the speaker's fine edge (hair)
+HairMatter = Callable[[object], object]
+
+
+def modnet_matter() -> HairMatter | None:
+    """MODNet on one frame, or None when onnxruntime or the model can't be had (the cut-out then uses the
+    snapped MediaPipe edge alone)."""
+    try:
+        import cv2
+        import numpy as np
+        import onnxruntime as ort
+
+        session = ort.InferenceSession(_model_path("modnet.onnx"), providers=["CPUExecutionProvider"])
+    except Exception as e:  # noqa: BLE001 - optional quality upgrade, never a reason to fail the matte
+        log.warning("hair matting unavailable (%s); using the segmentation edge", e)
+        return None
+
+    def matte_hair(rgb):
+        h, w = rgb.shape[:2]
+        k = HAIR_SIZE / min(h, w)
+        size = (max(32, round(w * k / 32) * 32), max(32, round(h * k / 32) * 32))
+        x = cv2.resize(rgb, size, interpolation=cv2.INTER_AREA).astype(np.float32) / 127.5 - 1.0
+        return session.run(None, {"input": x.transpose(2, 0, 1)[None]})[0][0, 0]
+
+    return matte_hair
 
 
 def refine(person, held, face: tuple[float, float] | None, prev=None):
@@ -114,13 +152,68 @@ def refine(person, held, face: tuple[float, float] | None, prev=None):
         near = cv2.dilate(region.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
         mask = np.where(near, person, 0).astype(np.float32)
         mask = np.maximum(mask, np.where(hull > 0, held, 0).astype(np.float32))
-    if prev is not None and prev.shape == mask.shape:
-        a, b = prev > 0.5, mask > 0.5
-        union = np.logical_or(a, b).sum()
-        iou = np.logical_and(a, b).sum() / union if union else 1.0
-        if iou >= CUT_IOU:
-            mask = SMOOTH * mask + (1 - SMOOTH) * prev
-    return mask
+    return smooth(mask, prev)
+
+
+def same_shot(mask, prev) -> bool:
+    """Whether two consecutive masks overlap enough to be the same shot (no hard cut between them)."""
+    import numpy as np
+
+    if prev is None or prev.shape != mask.shape:
+        return False
+    a, b = prev > 0.5, mask > 0.5
+    union = np.logical_or(a, b).sum()
+    return bool(np.logical_and(a, b).sum() / union >= CUT_IOU) if union else True
+
+
+def smooth(mask, prev, shot: bool | None = None):
+    """Average with the previous frame's mask within a shot, so edges don't flicker; not across a cut."""
+    if prev is None or prev.shape != mask.shape:
+        return mask
+    return SMOOTH * mask + (1 - SMOOTH) * prev if (same_shot(mask, prev) if shot is None else shot) else mask
+
+
+def with_hair(hair, mask):
+    """The hair matte (any size) limited to the kept speaker and filled with the speaker's solid body.
+
+    MODNet draws hair and soft edges well but can miss a body part or catch another person; MediaPipe's
+    `mask` (from `refine`) says who the speaker is and where the body is. Returns 0..1 at the hair's size.
+    """
+    import cv2
+    import numpy as np
+
+    h, w = hair.shape
+    m = cv2.resize(mask, (w, h), interpolation=cv2.INTER_LINEAR)
+    grow = max(3, round(w / 36)) | 1
+    near = cv2.dilate((m > 0.3).astype(np.uint8), np.ones((grow, grow), np.uint8)).astype(np.float32)
+    near = np.clip(cv2.GaussianBlur(near, (0, 0), grow / 4) * 1.5, 0, 1)
+    core = cv2.erode((m > 0.6).astype(np.uint8), np.ones((9, 9), np.uint8)).astype(np.float32)
+    return np.maximum(np.clip(hair, 0, 1) * near, cv2.GaussianBlur(core, (0, 0), 3))
+
+
+def guided_filter(guide, src, radius: int, eps: float):
+    """He et al.'s guided filter: `src` smoothed so its edges follow the edges of the gray `guide` (0..1)."""
+    import cv2
+
+    box = lambda x: cv2.boxFilter(x, -1, (2 * radius + 1, 2 * radius + 1))  # noqa: E731
+    mi, mp_ = box(guide), box(src)
+    a = (box(guide * src) - mi * mp_) / (box(guide * guide) - mi * mi + eps)
+    b = mp_ - a * mi
+    return box(a) * guide + box(b)
+
+
+def snap_edge(rgb, alpha):
+    """Fit a soft alpha (0..1, any size) to the real edges of `rgb` and trim the faint rim of old
+    background around it. Returns 8-bit alpha at `rgb`'s size."""
+    import cv2
+    import numpy as np
+
+    h, w = rgb.shape[:2]
+    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY).astype(np.float32) / 255
+    a = cv2.resize(alpha.astype(np.float32), (w, h), interpolation=cv2.INTER_LINEAR)
+    a = guided_filter(gray, a, GUIDE_RADIUS, GUIDE_EPS)
+    lo, hi = CHOKE
+    return (np.clip((a - lo) / (hi - lo), 0.0, 1.0) * 255 + 0.5).astype(np.uint8)
 
 
 def face_at(reframe: Reframe, t: float) -> tuple[float, float] | None:
@@ -158,40 +251,45 @@ def matte(
     out_path: str | Path,
     *,
     segmenter: Segmenter | None = None,
+    hair: HairMatter | None | bool = True,
     on_progress: Callable[[float], None] | None = None,
 ) -> Path:
     """Write the speaker cut-out of `video_path` (the normalized video) to `out_path` as VP9 WebM with alpha.
 
-    FFmpeg decodes a small copy for the models; the mask (at that size) is piped back to FFmpeg, which
-    scales it up and merges it as the alpha channel of the untouched full-size frames.
+    FFmpeg decodes a copy EDGE_WIDTH wide. MediaPipe finds the speaker on a smaller copy, MODNet (`hair`;
+    True loads it, False or None skips it) draws the hair, and the edge is snapped to the picture at
+    EDGE_WIDTH. FFmpeg scales that alpha up and merges it with the untouched full-size frames.
     """
     import cv2
     import numpy as np
 
     segment = segmenter or mediapipe_segmenter()
+    matte_hair = modnet_matter() if hair is True else (hair or None)
     w, h = source.width, source.height
-    # The models only need a small picture, and FFmpeg merges the mask with the full-size original, so
-    # Python never touches a full-resolution frame.
-    mw = min(w, SEGMENT_WIDTH)
+    # Python never touches a full-resolution frame: the models need small pictures, and FFmpeg merges the
+    # alpha with the full-size original.
+    ew = min(w, EDGE_WIDTH)
+    eh = max(2, round(h * ew / w / 2) * 2)
+    mw = min(ew, SEGMENT_WIDTH)
     mh = max(2, round(h * mw / w / 2) * 2)
     out_path = Path(out_path)
     tmp = out_path.with_suffix(".part.webm")
     decode = subprocess.Popen(
-        ["ffmpeg", "-v", "error", "-i", str(video_path), "-vf", f"scale={mw}:{mh}:flags=area",
+        ["ffmpeg", "-v", "error", "-i", str(video_path), "-vf", f"scale={ew}:{eh}:flags=area",
          "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
         stdout=subprocess.PIPE,
     )
     encode = subprocess.Popen(
         ["ffmpeg", "-y", "-v", "error", "-i", str(video_path),
-         "-f", "rawvideo", "-pix_fmt", "gray", "-s", f"{mw}x{mh}", "-r", f"{source.fps:g}", "-i", "-",
+         "-f", "rawvideo", "-pix_fmt", "gray", "-s", f"{ew}x{eh}", "-r", f"{source.fps:g}", "-i", "-",
          "-filter_complex", f"[1:v]scale={w}:{h}:flags=bicubic[a];[0:v][a]alphamerge,format=yuva420p",
-         "-an", "-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "34", "-deadline", "realtime", "-cpu-used", "8",
+         "-an", "-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "30", "-deadline", "realtime", "-cpu-used", "8",
          "-row-mt", "1", "-auto-alt-ref", "0", str(tmp)],
         stdin=subprocess.PIPE,
     )
-    frame_bytes = mw * mh * 3
+    frame_bytes = ew * eh * 3
     total = max(1, round(source.duration * source.fps))
-    prev = None
+    prev = soft = None
     i = 0
     ok = False
     try:
@@ -199,11 +297,18 @@ def matte(
             buf = decode.stdout.read(frame_bytes)
             if len(buf) < frame_bytes:
                 break
-            rgb = np.frombuffer(buf, np.uint8).reshape(mh, mw, 3)
-            person, held = segment(rgb)
-            prev = refine(person, held, face_at(reframe, i / source.fps), prev)
-            alpha = cv2.resize(to_alpha(prev), (mw, mh), interpolation=cv2.INTER_LINEAR)
-            encode.stdin.write(alpha.tobytes())
+            rgb = np.frombuffer(buf, np.uint8).reshape(eh, ew, 3)
+            small = cv2.resize(rgb, (mw, mh), interpolation=cv2.INTER_AREA) if (mw, mh) != (ew, eh) else rgb
+            person, held = segment(small)
+            mask = refine(person, held, face_at(reframe, i / source.fps), prev)
+            shot = same_shot(mask, prev)
+            prev = mask
+            if matte_hair is not None:
+                new = with_hair(matte_hair(rgb), mask)
+                soft = smooth(new, soft, shot) if soft is not None and soft.shape == new.shape else new
+            else:
+                soft = to_alpha(mask).astype(np.float32) / 255
+            encode.stdin.write(snap_edge(rgb, soft).tobytes())
             i += 1
             if on_progress and i % 30 == 0:
                 on_progress(min(1.0, i / total))

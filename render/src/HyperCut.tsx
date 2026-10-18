@@ -111,8 +111,9 @@ const VideoSegment: React.FC<{
 								muted
 								startFrom={Math.round(seg.start * fps)}
 								playbackRate={tl.speed}
-								// A soft shadow so a speaker over a new background doesn't look pasted on.
-								style={{...placed, filter: lifted ? 'drop-shadow(0 18px 36px rgba(0,0,0,0.45))' : undefined}}
+								// A soft shadow below so a speaker over a new background doesn't look pasted on; kept low and
+								// faint, since a strong one reads as a dark outline around the cut-out (ADR 0902).
+								style={{...placed, filter: lifted ? 'drop-shadow(0 30px 40px rgba(0,0,0,0.3))' : undefined}}
 							/>
 						</AbsoluteFill>
 					</AbsoluteFill>

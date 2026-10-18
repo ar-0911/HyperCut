@@ -88,3 +88,43 @@ def test_titles_sit_where_the_head_covers_a_little():
     g2 = Graphic(id="b2", type="kinetic_text", start=0, end=2, props={"text": "TEN X"}, layer="behind")
     place_title(g2, plan, [(1.0, closeup)])
     assert g2.layer == "front" and "y" not in g2.props
+
+
+def test_hair_matte_keeps_the_speaker_and_fills_the_body():
+    from hypercut.matte.cutout import with_hair
+
+    mask = np.zeros((64, 64), np.float32)
+    mask[20:64, 20:44] = 1.0  # the speaker MediaPipe kept
+    hair = np.zeros((128, 128), np.float32)  # the hair model sees a bigger frame
+    hair[30:40, 40:88] = 0.6  # soft hair just above the head
+    hair[10:30, 0:12] = 1.0  # someone else, far from the speaker
+    out = with_hair(hair, mask)
+    assert out.shape == hair.shape
+    assert out[38, 64] > 0.5  # hair next to the head stays
+    assert out[20, 6] < 0.05  # the other person is dropped
+    assert out[100, 64] > 0.95  # the body is solid even where the hair model missed it
+
+
+def test_snap_edge_follows_the_picture_and_trims_the_rim():
+    from hypercut.matte.cutout import snap_edge
+
+    rgb = np.zeros((80, 80, 3), np.uint8)
+    rgb[:, 40:] = 255  # the real edge is at x = 40
+    alpha = np.zeros((40, 40), np.float32)
+    alpha[:, 17:] = 1.0  # a coarse mask whose edge is a few pixels off (x = 34 at full size)
+    out = snap_edge(rgb, alpha)
+    assert out.shape == (80, 80) and out.dtype == np.uint8
+    assert out[40, 70] == 255 and out[40, 5] == 0
+    assert out[40, 36] < out[40, 44]  # the edge moved toward the real one
+
+
+def test_hair_smoothing_follows_the_shot():
+    from hypercut.matte.cutout import same_shot, smooth
+
+    a = np.zeros((20, 20), np.float32)
+    a[5:15, 5:15] = 1.0
+    b = np.zeros_like(a)
+    b[0:4, 0:4] = 1.0
+    assert same_shot(a, a.copy()) and not same_shot(b, a) and not same_shot(a, None)
+    assert smooth(a * 0.5, a, shot=True)[10, 10] == pytest.approx(0.7)
+    assert smooth(a * 0.5, a, shot=False)[10, 10] == pytest.approx(0.5)
