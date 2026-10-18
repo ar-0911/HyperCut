@@ -42,10 +42,22 @@ export function findBrowser(env = process.env): string | undefined {
 	return undefined;
 }
 
+/** File names of the imported media a plan uses. Plain names only: nothing outside the asset folder. */
+export function mediaFiles(plan: {graphics: {type: string; props: Record<string, unknown>}[]}): string[] {
+	const names = new Set<string>();
+	for (const g of plan.graphics) {
+		if (g.type !== 'media') continue;
+		const name = String(g.props.src ?? '');
+		if (!name || name !== path.basename(name) || name.startsWith('.')) throw new Error(`bad media file name: ${JSON.stringify(name)}`);
+		names.add(name);
+	}
+	return [...names];
+}
+
 async function main() {
 	const args = parseArgs(process.argv.slice(2));
 	if (!args.plan || !args.video || !args.out) {
-		console.error('usage: npm run render -- --plan <plan.json> --video <file> --out <mp4> [--composition HyperCut] [--concurrency N]');
+		console.error('usage: npm run render -- --plan <plan.json> --video <file> --out <mp4> [--assets <dir>] [--composition HyperCut] [--concurrency N]');
 		process.exit(2);
 	}
 	const planPath = path.resolve(args.plan);
@@ -60,10 +72,20 @@ async function main() {
 	const videoName = `source${path.extname(videoPath) || '.mp4'}`;
 	// The bundler copies publicDir and drops symlinks, so link the real file (hard link is free, copy if
 	// the video is on another filesystem).
-	try {
-		fs.linkSync(videoPath, path.join(publicDir, videoName));
-	} catch {
-		fs.copyFileSync(videoPath, path.join(publicDir, videoName));
+	const place = (from: string, name: string) => {
+		try {
+			fs.linkSync(from, path.join(publicDir, name));
+		} catch {
+			fs.copyFileSync(from, path.join(publicDir, name));
+		}
+	};
+	place(videoPath, videoName);
+	// Imported media (B-roll) sits next to the video unless --assets says otherwise.
+	const assetDir = path.resolve(args.assets ?? path.dirname(videoPath));
+	for (const name of mediaFiles(plan)) {
+		const from = path.join(assetDir, name);
+		if (!fs.existsSync(from)) throw new Error(`imported file not found: ${from}`);
+		if (!fs.existsSync(path.join(publicDir, name))) place(from, name);
 	}
 
 	try {

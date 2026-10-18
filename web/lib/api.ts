@@ -1,4 +1,5 @@
 import type {EditPlan} from '@render/plan';
+import type {Asset} from '@/lib/timeline';
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/+$/, '');
 
@@ -16,6 +17,9 @@ export type Job = {
 	hook_strategy: 'cold_open' | 'trim';
 	filename?: string;
 	plan: EditPlan | null;
+	/** The plan as the pipeline made it (before any edit). */
+	base_plan: EditPlan | null;
+	assets: Asset[];
 	files: string[];
 };
 
@@ -69,3 +73,23 @@ export const savePlan = (id: string, plan: EditPlan) =>
 	});
 
 export const startRender = (id: string) => request<{id: string; render: string}>(`/jobs/${id}/render`, {method: 'POST'});
+
+export const restorePlan = (id: string) => request<EditPlan>(`/jobs/${id}/plan/restore`, {method: 'POST'});
+
+export function uploadAsset(id: string, file: File) {
+	const form = new FormData();
+	form.set('file', file);
+	return request<Asset>(`/jobs/${id}/assets`, {method: 'POST', body: form});
+}
+
+export const deleteAsset = (id: string, name: string) =>
+	request<{deleted: string}>(`/jobs/${id}/assets/${encodeURIComponent(name)}`, {method: 'DELETE'});
+
+export type AssistResult = {plan: EditPlan; message: string; changes: string[]};
+
+export const askAssistant = (id: string, body: {instruction: string; plan: EditPlan; playhead: number; selected?: string | null}) =>
+	request<AssistResult>(`/jobs/${id}/assistant`, {
+		method: 'POST',
+		headers: {'Content-Type': 'application/json'},
+		body: JSON.stringify(body),
+	});

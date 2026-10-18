@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -84,7 +84,14 @@ GraphicType = Literal[
     # Visuals: shown in the top panel of a "split" span, full frame in a "visual" span, as a card off
     # the face otherwise.
     "illustration",  # props: {"viewBox", "defs", "layers": [svg fragments, revealed in order], "title", "brief"}
+    # Footage or a picture the user imported in the editor (B-roll). Never produced by analyze.
+    # props: {"src": file name in the job folder, "kind": "image" | "video", "fit": "cover" | "contain",
+    #         "trim_start": seconds into the clip, "duration": clip length in seconds, "label"}
+    "media",
 ]
+
+# Graphic types the analyze stage may propose; "media" only comes from the user's own uploads.
+GENERATED_GRAPHIC_TYPES: tuple[str, ...] = tuple(t for t in get_args(GraphicType) if t != "media")
 
 
 class Graphic(Span):

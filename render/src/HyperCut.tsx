@@ -1,13 +1,53 @@
 import React, {useMemo} from 'react';
-import {AbsoluteFill, OffthreadVideo, Sequence, staticFile, useCurrentFrame} from 'remotion';
+import {AbsoluteFill, Freeze, Img, OffthreadVideo, Sequence, staticFile, useCurrentFrame} from 'remotion';
 import {Captions} from './Captions';
 import {GraphicBody, GraphicView} from './Graphics';
-import {isVisualType, sceneAt, SPLIT_AREA, VISUAL_AREA, VISUAL_IN} from './layout';
+import {isVisualType, sceneAt, SPLIT, SPLIT_AREA, VISUAL_AREA, VISUAL_IN} from './layout';
 import {normalizePlan, type CompositionProps, type EditPlan, type Graphic} from './plan';
-import {buildTimeline, frameToSource, isKept, type Timeline, type TimelineSegment} from './timing';
+import {buildTimeline, frameToSource, isKept, mediaRuns, type Timeline, type TimelineSegment} from './timing';
 
 const isUrl = (s: string) => /^(https?:|blob:|data:)/.test(s);
 export const resolveSrc = (src: string) => (isUrl(src) ? src : staticFile(src));
+/** An imported file: fetched from assetBase in the preview, a static file next to the video in the render. */
+export const mediaSrc = (name: string, assetBase?: string) => (assetBase ? `${assetBase}${encodeURIComponent(name)}` : resolveSrc(name));
+
+const num = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+
+/**
+ * An imported picture or clip filling its box (the split panel or the whole frame). Pictures drift in
+ * slowly; clips play from `trim_start`, muted (the speaker keeps the audio), and hold their last frame
+ * if the block outlasts the clip.
+ */
+const MediaFill: React.FC<{graphic: Graphic; tl: Timeline; t: number; frame: number; assetBase?: string}> = ({graphic, tl, t, frame, assetBase}) => {
+	const {props} = graphic;
+	const src = mediaSrc(String(props.src ?? ''), assetBase);
+	const fit = props.fit === 'contain' ? 'contain' : 'cover';
+	const fill: React.CSSProperties = {position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: fit};
+	if (props.kind !== 'video') {
+		const k = Math.min(1, Math.max(0, (t - graphic.start) / Math.max(0.1, graphic.end - graphic.start)));
+		return <Img src={src} style={{...fill, transform: `scale(${1.02 + 0.06 * k})`}} />;
+	}
+	const run = mediaRuns(tl, graphic).find((r) => frame >= r.from && frame < r.from + r.frames);
+	if (!run) return null;
+	const fps = tl.fps;
+	const start = Math.round((num(props.trim_start, 0) + run.offset) * fps);
+	const clipFrames = props.duration === undefined ? Infinity : Math.floor(num(props.duration, 0) * fps) - start - 1;
+	const playFrames = Math.max(1, Math.min(run.frames, clipFrames));
+	return (
+		<>
+			<Sequence from={run.from} durationInFrames={playFrames} layout="none">
+				<OffthreadVideo src={src} muted startFrom={start} style={fill} />
+			</Sequence>
+			{playFrames < run.frames ? (
+				<Sequence from={run.from + playFrames} durationInFrames={run.frames - playFrames} layout="none">
+					<Freeze frame={0}>
+						<OffthreadVideo src={src} muted startFrom={start + playFrames - 1} style={fill} />
+					</Freeze>
+				</Sequence>
+			) : null}
+		</>
+	);
+};
 
 /** The speaker, cropped into its panel and zoomed. Source pixels are never altered beyond scale/crop. */
 const VideoSegment: React.FC<{plan: EditPlan; seg: TimelineSegment; src: string}> = ({plan, seg, src}) => {
@@ -69,7 +109,7 @@ const VisualBox: React.FC<{
 	</div>
 );
 
-const Overlays: React.FC<{plan: EditPlan; tl: Timeline}> = ({plan, tl}) => {
+const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string}> = ({plan, tl, assetBase}) => {
 	const frame = useCurrentFrame();
 	const t = frameToSource(tl, frame);
 	// Words in cut time never show, and lines are grouped from what is actually played.
@@ -80,8 +120,11 @@ const Overlays: React.FC<{plan: EditPlan; tl: Timeline}> = ({plan, tl}) => {
 	const scene = sceneAt(plan, t);
 	const {mode} = scene;
 	const active = plan.graphics.filter((g) => t >= g.start && t < g.end);
-	const boxed = mode === 'speaker' ? [] : active.filter((g) => isVisualType(g.type));
-	const placed = active.filter((g) => !boxed.includes(g));
+	const visuals = mode === 'speaker' ? [] : active.filter((g) => isVisualType(g.type));
+	const media = visuals.filter((g) => g.type === 'media');
+	const boxed = visuals.filter((g) => g.type !== 'media');
+	const placed = active.filter((g) => !visuals.includes(g));
+	const mediaLayer = media.map((g) => <MediaFill key={g.id} graphic={g} tl={tl} t={t} frame={frame} assetBase={assetBase} />);
 	const accent = plan.style.graphics.accent_color;
 	const visualK = Math.min(1, Math.max(0, scene.enter / VISUAL_IN));
 
@@ -91,6 +134,8 @@ const Overlays: React.FC<{plan: EditPlan; tl: Timeline}> = ({plan, tl}) => {
 				// The top panel is revealed as the speaker panel slides down; nothing spills below it.
 				<div style={{position: 'absolute', left: 0, top: 0, width, height: scene.panel.top, overflow: 'hidden'}}>
 					<Backdrop frame={frame} fps={fps} accent={accent} />
+					{/* Imported media fills the panel at its final size, so the reveal uncovers it rather than squashing it. */}
+					<div style={{position: 'absolute', left: 0, top: 0, width, height: SPLIT * height, overflow: 'hidden'}}>{mediaLayer}</div>
 					<VisualBox graphics={boxed} t={t} plan={plan} mode="split" top={SPLIT_AREA.top * height} height={(SPLIT_AREA.bottom - SPLIT_AREA.top) * height} />
 					<div style={{position: 'absolute', left: 0, right: 0, bottom: 0, height: 6, background: accent}} />
 				</div>
@@ -98,6 +143,7 @@ const Overlays: React.FC<{plan: EditPlan; tl: Timeline}> = ({plan, tl}) => {
 			{mode === 'visual' ? (
 				<AbsoluteFill style={{opacity: visualK, transform: `scale(${1.06 - 0.06 * visualK})`}}>
 					<Backdrop frame={frame} fps={fps} accent={accent} />
+					{mediaLayer}
 					<VisualBox graphics={boxed} t={t} plan={plan} mode="visual" top={VISUAL_AREA.top * height} height={(VISUAL_AREA.bottom - VISUAL_AREA.top) * height} />
 				</AbsoluteFill>
 			) : null}
@@ -119,7 +165,7 @@ const Overlays: React.FC<{plan: EditPlan; tl: Timeline}> = ({plan, tl}) => {
 	);
 };
 
-export const HyperCut: React.FC<CompositionProps> = ({plan: rawPlan, videoSrc}) => {
+export const HyperCut: React.FC<CompositionProps> = ({plan: rawPlan, videoSrc, assetBase}) => {
 	const plan = useMemo(() => normalizePlan(rawPlan), [rawPlan]);
 	const tl = useMemo(() => buildTimeline(plan.segments, plan.source.duration, plan.output.fps), [plan]);
 	const src = resolveSrc(videoSrc);
@@ -130,7 +176,7 @@ export const HyperCut: React.FC<CompositionProps> = ({plan: rawPlan, videoSrc}) 
 					<VideoSegment plan={plan} seg={seg} src={src} />
 				</Sequence>
 			))}
-			<Overlays plan={plan} tl={tl} />
+			<Overlays plan={plan} tl={tl} assetBase={assetBase} />
 		</AbsoluteFill>
 	);
 };

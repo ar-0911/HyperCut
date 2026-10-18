@@ -143,6 +143,18 @@
         ]
       },
       "anchor": "auto"
+    },
+    {
+      "id": "m1",
+      "type": "media",
+      "start": 10.0,
+      "end": 11.5,
+      "props": {
+        "src": "asset-0123456789ab.jpg",
+        "kind": "image",
+        "fit": "cover",
+        "label": "product shot"
+      }
     }
   ],
   "zooms": [

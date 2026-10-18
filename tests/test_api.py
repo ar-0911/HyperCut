@@ -156,3 +156,101 @@ def test_files_are_confined(client, fake_stages):
     assert client.get(f"/jobs/{job_id}/files/%2e%2e%2fother").status_code == 404
     assert client.get(f"/jobs/{job_id}/files/missing.txt").status_code == 404
     assert client.get(f"/jobs/{job_id}/files/plan.json").status_code == 200
+
+
+def _done_job(client, fake_stages):
+    job_id = _submit(client)
+    _wait(client, job_id)
+    return job_id
+
+
+def test_cors_allows_the_web_app(client):
+    r = client.options("/jobs/000000000000", headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "PUT"})
+    assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
+def test_base_plan_kept_and_restored(client, fake_stages):
+    job_id = _done_job(client, fake_stages)
+    body = client.get(f"/jobs/{job_id}").json()
+    assert body["base_plan"] == body["plan"] and body["assets"] == []
+    plan = body["plan"]
+    plan["hook"]["chosen"] = 1
+    client.put(f"/jobs/{job_id}/plan", json=plan)
+    plan["hook"]["chosen"] = 0
+    plan["zooms"] = [{"start": 1, "end": 2}]
+    client.put(f"/jobs/{job_id}/plan", json=plan)
+    body = client.get(f"/jobs/{job_id}").json()
+    assert body["base_plan"]["hook"]["chosen"] == 0 and body["base_plan"]["zooms"] == []
+    restored = client.post(f"/jobs/{job_id}/plan/restore").json()
+    assert restored["zooms"] == [] and client.get(f"/jobs/{job_id}").json()["plan"]["zooms"] == []
+
+
+def test_import_image_and_video_assets(client, fake_stages, monkeypatch):
+    from api import assets
+
+    def fake_prepare(src, out):
+        out.write_bytes(b"mp4")
+        return 12.5
+
+    monkeypatch.setattr(assets, "prepare_video", fake_prepare)
+    job_id = _done_job(client, fake_stages)
+    img = client.post(f"/jobs/{job_id}/assets", files={"file": ("Product Shot.PNG", b"png")}).json()
+    vid = client.post(f"/jobs/{job_id}/assets", files={"file": ("beach.mov", b"mov")}).json()
+    assert img["kind"] == "image" and img["name"].endswith(".png") and img["label"] == "Product Shot"
+    assert vid["kind"] == "video" and vid["name"].endswith(".mp4") and vid["duration"] == 12.5
+    assert assets.is_asset_name(img["name"]) and assets.is_asset_name(vid["name"])
+    body = client.get(f"/jobs/{job_id}").json()
+    assert [a["name"] for a in body["assets"]] == [img["name"], vid["name"]]
+    assert not any(f.endswith(".tmp") for f in body["files"])
+    assert client.get(f"/jobs/{job_id}/files/{vid['name']}").content == b"mp4"
+
+    bad = client.post(f"/jobs/{job_id}/assets", files={"file": ("notes.txt", b"x")})
+    assert bad.status_code == 422 and "image" in bad.json()["detail"]
+
+    # A media graphic must point at an imported file.
+    plan = body["plan"]
+    plan["graphics"] = [{"id": "m1", "type": "media", "start": 1, "end": 3, "props": {"src": "asset-ffffffffffff.png", "kind": "image"}}]
+    assert client.put(f"/jobs/{job_id}/plan", json=plan).status_code == 422
+    plan["graphics"][0]["props"]["src"] = img["name"]
+    assert client.put(f"/jobs/{job_id}/plan", json=plan).status_code == 200
+    assert client.delete(f"/jobs/{job_id}/assets/{img['name']}").status_code == 409
+    assert client.delete(f"/jobs/{job_id}/assets/{vid['name']}").status_code == 200
+    assert [a["name"] for a in client.get(f"/jobs/{job_id}").json()["assets"]] == [img["name"]]
+
+
+def test_assistant_endpoint_returns_an_unsaved_plan(client, fake_stages, monkeypatch):
+    from hypercut import llm
+
+    job_id = _done_job(client, fake_stages)
+    plan = client.get(f"/jobs/{job_id}").json()["plan"]
+    plan["zooms"] = [{"start": 1, "end": 2}]
+    monkeypatch.setattr(llm, "ask_json", lambda prompt, system="", **kw: {"message": "Zoom removed.", "ops": [{"op": "delete", "keys": ["z0"]}]})
+    r = client.post(f"/jobs/{job_id}/assistant", json={"instruction": "remove the zoom", "plan": plan, "playhead": 1})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["plan"]["zooms"] == [] and body["message"] == "Zoom removed." and body["changes"] == ["Removed z0"]
+    assert client.get(f"/jobs/{job_id}").json()["plan"]["zooms"] == []  # the job's own plan never had it
+
+    def down(prompt, system="", **kw):
+        raise llm.LLMError("usage limit")
+
+    monkeypatch.setattr(llm, "ask_json", down)
+    r = client.post(f"/jobs/{job_id}/assistant", json={"instruction": "x", "plan": plan})
+    assert r.status_code == 502 and "usage limit" in r.json()["detail"]
+
+
+def test_import_job_cli(tmp_path, monkeypatch):
+    monkeypatch.setenv("HYPERCUT_MEDIA", str(tmp_path / "media"))
+    from api import import_job, jobs
+    from hypercut import plan as plan_mod
+
+    folder = tmp_path / "run"
+    folder.mkdir()
+    (folder / "normalized.mp4").write_bytes(b"video")
+    plan_mod.save(EditPlan(source=SOURCE), folder / "plan_split.json")
+    assert import_job.main([str(folder)]) == 1  # no plan.json
+    job_id = import_job.import_job(folder, "plan_split.json")
+    state = jobs.read(job_id)
+    assert state["status"] == "done" and state["assets"] == []
+    assert (jobs.job_dir(job_id) / "normalized.mp4").read_bytes() == b"video"
+    assert plan_mod.load(jobs.job_dir(job_id) / "plan.json").source == SOURCE

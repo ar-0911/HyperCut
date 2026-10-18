@@ -127,7 +127,7 @@ export const SPLIT_AREA = {top: 0.03, bottom: 0.44};
 export const VISUAL_AREA = {top: 0.06, bottom: 0.74};
 
 /** Graphic types that can carry a split top panel or a full-frame visual. */
-export const VISUAL_TYPES: readonly GraphicType[] = ['illustration', 'kinetic_text', 'stat_card', 'list_build'];
+export const VISUAL_TYPES: readonly GraphicType[] = ['illustration', 'kinetic_text', 'stat_card', 'list_build', 'media'];
 export const isVisualType = (type: GraphicType) => VISUAL_TYPES.includes(type);
 
 const EPS = 1e-3;
