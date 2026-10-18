@@ -138,10 +138,16 @@ split/visual span with no visual graphic on screen plays as speaker. Crop follow
 keys (center crop without them); zooms scale about the face (`cx`, `cy` from the track, decision 0606);
 in speaker mode graphics take one of three vertical bands chosen to stay clear of the face and the captions.
 `illustration` graphics are Claude-drawn SVG layers that pop in one by one. Every frame is a pure function
-of the frame number (no CSS animation, no randomness).
-Run it with `npm run render -- --plan plan.json --video normalized.mp4 --out out.mp4` in `render/`
-(`REMOTION_BROWSER` selects a Chromium). See ADRs [0601](decisions/0601-render-architecture.md) to
-[0606](decisions/0606-zoom-about-the-face.md).
+of the frame number (no CSS animation, no randomness). `media` graphics are the user's own imported
+pictures and clips (decision 0607): they fill the split panel or, in a `visual` span, the whole frame;
+pictures drift in slowly, clips play muted from `trim_start` in one Remotion sequence per stretch of output
+(`mediaRuns`, so B-roll plays straight through small filler cuts) and hold their last frame if the block
+outlasts the clip. In the browser preview they load from the `assetBase` prop; in the final render they sit
+next to the video.
+Run it with `npm run render -- --plan plan.json --video normalized.mp4 --out out.mp4 [--assets DIR]` in
+`render/` (`REMOTION_BROWSER` selects a Chromium; imported files are read from the video's folder unless
+`--assets` says otherwise). See ADRs [0601](decisions/0601-render-architecture.md) to
+[0607](decisions/0607-imported-media.md).
 
 **API.** `uvicorn api.main:app` serves a job per upload. `POST /jobs` (multipart `video`, `style`,
 `hook_strategy`) saves to `media/<job_id>/` and returns an id; a background thread runs
@@ -151,24 +157,42 @@ writes `plan.json`. `GET /jobs/{id}` returns `status` (`queued|running|done|erro
 validation (e.g. a different `hook.chosen`, a fixed transcript). `POST /jobs/{id}/render` runs the render
 project's `npm run render` into `output.mp4`; `GET /jobs/{id}/files/{name}` serves outputs. State is one
 `job.json` per job, no database. `python -m hypercut.run VIDEO [--style ...] [--render]` runs the same
-pipeline without the server. See [ADR 0701](decisions/0701-job-server-design.md).
+pipeline without the server. For re-editing (decision 0702): the first `PUT` keeps the pipeline's plan as
+`plan.base.json` (returned as `base_plan`) and `POST /jobs/{id}/plan/restore` puts it back; `POST
+/jobs/{id}/assets` imports a picture or a clip (clips are re-encoded to silent H.264, at most a minute and
+1920 px on the longest side; 30 files per job) and `DELETE` removes one that is off the timeline; a plan whose `media` graphic
+names a file the job does not have is rejected. `POST /jobs/{id}/assistant` runs the editor assistant on the
+plan it is sent and returns the edited plan without saving it. CORS allows `HYPERCUT_WEB_ORIGINS` (default
+`http://localhost:3000`). `python -m api.import_job FOLDER [--plan plan_split.json]` turns a CLI run's folder
+into a web job. See ADRs [0701](decisions/0701-job-server-design.md) and
+[0702](decisions/0702-re-editing-endpoints.md).
 
 **Web.** `web/` is a Next.js 14 App Router app (client components, no server code) that talks to the API at
 `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`). `/` uploads a video with a style prompt (preset
-chips fill the prompt) and a hook strategy; `/jobs/[id]` polls the job and shows the four stages, then an
-editor: a `@remotion/player` preview of the `HyperCut` composition imported from `render/src` (one
-implementation of the look, no copy), the three hook candidates, an editable transcript, and Save, Render and
-Download. Picking a hook or editing a word changes the plan in the browser (`web/lib/rehook.ts` rebuilds
-`segments` as `analyze` does); Save and Render `PUT` the plan first. The preview plays the API's
-`normalized.mp4`. `npm test` in `web/` runs vitest (API client, hook logic) and a production build. See
-ADRs [0801](decisions/0801-nextjs-app-and-shared-composition.md) to [0803](decisions/0803-client-side-plan-edits.md).
+chips fill the prompt) and a hook strategy; `/jobs/[id]` polls the job and shows the four stages, then the
+editor (decision 0804), laid out like a video editor: a bin on the left (tabs for text and graphics, zoom and
+layout tiles, the user's imported media with an import drop zone, removed blocks, the hook choice and the
+transcript), the `@remotion/player` preview of the `HyperCut` composition imported from `render/src` (one
+implementation of the look, no copy) in the middle, and an inspector plus the "Ask AI to edit" box on the
+right. Below is a toolbar (undo, redo, split, duplicate, delete, timeline zoom, snap, restore original, save,
+render, download) and a timeline in reel time with six tracks: Visuals, Overlays, Layout, Zooms, Video (the
+kept segments, hook marked) and Captions (one block per caption line). Blocks drag to move, drag at the edges
+to trim, snap to word starts and other edges, and anything in the bin drags onto the timeline (or is added at
+the playhead on click). All edits are pure functions of the plan in `web/lib/timeline.ts`, built on the
+renderer's own `buildTimeline`, with undo/redo in `web/lib/history.ts`; something inside a cold-open hook
+shows twice and both copies move together. Picking a hook or editing a word still goes through
+`web/lib/rehook.ts`. Save and Render `PUT` the plan first. `npm test` in `web/` runs vitest (API client, hook
+logic, timeline edits) and a production build. See
+ADRs [0801](decisions/0801-nextjs-app-and-shared-composition.md) to [0804](decisions/0804-timeline-editor.md).
 
 ## Claude calls
 
 All of them go through `hypercut/llm.py`'s `ask_json`. By default it runs Claude Code headless
 (`claude -p --output-format json`) on the user's own subscription; `HYPERCUT_LLM=api` switches to the
 Anthropic API for when other people use the app. Every answer is parsed and validated with the pydantic
-models before use. See [ADR 0003](decisions/0003-claude-via-subscription.md).
+models before use. See [ADR 0003](decisions/0003-claude-via-subscription.md). The editor assistant
+(`hypercut/assistant.py`, decision 0013) is the one call made after the pipeline: one per request, plus one per
+batch of new illustrations.
 
 ## Where things live
 

@@ -125,7 +125,8 @@
             "list_build",
             "lower_third",
             "progress_bar",
-            "illustration"
+            "illustration",
+            "media"
           ],
           "title": "Type",
           "type": "string"

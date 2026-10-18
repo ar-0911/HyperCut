@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, get_args
+from typing import Any
 
 from hypercut import llm
 from hypercut.analyze import cuts as cutting
 from hypercut.analyze.visuals import merge_graphics, plan_visuals
 from hypercut.plan import (
-    EditPlan, Graphic, GraphicType, Hook, HookCandidate, Source, Style, Transcript, Zoom,
+    GENERATED_GRAPHIC_TYPES, EditPlan, Graphic, Hook, HookCandidate, Source, Style, Transcript, Zoom,
 )
 
 MAX_HOOKS = 3
@@ -78,7 +78,7 @@ def analyze(
             zoom_frequency=style.camera.zoom_frequency,
             max_graphics=max_graphics,
             max_zooms=max_zooms,
-            types=list(get_args(GraphicType)),
+            types=list(GENERATED_GRAPHIC_TYPES),
         ),
         system=SYSTEM,
     )
@@ -148,7 +148,7 @@ def _hooks(items: Any, transcript: Transcript, duration: float) -> list[HookCand
 
 
 def _graphics(items: Any, duration: float, limit: int) -> list[Graphic]:
-    valid_types = set(get_args(GraphicType))
+    valid_types = set(GENERATED_GRAPHIC_TYPES)
     out: list[Graphic] = []
     for item in items if isinstance(items, list) else []:
         span = _span(item, duration)

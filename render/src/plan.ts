@@ -16,6 +16,8 @@ export const GRAPHIC_TYPES = [
 	'lower_third',
 	'progress_bar',
 	'illustration',
+	// Footage or a picture the user imported (B-roll). props: {src, kind: 'image' | 'video', fit, trim_start, duration, label}
+	'media',
 ] as const;
 export type GraphicType = (typeof GRAPHIC_TYPES)[number];
 export type Anchor = 'auto' | 'top' | 'center' | 'bottom';
@@ -75,7 +77,11 @@ export type EditPlan = {
 	style: Style;
 };
 
-export type CompositionProps = {plan: EditPlan; videoSrc: string};
+/**
+ * videoSrc: the speaker video. assetBase: where imported media files are fetched from (a URL prefix in
+ * the browser preview); omitted in the final render, where they sit next to the video as static files.
+ */
+export type CompositionProps = {plan: EditPlan; videoSrc: string; assetBase?: string};
 
 export const DEFAULT_CAPTION: CaptionStyle = {
 	font: 'Montserrat',

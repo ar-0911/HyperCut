@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {buildTimeline, clipSpan, frameToSource, isKept, segmentAtFrame, sourceToFrames} from './timing';
+import {buildTimeline, clipSpan, frameToSource, isKept, mediaRuns, segmentAtFrame, sourceToFrames} from './timing';
 
 const fps = 30;
 const cold = buildTimeline(
@@ -79,5 +79,35 @@ describe('clipSpan', () => {
 
 	it('drops a span that lies entirely in a cut', () => {
 		expect(clipSpan(cold, {start: 3, end: 5})).toEqual([]);
+	});
+});
+
+describe('mediaRuns', () => {
+	const fps = 30;
+	// Hook 10-12 first, then body 0-5 and 5.5-20 (a filler cut at 5-5.5).
+	const tl = buildTimeline(
+		[
+			{start: 10, end: 12, reason: 'hook'},
+			{start: 0, end: 5, reason: 'body'},
+			{start: 5.5, end: 20, reason: 'body'},
+		],
+		20,
+		fps,
+	);
+
+	it('joins pieces across a small cut so the clip plays straight through', () => {
+		expect(mediaRuns(tl, {start: 4, end: 7})).toEqual([{from: 6 * fps, frames: 2.5 * fps, offset: 0}]);
+	});
+
+	it('gives the cold-open copy its own run', () => {
+		const runs = mediaRuns(tl, {start: 11, end: 13});
+		expect(runs).toEqual([
+			{from: 1 * fps, frames: 1 * fps, offset: 0},
+			{from: Math.round((2 + 5 + 5.5) * fps), frames: 2 * fps, offset: 0},
+		]);
+	});
+
+	it('is empty for a span that was cut', () => {
+		expect(mediaRuns(tl, {start: 5.1, end: 5.4})).toEqual([]);
 	});
 });

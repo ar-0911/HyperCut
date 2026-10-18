@@ -81,3 +81,36 @@ export function clipSpan(tl: Timeline, span: Span): OutputSpan[] {
 export function isKept(tl: Timeline, t: number): boolean {
 	return tl.segments.some((s) => t >= s.start && t < s.end);
 }
+
+export type MediaRun = {
+	/** Output frame the run starts at, and its length. */
+	from: number;
+	frames: number;
+	/** Seconds into the graphic (source time since graphic.start) at which the run starts. */
+	offset: number;
+};
+
+/**
+ * Where an imported clip plays on the output: one run per stretch of output where the graphic is on screen
+ * without a jump back in source time. Pieces that follow each other in the output and move forward in
+ * source (body segments with a filler cut between them) join one run, so B-roll plays smoothly over small
+ * cuts instead of skipping. A cold-open copy of the span is its own run.
+ */
+export function mediaRuns(tl: Timeline, span: Span): MediaRun[] {
+	const runs: (MediaRun & {lastEnd: number})[] = [];
+	for (const s of tl.segments) {
+		const a = Math.max(span.start, s.start);
+		const b = Math.min(span.end, s.end);
+		if (b <= a) continue;
+		const from = s.outFrom + (a - s.start) * tl.fps;
+		const to = s.outFrom + (b - s.start) * tl.fps;
+		const prev = runs[runs.length - 1];
+		if (prev && Math.abs(prev.from + prev.frames - from) < 1 && a >= prev.lastEnd - 1e-6) {
+			prev.frames = to - prev.from;
+			prev.lastEnd = b;
+		} else {
+			runs.push({from, frames: to - from, offset: a - span.start, lastEnd: b});
+		}
+	}
+	return runs.map(({from, frames, offset}) => ({from: Math.round(from), frames: Math.max(1, Math.round(frames)), offset}));
+}
