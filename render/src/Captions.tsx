@@ -6,12 +6,14 @@ import type {CaptionStyle, Word} from './plan';
 const FONT_STACK = '"Montserrat", "Inter", "Helvetica Neue", Arial, sans-serif';
 
 /** Word captions for the line on screen at source time `t`. `words` are the ones that survive the cuts. */
-export const Captions: React.FC<{words: Word[]; style: CaptionStyle; t: number; height: number}> = ({
-	words,
-	style,
-	t,
-	height,
-}) => {
+export const Captions: React.FC<{
+	words: Word[];
+	style: CaptionStyle;
+	t: number;
+	height: number;
+	/** Line center as a fraction of height; defaults to the style's position. */
+	y?: number;
+}> = ({words, style, t, height, y}) => {
 	const groups = useMemo(() => groupWords(words, style.words_per_line), [words, style.words_per_line]);
 	const hit = groupAt(groups, t);
 	if (!hit) return null;
@@ -24,7 +26,7 @@ export const Captions: React.FC<{words: Word[]; style: CaptionStyle; t: number; 
 				position: 'absolute',
 				left: 60,
 				right: 60,
-				top: CAPTION_Y[style.position] * height,
+				top: (y ?? CAPTION_Y[style.position]) * height,
 				transform: 'translateY(-50%)',
 				display: 'flex',
 				flexWrap: 'wrap',

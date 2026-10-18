@@ -124,7 +124,8 @@
             "emoji_burst",
             "list_build",
             "lower_third",
-            "progress_bar"
+            "progress_bar",
+            "illustration"
           ],
           "title": "Type",
           "type": "string"
@@ -254,6 +255,38 @@
         "score"
       ],
       "title": "HookCandidate",
+      "type": "object"
+    },
+    "LayoutSpan": {
+      "additionalProperties": false,
+      "description": "How the frame is arranged for a stretch of the source. Outside every span: \"speaker\".",
+      "properties": {
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "number"
+        },
+        "end": {
+          "exclusiveMinimum": 0,
+          "title": "End",
+          "type": "number"
+        },
+        "mode": {
+          "default": "speaker",
+          "enum": [
+            "speaker",
+            "split",
+            "visual"
+          ],
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "LayoutSpan",
       "type": "object"
     },
     "Output": {
@@ -626,6 +659,14 @@
         "$ref": "#/$defs/Zoom"
       },
       "title": "Zooms",
+      "type": "array"
+    },
+    "layout": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/LayoutSpan"
+      },
+      "title": "Layout",
       "type": "array"
     },
     "reframe": {

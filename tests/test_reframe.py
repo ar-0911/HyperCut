@@ -26,7 +26,7 @@ def test_vertical_source_has_no_keys_and_skips_detection():
 def test_dead_zone_stops_jitter():
     keys = smooth_track(dets([0.5, 0.51, 0.49, 0.52, 0.5]), LANDSCAPE).keys
     assert {k.cx for k in keys} == {0.5}
-    assert all(k.cy == 0.5 for k in keys)
+    assert all(k.cy == 0.4 for k in keys)  # the face's height, for zooms and graphic placement
 
 
 def test_follows_a_move_smoothly():
@@ -87,3 +87,16 @@ def test_cut_into_a_faceless_shot_holds_position():
     keys = smooth_track(d, LANDSCAPE).keys
     assert keys[1].cx == pytest.approx(0.35) and keys[2].cx == pytest.approx(0.35)
     assert keys[-1].cx == pytest.approx(0.6)
+
+
+def test_face_height_follows_and_snaps_at_cuts():
+    d = [Detection(0.0, 0.4, 0.3), Detection(0.2, 0.4, 0.3), Detection(0.4, 0.6, 0.7, cut=True), Detection(0.6, 0.6, 0.7)]
+    keys = smooth_track(d, LANDSCAPE).keys
+    assert keys[0].cy == pytest.approx(0.3)
+    assert keys[2].cy == pytest.approx(0.3)  # held up to the cut
+    assert keys[3].cy == pytest.approx(0.7) and keys[-1].cy == pytest.approx(0.7)
+
+
+def test_missing_face_height_defaults_to_middle():
+    keys = smooth_track([Detection(0.0, 0.4), Detection(0.2, 0.4)], LANDSCAPE).keys
+    assert {k.cy for k in keys} == {0.5}

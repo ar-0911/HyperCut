@@ -1,41 +1,185 @@
 {
   "version": 1,
-  "source": {"path": "media/sample.mp4", "width": 1920, "height": 1080, "fps": 30, "duration": 12.0},
+  "source": {
+    "path": "media/sample.mp4",
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "duration": 12.0
+  },
   "transcript": {
     "language": "en",
     "words": [
-      {"text": "Most", "start": 0.2, "end": 0.45},
-      {"text": "people", "start": 0.45, "end": 0.8},
-      {"text": "waste", "start": 0.8, "end": 1.1},
-      {"text": "ten", "start": 1.1, "end": 1.35},
-      {"text": "hours", "start": 1.35, "end": 1.7},
-      {"text": "a", "start": 1.7, "end": 1.8},
-      {"text": "week.", "start": 1.8, "end": 2.2},
-      {"text": "Here's", "start": 6.0, "end": 6.3},
-      {"text": "how", "start": 6.3, "end": 6.5},
-      {"text": "to", "start": 6.5, "end": 6.6},
-      {"text": "fix", "start": 6.6, "end": 6.9},
-      {"text": "it.", "start": 6.9, "end": 7.3}
+      {
+        "text": "Most",
+        "start": 0.2,
+        "end": 0.45
+      },
+      {
+        "text": "people",
+        "start": 0.45,
+        "end": 0.8
+      },
+      {
+        "text": "waste",
+        "start": 0.8,
+        "end": 1.1
+      },
+      {
+        "text": "ten",
+        "start": 1.1,
+        "end": 1.35
+      },
+      {
+        "text": "hours",
+        "start": 1.35,
+        "end": 1.7
+      },
+      {
+        "text": "a",
+        "start": 1.7,
+        "end": 1.8
+      },
+      {
+        "text": "week.",
+        "start": 1.8,
+        "end": 2.2
+      },
+      {
+        "text": "Here's",
+        "start": 6.0,
+        "end": 6.3
+      },
+      {
+        "text": "how",
+        "start": 6.3,
+        "end": 6.5
+      },
+      {
+        "text": "to",
+        "start": 6.5,
+        "end": 6.6
+      },
+      {
+        "text": "fix",
+        "start": 6.6,
+        "end": 6.9
+      },
+      {
+        "text": "it.",
+        "start": 6.9,
+        "end": 7.3
+      }
     ]
   },
   "hook": {
     "strategy": "cold_open",
     "chosen": 0,
     "candidates": [
-      {"start": 6.0, "end": 7.3, "text": "Here's how to fix it.", "score": 0.62, "why": "promise of a payoff"},
-      {"start": 0.2, "end": 2.2, "text": "Most people waste ten hours a week.", "score": 0.81, "why": "surprising number"}
+      {
+        "start": 6.0,
+        "end": 7.3,
+        "text": "Here's how to fix it.",
+        "score": 0.62,
+        "why": "promise of a payoff"
+      },
+      {
+        "start": 0.2,
+        "end": 2.2,
+        "text": "Most people waste ten hours a week.",
+        "score": 0.81,
+        "why": "surprising number"
+      }
     ]
   },
   "segments": [
-    {"start": 0.2, "end": 2.2, "reason": "hook"},
-    {"start": 0.0, "end": 2.4, "reason": "body"},
-    {"start": 5.9, "end": 12.0, "reason": "body"}
+    {
+      "start": 0.2,
+      "end": 2.2,
+      "reason": "hook"
+    },
+    {
+      "start": 0.0,
+      "end": 2.4,
+      "reason": "body"
+    },
+    {
+      "start": 5.9,
+      "end": 12.0,
+      "reason": "body"
+    }
   ],
   "graphics": [
-    {"id": "g1", "type": "stat_card", "start": 1.1, "end": 2.2, "props": {"value": "10", "label": "hours a week"}},
-    {"id": "g2", "type": "progress_bar", "start": 0.0, "end": 12.0}
+    {
+      "id": "g1",
+      "type": "stat_card",
+      "start": 1.1,
+      "end": 2.2,
+      "props": {
+        "value": "10",
+        "label": "hours a week"
+      }
+    },
+    {
+      "id": "g2",
+      "type": "progress_bar",
+      "start": 0.0,
+      "end": 12.0
+    },
+    {
+      "id": "v1",
+      "type": "illustration",
+      "start": 6.0,
+      "end": 9.0,
+      "props": {
+        "title": "10 hours back",
+        "viewBox": "0 0 1000 800",
+        "defs": "<linearGradient id=\"sky\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#1E2A78\"/><stop offset=\"1\" stop-color=\"#0B0B12\"/></linearGradient>",
+        "layers": [
+          "<rect width=\"1000\" height=\"800\" rx=\"48\" fill=\"url(#sky)\"/>",
+          "<circle cx=\"500\" cy=\"400\" r=\"220\" fill=\"#FFFFFF\" stroke=\"#111111\" stroke-width=\"16\"/>",
+          "<g stroke=\"#111111\" stroke-width=\"18\" stroke-linecap=\"round\"><line x1=\"500\" y1=\"400\" x2=\"500\" y2=\"260\"/><line x1=\"500\" y1=\"400\" x2=\"600\" y2=\"440\"/></g>",
+          "<path d=\"M760 200 l40 -60 l40 60 z\" fill=\"#FFE600\"/>"
+        ]
+      },
+      "anchor": "auto"
+    }
   ],
-  "zooms": [{"start": 6.0, "end": 7.3, "scale": 1.2, "ease": "snap"}],
-  "reframe": {"keys": [{"t": 0.0, "cx": 0.52, "cy": 0.4}, {"t": 10.0, "cx": 0.5, "cy": 0.42}]},
-  "style": {"name": "bold_creator"}
+  "zooms": [
+    {
+      "start": 6.0,
+      "end": 7.3,
+      "scale": 1.2,
+      "ease": "snap"
+    }
+  ],
+  "reframe": {
+    "keys": [
+      {
+        "t": 0.0,
+        "cx": 0.52,
+        "cy": 0.4
+      },
+      {
+        "t": 10.0,
+        "cx": 0.5,
+        "cy": 0.42
+      }
+    ]
+  },
+  "style": {
+    "name": "bold_creator"
+  },
+  "layout": [
+    {
+      "start": 6.0,
+      "end": 7.5,
+      "mode": "split"
+    },
+    {
+      "start": 7.5,
+      "end": 9.0,
+      "mode": "visual"
+    }
+  ]
 }

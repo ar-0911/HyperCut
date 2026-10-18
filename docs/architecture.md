@@ -103,10 +103,21 @@ filler words and gaps over `style.pacing.max_silence` come from word timings (pl
 when the wav is given). Code then assembles `segments`: `cold_open` puts the hook first and keeps it in
 place; `trim` starts at the hook. See ADR 0401.
 
+With `visuals=True` (the default in `run_pipeline`; `--no-visuals` turns it off) analyze also directs the
+look of the video (`hypercut/analyze/visuals.py`, ADR 0402). Code groups the played words into beats of
+2-4.5 s, breaking at sentence ends. One director call, allowed to search the web for reference, picks each
+beat's `layout` mode (`speaker`, `split` with the visual above the speaker, or `visual` full frame) and
+writes an art brief specific to what is said, or picks a text card. Parallel illustrator calls turn
+the briefs into original SVG drawings. Code sanitizes them and splits each into layers that the renderer
+reveals in order (graphic type `illustration`). Code also enforces the mix: no visual-only opening, no two
+visual-only beats in a row, visual-only under 30% of the time. Text graphics from the main call that would
+share the panel with a visual are dropped.
+
 **Reframe.** `reframe(video, source)` samples ~5 frames/s with OpenCV and takes the largest MediaPipe face per
 frame. The track is smoothed (exponential, with a dead zone so the crop ignores small movements), clamped so the
-full-height 9:16 window stays inside the frame, and stored as normalized crop-center keyframes (`cy` is always
-0.5). No face, or an already-vertical source, means empty keys (center crop). The detector is an injectable
+full-height 9:16 window stays inside the frame, and stored as normalized crop-center keyframes. `cy` is the
+face's own height in the frame, smoothed the same way; the renderer zooms in on it and keeps graphics off it
+(decision 0504). No face, or an already-vertical source, means empty keys (center crop). The detector is an injectable
 function so tests need no mediapipe. Detection uses the MediaPipe Tasks face detector, whose model is fetched
 once into `~/.cache/hypercut` (decision 0502). Hard cuts between shots are found from colour-histogram jumps
 between samples, and at a cut the crop snaps to the new shot's speaker instead of easing (decision 0503), so
@@ -119,11 +130,18 @@ cropped and zoomed source frame, the caption line for the current words (styled 
 length taken from the plan. The video layer is one Remotion sequence per segment; overlays are driven by the
 *source* time of the current frame, so the cold-open hook shows its captions and graphics both times it plays
 and cut material shows nothing. The logic is in pure, unit-tested modules (`timing.ts`, `layout.ts`,
-`captions.ts`). Crop follows the interpolated reframe keys (center crop without them); zooms scale about the
-frame center; graphics take one of three vertical bands chosen to stay clear of the face and the captions.
+`captions.ts`); `sceneAt(plan, t)` gives both layers the frame's layout mode, speaker panel, crop, zoom and
+face point. `plan.layout` switches between three modes (decision 0605): `speaker` (full frame; the default),
+`split` (speaker slides into the bottom half, visuals above on an animated accent backdrop, captions on the
+seam) and `visual` (the visual graphic fills the frame while the speaker keeps talking underneath); a
+split/visual span with no visual graphic on screen plays as speaker. Crop follows the interpolated reframe
+keys (center crop without them); zooms scale about the face (`cx`, `cy` from the track, decision 0606);
+in speaker mode graphics take one of three vertical bands chosen to stay clear of the face and the captions.
+`illustration` graphics are Claude-drawn SVG layers that pop in one by one. Every frame is a pure function
+of the frame number (no CSS animation, no randomness).
 Run it with `npm run render -- --plan plan.json --video normalized.mp4 --out out.mp4` in `render/`
 (`REMOTION_BROWSER` selects a Chromium). See ADRs [0601](decisions/0601-render-architecture.md) to
-[0604](decisions/0604-render-cli-and-browser.md).
+[0606](decisions/0606-zoom-about-the-face.md).
 
 **API.** `uvicorn api.main:app` serves a job per upload. `POST /jobs` (multipart `video`, `style`,
 `hook_strategy`) saves to `media/<job_id>/` and returns an id; a background thread runs

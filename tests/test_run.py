@@ -27,8 +27,9 @@ def stages(monkeypatch):
         seen["style"] = prompt
         return Style()
 
-    def analyze(transcript, source, style, audio_wav=None, strategy="cold_open"):
+    def analyze(transcript, source, style, audio_wav=None, strategy="cold_open", visuals=False):
         seen["strategy"] = strategy
+        seen["visuals"] = visuals
         return EditPlan(source=source, transcript=transcript, style=style)
 
     monkeypatch.setattr(run, "ingest", ingest)
@@ -43,7 +44,7 @@ def test_run_pipeline_writes_plan(tmp_path, stages):
     stage_names = []
     plan = run.run_pipeline("in.mp4", tmp_path / "job", "calm", "trim", on_stage=stage_names.append)
     assert stage_names == ["ingest", "transcribe", "style", "analyze"]
-    assert stages["style"] == "calm" and stages["strategy"] == "trim"
+    assert stages["style"] == "calm" and stages["strategy"] == "trim" and stages["visuals"] is True
     saved = json.loads((tmp_path / "job" / "plan.json").read_text())
     assert saved["reframe"]["keys"][0]["cx"] == 0.3 and plan.reframe.keys
 

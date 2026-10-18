@@ -44,8 +44,9 @@ def smooth_track(
     Gaps hold the last known position (leading gaps take the first one). The crop only moves
     once the target leaves the dead zone around it, then eases toward it exponentially. At a
     hard cut (`Detection.cut`) it jumps straight to the new shot's face (ADR 0503).
-    Centers are clamped so the crop window never leaves the frame. cy stays 0.5 because the
-    crop uses the full source height.
+    cx is clamped so the crop window never leaves the frame. cy is the face's own height in the
+    frame (smoothed the same way): the full-height crop never moves vertically, so the renderer
+    uses it only to zoom in on the face and keep graphics off it (ADR 0504).
     """
     half = _crop_half_width(source)
     if half >= 0.5 or not any(d.cx is not None for d in detections):
@@ -53,31 +54,37 @@ def smooth_track(
 
     lo, hi = half, 1 - half
     clamp = lambda x: min(max(x, lo), hi)  # noqa: E731
+    face_y = lambda d: 0.5 if d.cy is None else min(max(d.cy, 0.0), 1.0)  # noqa: E731
 
-    def first_face(i: int) -> float | None:
-        """First face at or after sample i, within the same shot."""
+    def first_face(i: int) -> Detection | None:
+        """First detection with a face at or after sample i, within the same shot."""
         for j in range(i, len(detections)):
             if j > i and detections[j].cut:
                 return None
             if detections[j].cx is not None:
-                return detections[j].cx
+                return detections[j]
         return None
 
-    pos = clamp(first_face(0) or next(d.cx for d in detections if d.cx is not None))
+    start = first_face(0) or next(d for d in detections if d.cx is not None)
+    pos, pos_y = clamp(start.cx), face_y(start)
     keys: list[ReframeKey] = []
+    key = lambda t: ReframeKey(t=max(0.0, t), cx=round(pos, 4), cy=round(pos_y, 4))  # noqa: E731
     for i, d in enumerate(detections):
         if d.cut and i > 0:
             # Snap to the new shot's speaker instead of easing across the cut, and hold the old
             # position right up to the cut so interpolation between keys can't glide over it.
             nxt = first_face(i)
             if nxt is not None:
-                keys.append(ReframeKey(t=max(0.0, d.t - 0.001), cx=round(pos, 4), cy=0.5))
-                pos = clamp(nxt)
+                keys.append(key(d.t - 0.001))
+                pos, pos_y = clamp(nxt.cx), face_y(nxt)
         elif d.cx is not None:
             target = clamp(d.cx)
             if abs(target - pos) > dead_zone:
                 pos += alpha * (target - pos)
-        keys.append(ReframeKey(t=max(0.0, d.t), cx=round(pos, 4), cy=0.5))
+            target_y = face_y(d)
+            if abs(target_y - pos_y) > dead_zone:
+                pos_y += alpha * (target_y - pos_y)
+        keys.append(key(d.t))
     return Reframe(keys=keys)
 
 

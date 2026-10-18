@@ -13,6 +13,17 @@ describe('normalizePlan', () => {
 		expect(p.segments[0].reason).toBe('hook');
 	});
 
+	it('defaults layout to speaker throughout and fills span modes', () => {
+		const {layout: _drop, ...old} = samplePlan as Record<string, unknown>;
+		expect(normalizePlan(old).layout).toEqual([]);
+		const p = normalizePlan({...samplePlan, layout: [{start: 1, end: 2}, {start: 2, end: 3, mode: 'visual'}]});
+		expect(p.layout).toEqual([
+			{start: 1, end: 2, mode: 'speaker'},
+			{start: 2, end: 3, mode: 'visual'},
+		]);
+		expect(normalizePlan(samplePlan).layout.map((l) => l.mode)).toEqual(['split', 'visual']);
+	});
+
 	it('keeps partial style overrides', () => {
 		const p = normalizePlan({...samplePlan, style: {caption: {animation: 'bounce'}}});
 		expect(p.style.caption.animation).toBe('bounce');
@@ -30,6 +41,9 @@ describe('schema drift guard', () => {
 	const defs = (schema as any).$defs;
 	it('renders every GraphicType the schema allows', () => {
 		expect([...GRAPHIC_TYPES].sort()).toEqual([...defs.Graphic.properties.type.enum].sort());
+	});
+	it('knows every layout mode', () => {
+		expect([...defs.LayoutSpan.properties.mode.enum].sort()).toEqual(['speaker', 'split', 'visual']);
 	});
 	it('knows every caption animation', () => {
 		expect(defs.CaptionStyle.properties.animation.enum.sort()).toEqual(['bounce', 'karaoke', 'pop', 'typewriter']);

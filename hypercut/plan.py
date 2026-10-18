@@ -81,6 +81,9 @@ GraphicType = Literal[
     "list_build",
     "lower_third",
     "progress_bar",
+    # Visuals: shown in the top panel of a "split" span, full frame in a "visual" span, as a card off
+    # the face otherwise.
+    "illustration",  # props: {"viewBox", "defs", "layers": [svg fragments, revealed in order], "title", "brief"}
 ]
 
 
@@ -94,6 +97,14 @@ class Graphic(Span):
     anchor: Literal["auto", "top", "center", "bottom"] = "auto"
 
 
+class LayoutSpan(Span):
+    """How the frame is arranged for a stretch of the source. Outside every span: "speaker"."""
+
+    # speaker: speaker fills the frame. split: speaker in the bottom half, visuals above.
+    # visual: the visual fills the frame while the speaker keeps talking (B-roll).
+    mode: Literal["speaker", "split", "visual"] = "speaker"
+
+
 class Zoom(Span):
     scale: float = Field(default=1.15, ge=1, le=2)
     ease: Literal["linear", "ease_in_out", "snap"] = "ease_in_out"
@@ -101,7 +112,8 @@ class Zoom(Span):
 
 class ReframeKey(_Model):
     t: float = Field(ge=0)
-    # Crop center on the source frame, normalized 0..1.
+    # Normalized 0..1 on the source frame. cx: horizontal crop center. cy: the face's height in the
+    # frame (the crop is full height); older plans have 0.5 here.
     cx: float = Field(ge=0, le=1)
     cy: float = Field(ge=0, le=1)
 
@@ -157,13 +169,14 @@ class EditPlan(_Model):
     segments: list[Segment] = []  # empty: whole source, unedited
     graphics: list[Graphic] = []
     zooms: list[Zoom] = []
+    layout: list[LayoutSpan] = []  # empty: speaker full frame throughout
     reframe: Reframe = Reframe()
     style: Style = Style()
 
     @model_validator(mode="after")
     def _within_source(self) -> "EditPlan":
         limit = self.source.duration + 1e-6
-        for name in ("segments", "graphics", "zooms"):
+        for name in ("segments", "graphics", "zooms", "layout"):
             for item in getattr(self, name):
                 if item.end > limit:
                     raise ValueError(f"{name}: {item.end}s is past the source end ({self.source.duration}s)")

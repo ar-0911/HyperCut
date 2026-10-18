@@ -1,10 +1,13 @@
-// Pure geometry: reframe interpolation, crop rectangle, zoom curve, graphic placement.
+// Pure geometry: reframe interpolation, crop rectangle, zoom curve, graphic placement, layout modes.
 
-import type {Anchor, ReframeKey, Zoom} from './plan';
+import type {Anchor, EditPlan, Graphic, GraphicType, LayoutMode, LayoutSpan, ReframeKey, Zoom} from './plan';
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-/** Crop center at source time t: linear between keys, held at the ends, 0.5/0.5 with no keys. */
+/**
+ * Reframe at source time t: linear between keys, held at the ends, 0.5/0.5 with no keys. cx is the
+ * horizontal crop center, cy the face's height in the source frame.
+ */
 export function reframeAt(keys: ReframeKey[], t: number): {cx: number; cy: number} {
 	if (!keys.length) return {cx: 0.5, cy: 0.5};
 	const ks = [...keys].sort((a, b) => a.t - b.t);
@@ -108,4 +111,135 @@ export function placeGraphic(
 	return pool.reduce((best, b) =>
 		Math.abs(BAND_Y[b] - faceY) > Math.abs(BAND_Y[best] - faceY) ? b : best,
 	);
+}
+
+// ---- layout modes ---------------------------------------------------------------------------
+
+/** Split layout: the speaker panel is the bottom (1 - SPLIT) of the frame, visuals the top SPLIT. */
+export const SPLIT = 0.5;
+/** Seconds the speaker panel takes to slide from full frame into the bottom half. */
+export const SPLIT_IN = 0.3;
+/** Seconds a full-frame visual takes to fade/scale in. */
+export const VISUAL_IN = 0.25;
+/** Vertical area (fractions of output height) the split layout's top panel lays graphics out in. */
+export const SPLIT_AREA = {top: 0.03, bottom: 0.44};
+/** Same for a full-frame visual; captions sit below it. */
+export const VISUAL_AREA = {top: 0.06, bottom: 0.74};
+
+/** Graphic types that can carry a split top panel or a full-frame visual. */
+export const VISUAL_TYPES: readonly GraphicType[] = ['illustration', 'kinetic_text', 'stat_card', 'list_build'];
+export const isVisualType = (type: GraphicType) => VISUAL_TYPES.includes(type);
+
+const EPS = 1e-3;
+
+/**
+ * Layout mode at source time t and seconds since it started (Infinity outside every span).
+ * Back-to-back spans of the same mode count as one, so they do not re-animate at the seam.
+ */
+export function layoutAt(spans: LayoutSpan[], t: number): {mode: LayoutMode; enter: number} {
+	const ks = [...spans].sort((a, b) => a.start - b.start);
+	const i = ks.findIndex((s) => t >= s.start && t < s.end);
+	if (i < 0) return {mode: 'speaker', enter: Infinity};
+	const {mode} = ks[i];
+	let start = ks[i].start;
+	for (let j = i - 1; j >= 0; j--) {
+		const p = ks[j];
+		if (p.mode === mode && p.end >= start - EPS && p.start < start) start = p.start;
+	}
+	return {mode, enter: t - start};
+}
+
+/**
+ * The mode actually drawn at t: the layout mode, except that a split or visual span with no visual
+ * graphic on screen falls back to speaker (never an empty panel), and a visual graphic during a speaker
+ * span opens the split panel (text cards never sit on the face). `enter` counts from when the run of
+ * visual graphics inside the span began, so a visual arriving mid-span still animates in.
+ */
+export function modeAt(spans: LayoutSpan[], graphics: Graphic[], t: number): {mode: LayoutMode; enter: number} {
+	const l = layoutAt(spans, t);
+	const vis = graphics.filter((g) => isVisualType(g.type));
+	const active = vis.filter((g) => t >= g.start && t < g.end);
+	if (!active.length) return {mode: 'speaker', enter: Infinity};
+	// A visual during a speaker span opens the split panel rather than covering the speaker's face.
+	const mode: LayoutMode = l.mode === 'speaker' ? 'split' : l.mode;
+	// Walk back through overlapping / touching visuals to the start of this run of coverage.
+	let start = Math.min(...active.map((g) => g.start));
+	for (let moved = true; moved; ) {
+		moved = false;
+		for (const g of vis) {
+			if (g.start < start && g.end >= start - EPS) {
+				start = g.start;
+				moved = true;
+			}
+		}
+	}
+	const spanStart = l.mode === 'speaker' ? -Infinity : t - l.enter;
+	return {mode, enter: t - Math.max(start, spanStart)};
+}
+
+/** Extra zoom on the speaker in split mode: half-size framing of a wide shot leaves the face small. */
+export const SPLIT_PUNCH = 1.35;
+
+const easeInOut = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+
+/** The speaker panel (output pixels): full frame, or sliding into the bottom part in split mode. */
+export function panelAt(mode: LayoutMode, enter: number, height: number): {top: number; height: number} {
+	if (mode !== 'split') return {top: 0, height};
+	const k = easeInOut(clamp(enter / SPLIT_IN, 0, 1));
+	const top = SPLIT * height * k;
+	return {top, height: height - top};
+}
+
+/** Caption center (fraction of output height): style position, the split seam, or bottom over a visual. */
+export function captionY(mode: LayoutMode, position: 'top' | 'middle' | 'bottom'): number {
+	if (mode === 'split') return SPLIT;
+	if (mode === 'visual') return CAPTION_Y.bottom;
+	return CAPTION_Y[position];
+}
+
+export type Scene = {
+	mode: LayoutMode;
+	enter: number;
+	/** Speaker panel in output pixels. */
+	panel: {top: number; height: number};
+	/** Crop of the source inside the panel (panel-local pixels). */
+	rect: CropRect;
+	zoom: number;
+	/** Zoom origin: the face, panel-local pixels. */
+	origin: {x: number; y: number};
+	/** The face in output pixels (a zoom about it does not move it). */
+	face: {x: number; y: number};
+	/** Face height as a fraction of output height for graphic placement (0.4 without a face track). */
+	faceY: number;
+	captionY: number;
+};
+
+/** Everything about the frame's arrangement at source time t, shared by the video and overlay layers. */
+export function sceneAt(plan: EditPlan, t: number): Scene {
+	const {width, height} = plan.output;
+	const {mode, enter} = modeAt(plan.layout, plan.graphics, t);
+	const panel = panelAt(mode, enter, height);
+	const {cx, cy} = reframeAt(plan.reframe.keys, t);
+	const rect = cropRect(plan.source, {width, height: panel.height}, cx, cy);
+	const p = pointInOutput(rect, cx, cy);
+	// Scaling (>= 1) about a point inside the panel keeps the panel covered.
+	const origin = {x: clamp(p.x, 0, width), y: clamp(p.y, 0, panel.height)};
+	const face = {x: origin.x, y: panel.top + origin.y};
+	return {
+		mode,
+		enter,
+		panel,
+		rect,
+		// In split mode the speaker is drawn at half size, so punch in on the face as the panel slides.
+		zoom: zoomAt(plan.zooms, t) * (1 + (SPLIT_PUNCH - 1) * (panel.top / (SPLIT * height))),
+		origin,
+		face,
+		faceY: plan.reframe.keys.length ? face.y / height : 0.4,
+		// While the speaker panel slides down, the caption line travels with the seam.
+		captionY:
+			mode === 'split'
+				? captionY('speaker', plan.style.caption.position) +
+					(SPLIT - captionY('speaker', plan.style.caption.position)) * (panel.top / (SPLIT * height))
+				: captionY(mode, plan.style.caption.position),
+	};
 }

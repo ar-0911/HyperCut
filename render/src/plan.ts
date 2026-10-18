@@ -15,6 +15,7 @@ export const GRAPHIC_TYPES = [
 	'list_build',
 	'lower_third',
 	'progress_bar',
+	'illustration',
 ] as const;
 export type GraphicType = (typeof GRAPHIC_TYPES)[number];
 export type Anchor = 'auto' | 'top' | 'center' | 'bottom';
@@ -25,7 +26,11 @@ export type Graphic = Span & {
 	props: Record<string, unknown>;
 	anchor: Anchor;
 };
+export type LayoutMode = 'speaker' | 'split' | 'visual';
+/** How the frame is arranged for a stretch of source time. Outside every span: speaker. */
+export type LayoutSpan = Span & {mode: LayoutMode};
 export type Zoom = Span & {scale: number; ease: 'linear' | 'ease_in_out' | 'snap'};
+/** cx: horizontal crop center; cy: the face's height in the source frame (0.5 in older plans). */
 export type ReframeKey = {t: number; cx: number; cy: number};
 
 export type CaptionAnimation = 'karaoke' | 'pop' | 'typewriter' | 'bounce';
@@ -64,6 +69,8 @@ export type EditPlan = {
 	segments: Segment[];
 	graphics: Graphic[];
 	zooms: Zoom[];
+	/** Empty: speaker full frame throughout. */
+	layout: LayoutSpan[];
 	reframe: {keys: ReframeKey[]};
 	style: Style;
 };
@@ -116,6 +123,7 @@ export function normalizePlan(raw: unknown): EditPlan {
 		segments: (r.segments ?? []).map((g: object) => ({reason: 'body' as const, ...g})),
 		graphics: (r.graphics ?? []).map((g: object) => ({props: {}, anchor: 'auto' as const, ...g})),
 		zooms: (r.zooms ?? []).map((z: object) => ({scale: 1.15, ease: 'ease_in_out' as const, ...z})),
+		layout: (r.layout ?? []).map((l: object) => ({mode: 'speaker' as const, ...l})),
 		reframe: {keys: [], ...(r.reframe ?? {})},
 		style: {
 			...DEFAULT_STYLE,
