@@ -1,7 +1,7 @@
 'use client';
 
 import type {EditPlan, Graphic, LayoutMode} from '@render/plan';
-import {isVisualType} from '@render/layout';
+import {isAroundType, isVisualType} from '@render/layout';
 import {
 	GRAPHIC_NAMES,
 	LAYOUT_NAMES,
@@ -59,6 +59,30 @@ function GraphicFields({plan, g, onChange}: {plan: EditPlan; g: Graphic; onChang
 						/>
 					</Field>
 				</>
+			);
+		case 'orbit':
+		case 'fly_out':
+			return (
+				<>
+					<Field label="Emoji or short words, one per line">
+						<textarea
+							value={(Array.isArray(g.props.items) ? g.props.items : []).join('\n')}
+							onChange={(e) => set({items: e.target.value.split('\n')})}
+						/>
+					</Field>
+					<p className="hint">Passes behind and in front of the speaker, never over the face.</p>
+				</>
+			);
+		case 'particles':
+			return (
+				<Field label="Kind">
+					<select value={String(g.props.kind ?? 'sparkles')} onChange={(e) => set({kind: e.target.value})}>
+						<option value="sparkles">Sparkles</option>
+						<option value="bokeh">Soft lights</option>
+						<option value="confetti">Confetti</option>
+						<option value="embers">Embers</option>
+					</select>
+				</Field>
 			);
 		case 'illustration':
 			return (
@@ -144,7 +168,7 @@ export default function Inspector({
 
 			{g && <GraphicFields plan={plan} g={g} onChange={onChange} />}
 
-			{g && g.type !== 'progress_bar' && (
+			{g && g.type !== 'progress_bar' && !isAroundType(g.type) && (
 				<label className="check">
 					<input
 						type="checkbox"

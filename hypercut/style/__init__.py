@@ -67,7 +67,8 @@ def style_from_prompt(prompt: str) -> Style:
 # these effects must never switch on by themselves (ADR 0901).
 DEPTH_WORDS = re.compile(
     r"background|backdrop|behind|green ?screen|chroma|cut ?out|matte|3 ?d\b|depth|parallax|bokeh|blur|"
-    r"pop(?:s|ping)? out|spotlight|segment|remove (?:the|my) (?:room|wall)|replace (?:the|my) (?:room|wall)",
+    r"pop(?:s|ping)? out|spotlight|segment|around (?:me|the speaker|him|her|them)|immersive|orbit|"
+    r"particles?|sparkles?|confetti|in front of (?:me|the speaker)|remove (?:the|my) (?:room|wall)|replace (?:the|my) (?:room|wall)",
     re.IGNORECASE,
 )
 
@@ -113,8 +114,8 @@ Style JSON schema (use only these fields and allowed values; colors are #RRGGBB)
 User request: {user_prompt}
 
 Green-screen effects (`depth`) stay off unless the request explicitly asks for them: text or graphics
-behind the speaker, removing, replacing, blurring or dimming the background, a green-screen, cut-out or 3D
-depth look. Then set depth.enabled true and pick depth.background (original keeps the real room).
+behind the speaker, things happening around or in front of the speaker (an immersive look), removing,
+replacing, blurring or dimming the background, a green-screen, cut-out or 3D depth look. Then set depth.enabled true and pick depth.background (original keeps the real room).
 
 Answer exactly: {{"preset": "<preset name>", "changes": {{...partial style, same nesting as the schema, omit `name`...}}}}
 Use an empty "changes" object if the preset already fits."""

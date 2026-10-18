@@ -236,3 +236,44 @@ def test_behind_titles_skip_split_and_visual_stretches():
               Graphic(id="", type="kinetic_text", start=6, end=7, props={"text": "B"}, layer="behind")]
     out = add_behind([], titles, [LayoutSpan(start=5, end=8, mode="split")])
     assert [g.props["text"] for g in out] == ["A"]
+
+
+def test_effects_around_the_speaker_only_when_on(sample, fake_llm):
+    answer = {**GOOD, "around": [{"type": "orbit", "start": 1.0, "end": 2.5, "items": ["🔥", "big money talk", "", "💡"]}]}
+    calls = fake_llm(answer)
+    assert not any(g.type == "orbit" for g in run(sample).graphics)
+    assert "AROUND the speaker" not in calls[0]
+
+    p = run(sample, style=Style(depth={"enabled": True}))
+    assert "AROUND the speaker" in calls[1]
+    orbit = next(g for g in p.graphics if g.type == "orbit")
+    assert (orbit.id, orbit.props["items"]) == ("o1", ["🔥", "big money", "💡"])
+    assert not any(g.type == "orbit" for g in run(sample, style=Style(depth={"enabled": True, "around": False})).graphics)
+
+
+def test_effects_around_are_cleaned_and_capped():
+    from hypercut.analyze.analyze import _around
+
+    items = [
+        {"type": "orbit", "start": 1.0, "end": 20.0, "items": ["A"]},
+        {"type": "fly_out", "start": 2.0, "end": 3.0, "items": ["x"]},  # overlaps the orbit
+        {"type": "particles", "start": 7.5, "end": 9.0, "kind": "glitter"},
+        {"type": "lasers", "start": 10, "end": 11},
+        {"type": "fly_out", "start": 12, "end": 13, "items": []},
+        {"type": "fly_out", "start": 14, "end": 15, "items": ["🚀"]},
+    ]
+    out = _around(items, duration=30, limit=2)
+    assert [(g.type, g.start, g.end, g.props) for g in out] == [
+        ("orbit", 1.0, 7.0, {"items": ["A"]}),  # capped at 6 s
+        ("particles", 7.5, 9.0, {"kind": "sparkles"}),  # unknown kind -> sparkles; the limit drops the last
+    ]
+
+
+def test_effects_around_skip_split_and_visual_stretches():
+    from hypercut.analyze.analyze import add_around
+    from hypercut.plan import Graphic, LayoutSpan
+
+    fx = [Graphic(id="", type="particles", start=1, end=3, props={"kind": "bokeh"}),
+          Graphic(id="", type="orbit", start=6, end=7, props={"items": ["A"]})]
+    out = add_around([], fx, [LayoutSpan(start=5, end=8, mode="visual")])
+    assert [(g.id, g.type) for g in out] == [("o1", "particles")]

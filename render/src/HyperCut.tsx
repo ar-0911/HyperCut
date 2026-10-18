@@ -1,9 +1,10 @@
 import React, {useMemo} from 'react';
 import {AbsoluteFill, Freeze, Img, OffthreadVideo, Sequence, staticFile, useCurrentFrame} from 'remotion';
+import {AroundLayer} from './Around';
 import {Captions} from './Captions';
 import {BackgroundFill, backgroundFilter, BehindLayer, replacesBackground} from './Depth';
 import {GraphicBody, GraphicView} from './Graphics';
-import {depthAt, isVisualType, sceneAt, SPLIT, SPLIT_AREA, VISUAL_AREA, VISUAL_IN} from './layout';
+import {aroundAt, depthAt, isAroundType, isVisualType, sceneAt, SPLIT, SPLIT_AREA, VISUAL_AREA, VISUAL_IN} from './layout';
 import {normalizePlan, type CompositionProps, type EditPlan, type Graphic} from './plan';
 import {buildTimeline, frameToSource, isKept, mediaRuns, type Timeline, type TimelineSegment} from './timing';
 
@@ -147,15 +148,20 @@ const Behind: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string}> = ({p
 	if (t === null) return null;
 	const scene = sceneAt(plan, t);
 	const depth = depthAt(plan, t, scene.mode, true);
-	if (!depth?.behind.length) return null;
+	if (!depth?.behind.length && !depth?.around.length) return null;
 	return (
-		<BehindLayer
-			graphics={depth.behind}
-			t={t}
-			plan={plan}
-			face={scene.face}
-			renderMedia={(g) => <MediaFill graphic={g} tl={tl} t={t} frame={frame} assetBase={assetBase} />}
-		/>
+		<>
+			{depth.behind.length ? (
+				<BehindLayer
+					graphics={depth.behind}
+					t={t}
+					plan={plan}
+					face={scene.face}
+					renderMedia={(g) => <MediaFill graphic={g} tl={tl} t={t} frame={frame} assetBase={assetBase} />}
+				/>
+			) : null}
+			<AroundLayer graphics={depth.around} t={t} plan={plan} face={scene.face} pass="behind" />
+		</>
 	);
 };
 
@@ -234,7 +240,10 @@ const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string; hasM
 	// Graphics drawn behind the speaker are not ours; the rest of the behind layer (no cut-out, or a split
 	// or visual stretch) is placed in front, off the face, like any other graphic.
 	const behind = depthAt(plan, t, mode, hasMatte)?.behind ?? [];
-	const active = plan.graphics.filter((g) => t >= g.start && t < g.end && !behind.includes(g));
+	const active = plan.graphics.filter((g) => t >= g.start && t < g.end && !behind.includes(g) && !isAroundType(g.type));
+	// Effects around the speaker: their near half here, in front of the cut-out; without one, all of them
+	// in front (kept off the face either way). Only in speaker stretches, and only when depth is on.
+	const around = mode === 'speaker' && plan.style.depth.enabled ? aroundAt(plan, t) : [];
 	const visuals = mode === 'speaker' ? [] : active.filter((g) => isVisualType(g.type) && g.layer !== 'behind');
 	const media = visuals.filter((g) => g.type === 'media');
 	const boxed = visuals.filter((g) => g.type !== 'media');
@@ -275,6 +284,7 @@ const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string; hasM
 					height={height}
 				/>
 			))}
+			{around.length ? <AroundLayer graphics={around} t={t} plan={plan} face={scene.face} pass={hasMatte ? 'front' : 'all'} /> : null}
 			<Captions words={words} style={plan.style.caption} t={t} height={height} y={scene.captionY} />
 		</AbsoluteFill>
 	);

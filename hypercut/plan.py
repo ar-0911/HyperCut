@@ -88,10 +88,19 @@ GraphicType = Literal[
     # props: {"src": file name in the job folder, "kind": "image" | "video", "fit": "cover" | "contain",
     #         "trim_start": seconds into the clip, "duration": clip length in seconds, "label"}
     "media",
+    # Effects AROUND the cut-out speaker (green-screen effects, ADR 0610): drawn partly behind and partly
+    # in front of the speaker, never over the face. Only with `style.depth.enabled`; `layer` is ignored.
+    "orbit",  # props: {"items": [emoji or 1-2 word labels]}: a ring circling the speaker's shoulders
+    "fly_out",  # props: {"items": [...]}: things that burst from behind the head toward the camera
+    "particles",  # props: {"kind": "sparkles" | "bokeh" | "confetti" | "embers", "color"}: depth-layered
 ]
 
-# Graphic types the analyze stage may propose; "media" only comes from the user's own uploads.
-GENERATED_GRAPHIC_TYPES: tuple[str, ...] = tuple(t for t in get_args(GraphicType) if t != "media")
+# Effects around the cut-out speaker; analyze only proposes them when green-screen effects are on.
+AROUND_GRAPHIC_TYPES: tuple[str, ...] = ("orbit", "fly_out", "particles")
+# Graphic types the analyze stage's main list offers; "media" only comes from the user's own uploads.
+GENERATED_GRAPHIC_TYPES: tuple[str, ...] = tuple(
+    t for t in get_args(GraphicType) if t != "media" and t not in AROUND_GRAPHIC_TYPES
+)
 
 
 class Graphic(Span):
@@ -213,11 +222,13 @@ class Depth(_Model):
     enabled: bool = Field(
         default=False,
         description="True only if the user explicitly asks for a green-screen look: text or graphics behind "
-        "the speaker, a removed, replaced, blurred or dimmed background, or a 3D/depth effect.",
+        "the speaker, things happening around or in front of the speaker, a removed, replaced, blurred or "
+        "dimmed background, or a 3D/depth effect.",
     )
     # Background where no `backgrounds` span says otherwise.
     background: BackgroundKind = "original"
     behind_titles: bool = True  # analyze puts a few big titles behind the speaker's head
+    around: bool = True  # analyze adds a few effects around the speaker (orbit, fly_out, particles)
 
 
 class Style(_Model):

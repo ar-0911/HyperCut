@@ -173,7 +173,7 @@
       "properties": {
         "enabled": {
           "default": false,
-          "description": "True only if the user explicitly asks for a green-screen look: text or graphics behind the speaker, a removed, replaced, blurred or dimmed background, or a 3D/depth effect.",
+          "description": "True only if the user explicitly asks for a green-screen look: text or graphics behind the speaker, things happening around or in front of the speaker, a removed, replaced, blurred or dimmed background, or a 3D/depth effect.",
           "title": "Enabled",
           "type": "boolean"
         },
@@ -193,6 +193,11 @@
         "behind_titles": {
           "default": true,
           "title": "Behind Titles",
+          "type": "boolean"
+        },
+        "around": {
+          "default": true,
+          "title": "Around",
           "type": "boolean"
         }
       },
@@ -225,7 +230,10 @@
             "lower_third",
             "progress_bar",
             "illustration",
-            "media"
+            "media",
+            "orbit",
+            "fly_out",
+            "particles"
           ],
           "title": "Type",
           "type": "string"
@@ -627,7 +635,8 @@
           "default": {
             "enabled": false,
             "background": "original",
-            "behind_titles": true
+            "behind_titles": true,
+            "around": true
           }
         }
       },
@@ -903,6 +912,7 @@
           "style": "smooth"
         },
         "depth": {
+          "around": true,
           "background": "original",
           "behind_titles": true,
           "enabled": false

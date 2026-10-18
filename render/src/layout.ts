@@ -129,6 +129,9 @@ export const VISUAL_AREA = {top: 0.06, bottom: 0.74};
 /** Graphic types that can carry a split top panel or a full-frame visual. */
 export const VISUAL_TYPES: readonly GraphicType[] = ['illustration', 'kinetic_text', 'stat_card', 'list_build', 'media'];
 export const isVisualType = (type: GraphicType) => VISUAL_TYPES.includes(type);
+/** Effects around the cut-out speaker (ADR 0610): drawn by Around.tsx, behind and in front of the speaker. */
+export const AROUND_TYPES: readonly GraphicType[] = ['orbit', 'fly_out', 'particles'];
+export const isAroundType = (type: GraphicType) => AROUND_TYPES.includes(type);
 
 const EPS = 1e-3;
 
@@ -258,9 +261,19 @@ export function backgroundAt(plan: EditPlan, t: number): BackgroundSpan {
  * speaker (only where the speaker fills the frame); `cutout` says whether the cut-out speaker must be
  * drawn on top this frame (a replaced or treated background, or something behind them).
  */
-export function depthAt(plan: EditPlan, t: number, mode: LayoutMode, hasMatte: boolean): {background: BackgroundSpan; behind: Graphic[]; cutout: boolean} | null {
+export function depthAt(
+	plan: EditPlan,
+	t: number,
+	mode: LayoutMode,
+	hasMatte: boolean,
+): {background: BackgroundSpan; behind: Graphic[]; around: Graphic[]; cutout: boolean} | null {
 	if (!hasMatte || !plan.style.depth.enabled || mode === 'visual') return null;
 	const background = backgroundAt(plan, t);
-	const behind = mode === 'speaker' ? plan.graphics.filter((g) => g.layer === 'behind' && t >= g.start && t < g.end) : [];
-	return {background, behind, cutout: background.kind !== 'original' || behind.length > 0};
+	const speaker = mode === 'speaker';
+	const behind = speaker ? plan.graphics.filter((g) => g.layer === 'behind' && !isAroundType(g.type) && t >= g.start && t < g.end) : [];
+	const around = speaker ? aroundAt(plan, t) : [];
+	return {background, behind, around, cutout: background.kind !== 'original' || behind.length > 0 || around.length > 0};
 }
+
+/** Effects around the speaker active at source time t (drawn in speaker stretches only). */
+export const aroundAt = (plan: EditPlan, t: number): Graphic[] => plan.graphics.filter((g) => isAroundType(g.type) && t >= g.start && t < g.end);

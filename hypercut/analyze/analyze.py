@@ -6,7 +6,7 @@ from hypercut import llm
 from hypercut.analyze import cuts as cutting
 from hypercut.analyze.visuals import merge_graphics, plan_visuals
 from hypercut.plan import (
-    GENERATED_GRAPHIC_TYPES, BackgroundSpan, EditPlan, Graphic, Hook, HookCandidate, Source, Style, Transcript, Zoom,
+    AROUND_GRAPHIC_TYPES, GENERATED_GRAPHIC_TYPES, BackgroundSpan, EditPlan, Graphic, Hook, HookCandidate, Source, Style, Transcript, Zoom,
 )
 
 MAX_HOOKS = 3
@@ -19,6 +19,9 @@ ZOOMS_PER_MIN = {"none": 0, "low": 2, "medium": 4, "high": 8}
 EASES = ("linear", "ease_in_out", "snap")
 ANCHORS = ("auto", "top", "center", "bottom")
 BEHIND_PER_MIN = 3  # big titles behind the speaker per minute, with green-screen effects on
+AROUND_PER_MIN = 3  # effects around the speaker per minute, with green-screen effects on
+PARTICLE_KINDS = ("sparkles", "bokeh", "confetti", "embers")
+MAX_AROUND_SECONDS = {"orbit": 6.0, "fly_out": 3.5, "particles": 12.0}
 BACKGROUNDS = ("original", "blur", "dim", "gradient")
 
 SYSTEM = (
@@ -60,6 +63,11 @@ Also return these keys in the same object:
   ],
   "backgrounds": [  // optional stretches where the background changes, for emphasis; the rest stays "{background}"
     {{"start": <s>, "end": <s>, "kind": "original"|"blur"|"dim"|"gradient"}}
+  ],
+  "around": [  // at most {max_around} effects that happen AROUND the speaker, passing behind and in front of them (never over the face), on moments that suit them; not overlapping each other
+    {{"type": "orbit", "start": <s>, "end": <s>, "items": ["<2-5 emoji or 1-2 word labels for what is said>"]}},  // a ring of things circling the speaker's shoulders, 2.5-5 s
+    {{"type": "fly_out", "start": <s>, "end": <s>, "items": ["<2-4 emoji or words>"]}},  // things bursting out from behind the head toward the camera, 1.5-3 s, for a reveal or a big claim
+    {{"type": "particles", "start": <s>, "end": <s>, "kind": "sparkles"|"bokeh"|"confetti"|"embers"}}  // atmosphere drifting around the speaker, 3-10 s; confetti for a win, embers for intensity
   ]"""
 
 
@@ -88,7 +96,8 @@ def analyze(
     max_zooms = _cap(ZOOMS_PER_MIN[style.camera.zoom_frequency], minutes)
     depth = style.depth.enabled
     max_behind = _cap(BEHIND_PER_MIN, minutes) if depth and style.depth.behind_titles else 0
-    extra = DEPTH_PROMPT.format(max_behind=max_behind, background=style.depth.background) if depth else ""
+    max_around = _cap(AROUND_PER_MIN, minutes) if depth and style.depth.around else 0
+    extra = DEPTH_PROMPT.format(max_behind=max_behind, max_around=max_around, background=style.depth.background) if depth else ""
     raw = llm.ask_json(
         PROMPT.format(
             words="\n".join(f"{i} {w.start:.2f} {w.text}" for i, w in enumerate(words)),
@@ -127,7 +136,47 @@ def analyze(
     if depth:
         plan.backgrounds = _backgrounds(raw.get("backgrounds"), source.duration)
         plan.graphics = add_behind(plan.graphics, _behind(raw.get("behind"), source.duration, max_behind), plan.layout)
+        plan.graphics = add_around(plan.graphics, _around(raw.get("around"), source.duration, max_around), plan.layout)
     return plan
+
+
+def around_props(kind: str, item: dict) -> dict | None:
+    """Clean props for an effect around the speaker, or None if it has nothing to show."""
+    if kind == "particles":
+        k = item.get("kind")
+        return {"kind": k if k in PARTICLE_KINDS else "sparkles"}
+    items = item.get("items")
+    items = [" ".join(str(x).split()[:2])[:16] for x in items if str(x).strip()] if isinstance(items, list) else []
+    return {"items": items[:5]} if items else None
+
+
+def _around(items: Any, duration: float, limit: int) -> list[Graphic]:
+    out: list[Graphic] = []
+    for item in items if isinstance(items, list) else []:
+        span = _span(item, duration)
+        kind = item.get("type") if isinstance(item, dict) else None
+        if span is None or kind not in AROUND_GRAPHIC_TYPES:
+            continue
+        props = around_props(kind, item)
+        if props is None:
+            continue
+        start, end = span
+        out.append(Graphic(id="", type=kind, start=start, end=min(end, start + MAX_AROUND_SECONDS[kind]), props=props))
+    out.sort(key=lambda g: g.start)
+    kept: list[Graphic] = []
+    for g in out:
+        if not kept or g.start >= kept[-1].end:
+            kept.append(g)
+    return kept[:limit]
+
+
+def add_around(graphics: list[Graphic], around: list[Graphic], layout: list) -> list[Graphic]:
+    """Add effects around the speaker where the speaker fills the frame (the only place they are drawn)."""
+    busy = [(s.start, s.end) for s in layout if s.mode != "speaker"]
+    kept = [g for g in around if not any(g.start < b and a < g.end for a, b in busy)]
+    for i, g in enumerate(kept, 1):
+        g.id = f"o{i}"
+    return sorted(graphics + kept, key=lambda g: g.start)
 
 
 def _behind(items: Any, duration: float, limit: int) -> list[Graphic]:
