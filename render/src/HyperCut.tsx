@@ -11,6 +11,7 @@ import {GraphicBody, GraphicView} from './Graphics';
 import {aroundAt, depthAt, isAroundType, isStageType, isVisualType, PULL_BACK, sceneAt, SPLIT, SPLIT_AREA, VISUAL_AREA, VISUAL_IN} from './layout';
 import {normalizePlan, type CompositionProps, type EditPlan, type Graphic} from './plan';
 import {cutAt, cutStyles, cutWindows} from './cuts';
+import {editorialScale, isEditorial, jcutFrames, punchedIn} from './editorial';
 import {buildTimeline, frameToSource, isKept, mediaRuns, type Timeline, type TimelineSegment} from './timing';
 
 const isUrl = (s: string) => /^(https?:|blob:|data:)/.test(s);
@@ -63,7 +64,8 @@ export const AUDIO_EASE = 3;
 
 /**
  * The speaker, cropped into its panel and zoomed. Source pixels are never altered beyond scale/crop.
- * `tail` extra frames keep playing past the segment's end, fading out over the next one (smooth cuts).
+ * `tail` extra frames keep playing past the segment's end, fading out over the next one (smooth cuts), or
+ * held whole, silent, over the start of the next one (the J-cut of editorial cuts, ADR 0614).
  *
  * With green-screen effects (ADR 0901) the segment is drawn twice: `part="full"` is the footage with its
  * background treated (blurred, dimmed) or covered by a replacement, and carries the sound; `part="cutout"`
@@ -80,15 +82,16 @@ const VideoSegment: React.FC<{
 	matteSrc?: string;
 	assetBase?: string;
 	silent?: boolean;
-}> = ({plan, tl, seg, src, tail, last, part = 'full', matteSrc, assetBase, silent}) => {
+	punched: boolean[];
+}> = ({plan, tl, seg, src, tail, last, part = 'full', matteSrc, assetBase, silent, punched}) => {
 	const local = useCurrentFrame();
 	const {fps, width} = plan.output;
 	const tr = plan.style.transitions;
 	const t = seg.start + (local / fps) * tl.speed;
 	const {mode, panel, rect, zoom, origin} = sceneAt(plan, t);
 	const depth = depthAt(plan, t, mode, Boolean(matteSrc));
-	const punch = tr.style === 'zoom' && seg.index % 2 === 1 ? ALT_PUNCH : 1;
-	const opacity = local < seg.frames ? 1 : 1 - (local - seg.frames + 1) / (tail + 1);
+	const punch = tr.style === 'zoom' ? (seg.index % 2 === 1 ? ALT_PUNCH : 1) : editorialScale(plan, tl, seg.index, t, punched);
+	const opacity = local < seg.frames || isEditorial(plan) ? 1 : 1 - (local - seg.frames + 1) / (tail + 1);
 	const fadeOutFrames = last ? Math.round(tr.fade_out * fps) : 0;
 	// Sound eases in and out over a few frames at each cut (the kept pause around cuts makes that silent
 	// anyway, but it removes clicks); the last segment fades out with the picture.
@@ -191,11 +194,13 @@ const Fades: React.FC<{plan: EditPlan; total: number}> = ({plan, total}) => {
 	return k > 0 ? <AbsoluteFill style={{background: '#000', opacity: k}} /> : null;
 };
 
-/** Frames a smooth cut lets segment i run on past its end, limited by the source and the next segment. */
+/** Frames a smooth cut lets segment i run on past its end, limited by the source and the next segment; for
+ * editorial cuts, the J-cut hold. */
 export function tailFrames(plan: EditPlan, tl: Timeline, i: number): number {
 	const tr = plan.style.transitions;
 	const seg = tl.segments[i];
 	const next = tl.segments[i + 1];
+	if (isEditorial(plan) && next) return jcutFrames(plan, tl, i);
 	if (tr.style !== 'smooth' || !next) return 0;
 	const want = Math.round(tr.length * plan.output.fps);
 	const room = Math.floor(((plan.source.duration - seg.end) * plan.output.fps) / tl.speed) - 1;
@@ -312,6 +317,7 @@ const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string; hasM
  */
 const Footage: React.FC<{plan: EditPlan; tl: Timeline; src: string; matteSrc?: string; assetBase?: string; silent?: boolean}> = ({plan, tl, src, matteSrc, assetBase, silent}) => {
 	const n = tl.segments.length;
+	const punched = useMemo(() => punchedIn(plan, tl), [plan, tl]);
 	return (
 		<>
 			{/* Drawn last to first, so a segment's fading tail lies over the start of the next one. */}
@@ -319,7 +325,7 @@ const Footage: React.FC<{plan: EditPlan; tl: Timeline; src: string; matteSrc?: s
 				const tail = tailFrames(plan, tl, seg.index);
 				return (
 					<Sequence key={seg.index} from={seg.outFrom} durationInFrames={seg.frames + tail} layout="none">
-						<VideoSegment plan={plan} tl={tl} seg={seg} src={src} tail={tail} last={seg.index === n - 1} matteSrc={matteSrc} assetBase={assetBase} silent={silent} />
+						<VideoSegment plan={plan} tl={tl} seg={seg} src={src} tail={tail} last={seg.index === n - 1} matteSrc={matteSrc} assetBase={assetBase} silent={silent} punched={punched} />
 					</Sequence>
 				);
 			})}
@@ -330,7 +336,7 @@ const Footage: React.FC<{plan: EditPlan; tl: Timeline; src: string; matteSrc?: s
 						const tail = tailFrames(plan, tl, seg.index);
 						return (
 							<Sequence key={`cut${seg.index}`} from={seg.outFrom} durationInFrames={seg.frames + tail} layout="none">
-								<VideoSegment plan={plan} tl={tl} seg={seg} src={src} tail={tail} last={seg.index === n - 1} part="cutout" matteSrc={matteSrc} />
+								<VideoSegment plan={plan} tl={tl} seg={seg} src={src} tail={tail} last={seg.index === n - 1} part="cutout" matteSrc={matteSrc} punched={punched} />
 							</Sequence>
 						);
 					})}

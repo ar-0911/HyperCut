@@ -4,7 +4,7 @@ from typing import Any
 
 from hypercut import llm
 from hypercut.analyze import cuts as cutting
-from hypercut.analyze import motion, stage
+from hypercut.analyze import cutaways, motion, stage
 from hypercut.analyze.visuals import merge_graphics, plan_visuals
 from hypercut.plan import (
     AROUND_GRAPHIC_TYPES, GENERATED_GRAPHIC_TYPES, BackgroundSpan, EditPlan, Graphic, Hook, HookCandidate, Source, Style, Transcript, Zoom,
@@ -157,6 +157,8 @@ def analyze(
     if moments:
         motion.add_motion(plan, moments)
         motion.design_scenes(plan.graphics, transcript, style)
+    # Visuals next to a jump cut straddle it, like B-roll laid over the cut (ADR 0614).
+    cutaways.cover_cuts(plan)
     return plan
 
 

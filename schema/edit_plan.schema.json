@@ -708,7 +708,7 @@
         "transitions": {
           "$ref": "#/$defs/Transitions",
           "default": {
-            "style": "smooth",
+            "style": "editorial",
             "length": 0.2,
             "fade_in": 0.0,
             "fade_out": 0.8
@@ -753,11 +753,12 @@
       "description": "How one kept piece of footage meets the next, and how the reel starts and ends.",
       "properties": {
         "style": {
-          "default": "smooth",
+          "default": "editorial",
           "enum": [
             "hard",
             "smooth",
-            "zoom"
+            "zoom",
+            "editorial"
           ],
           "title": "Style",
           "type": "string"
@@ -998,7 +999,7 @@
           "fade_in": 0.0,
           "fade_out": 0.8,
           "length": 0.2,
-          "style": "smooth"
+          "style": "editorial"
         },
         "depth": {
           "around": true,

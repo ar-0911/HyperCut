@@ -97,8 +97,8 @@ speed up the whole reel; keep_pause is how much pause stays around each cut (re-
 - {{"op": "motion", "start": s, "end": e, "title": "1-4 words", "idea": "the one 3D object or moment to show"}}  a 2-3 s full-screen 3D motion graphic of what is said there (the speaker keeps talking)
 - {{"op": "cut_transition", "at": s, "kind": "drop" | "whip" | "zoom" | "push" | "none"}}  an animated transition at a cut or shot change: drop = the old shot falls off screen, whip = a fast blurred pan, zoom = pushing through, push = slides up; "none" removes the one there. Use sparingly
 - {{"op": "depth", "enabled": false}}  turn all green-screen effects off
-- {{"op": "transitions", "style": "hard" | "smooth" | "zoom", "fade_out": seconds}}  hard cuts, short crossfades, \
-or alternating punch-ins at cuts; fade to black at the end
+- {{"op": "transitions", "style": "editorial" | "hard" | "smooth" | "zoom", "fade_out": seconds}}  editorial (J-cuts, \
+punch-ins across jump cuts, a settle on new shots), hard cuts, short crossfades, or alternating punch-ins at cuts; fade to black at the end
 
 A new visual (illustration, footage, big text, stat card, list) replaces any visual already in that stretch.
 Use only what the request asks for; green-screen ops only when the user asks for something behind them,
@@ -357,7 +357,7 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
             changes.append("Turned green-screen effects off")
         elif kind == "transitions":
             t = plan.style.transitions
-            if op.get("style") in ("hard", "smooth", "zoom"):
+            if op.get("style") in ("editorial", "hard", "smooth", "zoom"):
                 t.style = op["style"]
                 changes.append(f"Cuts: {t.style}")
             if _num(op.get("fade_out")) is not None:

@@ -87,7 +87,7 @@ export type GraphicsStyle = {
 	panel_color?: string;
 };
 export type Pacing = {remove_fillers: boolean; max_silence: number; keep_pause: number; speed: number};
-export type TransitionStyle = 'hard' | 'smooth' | 'zoom';
+export type TransitionStyle = 'hard' | 'smooth' | 'zoom' | 'editorial';
 /** How kept pieces meet (hard cut, crossfade, alternating punch-in) and the fade in/out of the reel. */
 export type Transitions = {style: TransitionStyle; length: number; fade_in: number; fade_out: number};
 export type Style = {
@@ -147,7 +147,7 @@ export const DEFAULT_STYLE: Style = {
 	graphics: {density: 'balanced', theme: 'bold', accent_color: '#FFE600', secondary_color: null, panel_color: '#0E1330'},
 	pacing: {remove_fillers: true, max_silence: 0.35, keep_pause: 0.15, speed: 1},
 	camera: {zoom_frequency: 'medium', zoom_scale: 1.15},
-	transitions: {style: 'smooth', length: 0.2, fade_in: 0, fade_out: 0.8},
+	transitions: {style: 'editorial', length: 0.2, fade_in: 0, fade_out: 0.8},
 	depth: {enabled: false, cutout: false, background: 'original', behind_titles: true, around: true},
 };
 

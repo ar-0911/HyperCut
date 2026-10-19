@@ -1,12 +1,19 @@
 from hypercut.analyze.transitions import MIN_GAP, plan_transitions
-from hypercut.plan import EditPlan, Graphic, LayoutSpan, Reframe, Segment, Source
+from hypercut.plan import EditPlan, Graphic, LayoutSpan, Reframe, Segment, Source, Style
 
 SOURCE = Source(path="n.mp4", width=1920, height=1080, fps=30, duration=90)
 
 
-def _plan(shots, layout=(), hook=True, graphics=()):
+def _plan(shots, layout=(), hook=True, graphics=(), cuts="smooth"):
     segs = [Segment(start=60, end=64, reason="hook"), Segment(start=0, end=90)] if hook else [Segment(start=0, end=90)]
-    return EditPlan(source=SOURCE, segments=segs, reframe=Reframe(shots=list(shots)), layout=list(layout), graphics=list(graphics))
+    return EditPlan(source=SOURCE, segments=segs, reframe=Reframe(shots=list(shots)), layout=list(layout), graphics=list(graphics),
+                    style=Style(transitions={"style": cuts}))
+
+
+def test_editorial_cuts_keep_only_the_cold_open():
+    cuts = plan_transitions(_plan([20, 40, 60.5, 70], cuts="editorial"))
+    assert [(c.at, c.kind) for c in cuts] == [(0, "drop")]
+    assert plan_transitions(_plan([20, 40], hook=False, cuts="editorial")) == []
 
 
 def test_cold_open_hands_over_with_a_drop_and_shot_changes_vary():

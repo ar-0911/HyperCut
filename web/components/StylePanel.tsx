@@ -11,6 +11,7 @@ const PAUSES = [
 ];
 
 const CUTS: {value: TransitionStyle; label: string; hint: string}[] = [
+	{value: 'editorial', label: 'Editorial', hint: 'J-cuts (sound leads the picture), punch-ins across jump cuts, a settle on new shots'},
 	{value: 'hard', label: 'Hard cuts', hint: 'Straight cuts, fastest feel'},
 	{value: 'smooth', label: 'Smooth', hint: 'A quick crossfade at each cut'},
 	{value: 'zoom', label: 'Zoom cuts', hint: 'Alternating punch-in hides jump cuts'},

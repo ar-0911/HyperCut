@@ -231,7 +231,10 @@ class Transitions(_Model):
 
     # hard: straight cuts. smooth: a short crossfade with the sound eased across it.
     # zoom: straight cuts that alternate a slight punch-in, so jump cuts look intentional.
-    style: Literal["hard", "smooth", "zoom"] = "smooth"
+    # editorial: how an editor cuts a talking head (ADR 0614): J-cuts (the next piece's sound leads its
+    # picture by a few frames), alternating punch-ins across jump cuts of the same shot, and a short settle
+    # where the shot changes.
+    style: Literal["hard", "smooth", "zoom", "editorial"] = "editorial"
     length: float = Field(default=0.2, ge=0, le=1)  # seconds, for smooth
     fade_in: float = Field(default=0.0, ge=0, le=3)  # seconds from black at the start
     fade_out: float = Field(default=0.8, ge=0, le=3)  # seconds to black (and silence) at the end
