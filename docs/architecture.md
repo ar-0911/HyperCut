@@ -92,6 +92,9 @@ prompt returns `bold_creator` with no Claude call. API: `get_preset(name)`, `sty
 CLI `python -m hypercut.style "prompt"` (see decision 0301). `style.depth` (green-screen effects) is off in
 every preset and only turned on when the prompt asks for something behind or around the speaker, a changed
 background or a depth look; a keyword check overrules Claude if it turns it on for a prompt that never asked (decision 0901).
+`style.depth.cutout` (the speaker cut out of the frame) is narrower still: only a prompt that names a different
+background or something behind the speaker turns it on, with the same kind of keyword check; otherwise effects
+are drawn over the real room and the background stays `original` (decision 0614).
 
 **Analyze.** `analyze(transcript, source, style, audio_wav=None, strategy="cold_open")`. One Claude call
 gets the transcript as `index time word` lines and the style, and returns as JSON:
@@ -120,7 +123,9 @@ reveals in order (graphic type `illustration`). Code also enforces the mix: no v
 visual-only beats in a row, visual-only under 30% of the time. Text graphics from the main call that would
 share the panel with a visual are dropped.
 
-With `style.depth.enabled` the same main call also returns a few big titles to place behind the speaker's
+Big titles behind the speaker and `backgrounds` need the speaker cut out, so they are only asked for with
+`style.depth.cutout` (decision 0614); without it the prompt says the real background stays as filmed. With
+`style.depth.enabled` and `cutout` the same main call also returns a few big titles to place behind the speaker's
 head (`kinetic_text` with `layer: "behind"`, ids `b1`..., about three a minute, only in speaker stretches)
 and optional `backgrounds` stretches (blur or dim, never a plain colour or gradient, decision 0613) for emphasis (decision 0901), plus a few effects
 around the speaker (`orbit`, `fly_out`, `particles`, ids `o1`..., only where a moment calls for one, at most
@@ -128,7 +133,9 @@ one a minute, with `style.depth.around`), capped in length, never overlapping, o
 Orbit and fly-out items are drawn by Claude as small sticker SVGs (`visuals.draw_icons`, `props.art`), and
 items added in the editor are drawn before the render (decision 0610). Analyze now proposes stage graphics
 instead (`hypercut/analyze/stage.py`, decision 0611): `card_stack`, `scene` and `chart`, ids `s1`..., at most
-two a minute and only where a moment calls for one; cards and scenes are drawn by the illustrator.
+two a minute and only where a moment calls for one; cards and scenes are drawn by the illustrator. They are
+asked for in every reel (with `style.depth.around`, on by default): without the cut-out they are animated over
+the real footage in the free space beside the speaker and there are no scenes (decision 0614).
 
 The main call also picks a few full-screen motion graphics (`hypercut/analyze/motion.py`, decision 0612):
 `"motion"` moments of 1.8-3.2 s, at most two a minute, each with a short title and the idea of the one thing
@@ -136,7 +143,11 @@ to show. They get the whole frame (layout `visual`, other visuals there cleared)
 designs each as a 3D scene in a small validated JSON scene language (shapes, finishes, moves, camera, a light
 or dark studio). After reframe, `analyze/transitions.py` picks a few animated transitions (`plan.cuts`,
 decision 0613): a drop where the cold open hands over to the story, and whip, zoom or push at hard cuts between
-shots that land on the speaker alone, at most three a minute and 12 s apart. No Claude call.
+shots that land on the speaker alone, at most three a minute and 12 s apart. No Claude call. With editorial cuts
+(`transitions.style: "editorial"`, the default, decision 0614) only the cold-open drop is added. Last,
+`analyze/cutaways.py` stretches any visual (split panel, B-roll, motion graphic) whose edge is within 0.8 s of a
+jump cut across it by 0.4 s, the way B-roll is laid over a jump cut, so the speaker never reappears for a few
+frames and then jumps.
 
 **Reframe.** `reframe(video, source)` samples ~5 frames/s with OpenCV and takes the largest MediaPipe face per
 frame. The track is smoothed (exponential, with a dead zone so the crop ignores small movements), clamped so the
@@ -153,7 +164,8 @@ the shot rather than the biggest face-like thing in each frame (a shirt pattern,
 dropped by a running median; a shot with no face is centred (decision 0505). The hard cuts are also kept as
 `reframe.shots` (source times), where animated transitions can go (decision 0613).
 
-**Matte.** Only when the plan asks for green-screen effects (`style.depth.enabled`), `matte(video, source,
+**Matte.** Only when the plan asks for the speaker cut out (`style.depth.enabled` and `style.depth.cutout`: a
+different background or things behind the speaker, decision 0614), `matte(video, source,
 reframe, out)` cuts the speaker out of every frame and writes `matte.webm`: VP9 with an alpha channel, frame
 for frame with `normalized.mp4`, the speaker's own pixels where they are and transparent elsewhere. FFmpeg
 decodes a 1280 px wide copy. Two MediaPipe selfie segmentation models see a 640 px copy of it (multi-class
@@ -187,8 +199,12 @@ pictures drift in slowly, clips play muted from `trim_start` in one Remotion seq
 (`mediaRuns`, so B-roll plays straight through small filler cuts) and hold their last frame if the block
 outlasts the clip. In the browser preview they load from the `assetBase` prop; in the final render they sit
 next to the video. `pacing.speed` slows or speeds the whole reel (segments last `duration / speed`, video
-plays at that rate, B-roll at normal speed). `transitions.style` is `hard`, `smooth` (each segment overlaps
-the next by `length` and crossfades) or `zoom` (alternate segments punched in); audio eases at every cut,
+plays at that rate, B-roll at normal speed). `transitions.style` is `editorial` (the default, `src/editorial.ts`,
+decision 0614), `hard`, `smooth` (each segment overlaps the next by `length` and crossfades) or `zoom`
+(alternate segments punched in). Editorial cuts join pieces the way an editor would: a J-cut at every jump cut
+(the outgoing picture holds 4 frames, silent, while the next piece's sound starts; the kept pause keeps lips in
+sync), pieces of the same shot alternate between normal and 1.12x framing about the face, and a new shot (a hard
+cut in the source or a jump to another shot) settles in from 1.04x over 0.4 s; audio eases at every cut,
 and `fade_in`/`fade_out` fade picture and sound at the ends. Caption fonts are twelve bundled Google fonts
 (`src/fonts.ts`), and `caption.box` puts each line in a rounded box instead of an outline. See decisions 0608
 and 0613. A few cuts are animated (`plan.cuts`, `src/cuts.ts`, decision 0613): for a few frames the last frame
@@ -210,11 +226,14 @@ ones after it, and near ones fade out before they reach the face; without a cut-
 Items are the drawn stickers, or a built-in icon (`src/icons.ts`) when there is no drawing. Stage graphics
 (`src/Stage.tsx`, decision 0611) are drawn in the behind layer: cards slide out from behind the speaker down
 one side, a scene replaces the room, a chart builds over a studio backdrop; the cut-out is pulled back to 74%
-about the bottom of the frame (and moved aside for cards).
+about the bottom of the frame (and moved aside for cards). Without the cut-out (the default, decision 0614)
+they are drawn over the real footage instead: cards slide in from the frame edge into the space beside the
+face, sized to clear it, and a chart builds in the taller of the spaces above the face and between the face and
+the captions; scenes are not drawn. The matte is only used with `style.depth.cutout`.
 Run it with `npm run render -- --plan plan.json --video normalized.mp4 --out out.mp4 [--assets DIR] [--matte matte.webm]` in
 `render/` (`REMOTION_BROWSER` selects a Chromium; imported files are read from the video's folder unless
 `--assets` says otherwise). See ADRs [0601](decisions/0601-render-architecture.md) to
-[0613](decisions/0613-editorial-look-and-animated-transitions.md).
+[0614](decisions/0614-real-background-and-editorial-cuts.md).
 
 **API.** `uvicorn api.main:app` serves a job per upload. `POST /jobs` (multipart `video`, `style`,
 `hook_strategy`) saves to `media/<job_id>/` and returns an id; a background thread runs

@@ -58,10 +58,10 @@ def run_pipeline(
 
         note("style")
         style = styled.result()
-        # Green-screen effects only when the style prompt asked for them (ADR 0901): the speaker cut-out
-        # is made while Claude plans the edit.
+        # The speaker is cut out only when the style prompt asked for a different background or things behind
+        # them (ADR 0901, 0614): the cut-out is made while Claude plans the edit.
         cutout = None
-        if style.depth.enabled:
+        if style.depth.enabled and style.depth.cutout:
             cutout = pool.submit(matte, mp4, source, reframe_result, job_dir / MATTE_FILE)
 
         note("analyze")
@@ -123,11 +123,8 @@ def draw_new_around(job_dir: str | Path, draw=None, illustrate=None, design=None
     plan = plan_mod.load(path)
     # Motion graphics added in the editor (or whose idea was changed) get their 3D scene designed (ADR 0612).
     scenes = design_scenes(plan.graphics, plan.transcript, plan.style, design)
-    if not plan.style.depth.enabled:
-        if scenes:
-            plan_mod.save(plan, path)
-        return
-    icons = draw_around(plan.graphics, plan.style, draw)
+    # Cards are drawn whatever the depth settings: without the cut-out they play over the real footage (ADR 0614).
+    icons = draw_around(plan.graphics, plan.style, draw) if plan.style.depth.enabled else False
     if draw_stage(plan.graphics, plan.style, illustrate) or icons or scenes:
         plan_mod.save(plan, path)
 

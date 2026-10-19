@@ -4,7 +4,7 @@ from typing import Any
 
 from hypercut import llm
 from hypercut.analyze import cuts as cutting
-from hypercut.analyze import motion, stage
+from hypercut.analyze import cutaways, motion, stage
 from hypercut.analyze.visuals import merge_graphics, plan_visuals
 from hypercut.plan import (
     AROUND_GRAPHIC_TYPES, GENERATED_GRAPHIC_TYPES, BackgroundSpan, EditPlan, Graphic, Hook, HookCandidate, Source, Style, Transcript, Zoom,
@@ -65,6 +65,15 @@ Also return these keys in the same object:
     {{"start": <s>, "end": <s>, "kind": "original"|"blur"|"dim"}}
   ]{stage}"""
 
+# Without the cut-out (ADR 0614) the real background stays as filmed and graphics are animated over it, in the
+# free space beside the speaker.
+OVER_PROMPT = """
+
+The real background stays as filmed: graphics are animated over the footage where there is free space beside
+the speaker, never over their face, and nothing goes behind the speaker.
+Also return these keys in the same object:
+  "behind": []{stage}"""
+
 
 def analyze(
     transcript: Transcript,
@@ -90,13 +99,17 @@ def analyze(
     max_graphics = _cap(GRAPHICS_PER_MIN[style.graphics.density], minutes)
     max_zooms = _cap(ZOOMS_PER_MIN[style.camera.zoom_frequency], minutes)
     depth = style.depth.enabled
-    max_behind = _cap(BEHIND_PER_MIN, minutes) if depth and style.depth.behind_titles else 0
-    max_stage = _cap(stage.STAGE_PER_MIN, minutes) if depth and style.depth.around else 0
+    # Only a cut-out speaker can have things behind them or a different background (ADR 0614).
+    cutout = depth and style.depth.cutout
+    max_behind = _cap(BEHIND_PER_MIN, minutes) if cutout and style.depth.behind_titles else 0
+    # Cards and charts of what is said: behind a cut-out speaker, otherwise over the real footage beside them.
+    max_stage = _cap(stage.STAGE_PER_MIN, minutes) if style.depth.around else 0
     max_motion = _cap(motion.MOTION_PER_MIN, minutes)
-    extra = DEPTH_PROMPT.format(
-        max_behind=max_behind, background=style.depth.background,
-        stage=stage.PROMPT.format(max_stage=max_stage) if max_stage else "",
-    ) if depth else ""
+    stage_prompt = stage.prompt(max_stage, cutout) if max_stage else ""
+    if cutout:
+        extra = DEPTH_PROMPT.format(max_behind=max_behind, background=style.depth.background, stage=stage_prompt)
+    else:
+        extra = OVER_PROMPT.format(stage=stage_prompt) if stage_prompt else ""
     raw = llm.ask_json(
         PROMPT.format(
             words="\n".join(f"{i} {w.start:.2f} {w.text}" for i, w in enumerate(words)),
@@ -133,16 +146,19 @@ def analyze(
         layout, art = plan_visuals(transcript, plan.segments, source.duration, style, hook_span)
         plan.layout = layout
         plan.graphics = merge_graphics(plan.graphics, art, layout)
-    if depth:
+    if cutout:
         plan.backgrounds = _backgrounds(raw.get("backgrounds"), source.duration)
         plan.graphics = add_behind(plan.graphics, _behind(raw.get("behind"), source.duration, max_behind), plan.layout)
-        stage.add_stage(plan, stage.parse_stage(raw.get("stage"), source.duration, max_stage))
+    if max_stage:
+        stage.add_stage(plan, stage.parse_stage(raw.get("stage"), source.duration, max_stage, cutout))
         stage.draw_stage(plan.graphics, style)
     # A few seconds of full-screen motion graphics (ADR 0612), then one more call designs their scenes.
     moments = motion.parse_motion(raw.get("motion"), source.duration, max_motion)
     if moments:
         motion.add_motion(plan, moments)
         motion.design_scenes(plan.graphics, transcript, style)
+    # Visuals next to a jump cut straddle it, like B-roll laid over the cut (ADR 0614).
+    cutaways.cover_cuts(plan)
     return plan
 
 

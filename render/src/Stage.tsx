@@ -1,9 +1,12 @@
 // Stage graphics (ADR 0611): what the speaker talks about, drawn behind the cut-out speaker. Cards slide out
 // from behind them into the free side of the frame; a scene replaces the room and a chart builds behind
-// them while the speaker is pulled back (layout.ts pullAt) so it shows. All pure functions of time.
+// them while the speaker is pulled back (layout.ts pullAt) so it shows. Without the cut-out (ADR 0614) the
+// real room stays: cards slide in from the edge into the free side and a chart builds above or below the
+// face, both drawn over the footage. All pure functions of time.
 
 import React from 'react';
 import {AbsoluteFill} from 'remotion';
+import {faceBox} from './Around';
 import {StudioBackdrop} from './Backdrop';
 import {captionFamily} from './fonts';
 import {freeSide, PULL_BACK} from './layout';
@@ -54,8 +57,8 @@ const colorsOf = (plan: EditPlan): Colors => ({
 export {freeSide};
 
 /** Card boxes (output px) for n cards on one side: stacked down the free side, upper frame first. */
-export function cardBoxes(n: number, side: 'left' | 'right', width: number, height: number) {
-	const w = Math.round(0.38 * width);
+export function cardBoxes(n: number, side: 'left' | 'right', width: number, height: number, cardWidth = 0.38 * width) {
+	const w = Math.round(cardWidth);
 	const h = Math.round(w * 0.8 + 0.075 * width);
 	const gap = 0.025 * height;
 	const top0 = n === 1 ? 0.16 * height : 0.07 * height;
@@ -63,9 +66,26 @@ export function cardBoxes(n: number, side: 'left' | 'right', width: number, heig
 	return Array.from({length: n}, (_, i) => ({x, y: top0 + i * (h + gap), w, h}));
 }
 
-const Cards: React.FC<{g: Graphic; t: number; width: number; height: number; face: {x: number; y: number}; side: 'left' | 'right'; c: Colors}> = ({g, t, width, height, face, side, c}) => {
+/** Card width over the real footage: what fits between the face and the frame edge, within reason. */
+export function frontCardWidth(face: {x: number; y: number}, side: 'left' | 'right', width: number, height: number): number {
+	const box = faceBox(face, width, height);
+	const room = (side === 'right' ? width - box.x1 : box.x0) - 0.035 * width;
+	return Math.max(0.26 * width, Math.min(0.38 * width, room));
+}
+
+/** Where a chart goes over the real footage: the taller of the space above the face and between the face and
+ * the captions (output px). Its headline sits at the top of the area, the panel fills the rest. */
+export function frontChartArea(face: {x: number; y: number}, width: number, height: number, captionY: number) {
+	const box = faceBox(face, width, height);
+	const above = {top: 0.04 * height, bottom: box.y0 - 0.01 * height};
+	const below = {top: box.y1 + 0.01 * height, bottom: captionY * height - 0.06 * height};
+	const area = above.bottom - above.top >= below.bottom - below.top ? above : below;
+	return {top: area.top, height: Math.max(0.2 * height, area.bottom - area.top)};
+}
+
+const Cards: React.FC<{g: Graphic; t: number; width: number; height: number; face: {x: number; y: number}; side: 'left' | 'right'; c: Colors; front?: boolean}> = ({g, t, width, height, face, side, c, front}) => {
 	const cards = (Array.isArray(g.props.cards) ? g.props.cards : []).filter((x): x is Record<string, unknown> => !!x && typeof x === 'object').slice(0, 3);
-	const boxes = cardBoxes(cards.length, side, width, height);
+	const boxes = cardBoxes(cards.length, side, width, height, front ? frontCardWidth(face, side, width, height) : undefined);
 	const dir = side === 'left' ? 1 : -1;
 	return (
 		<AbsoluteFill style={{perspective: 1600}}>
@@ -73,10 +93,12 @@ const Cards: React.FC<{g: Graphic; t: number; width: number; height: number; fac
 				const b = boxes[i];
 				const k = easeOutCubic(clamp01((t - g.start - 0.3 * i) / 0.6));
 				const out = clamp01((g.end - t) / 0.35);
-				// From behind the head (the speaker hides it there) out to its place.
-				const fromX = face.x - b.w / 2;
+				// From behind the head (the speaker hides it there) out to its place; over the real footage, in from
+				// the edge of the frame on its side, so it never crosses the face.
+				const fromX = front ? (side === 'right' ? width + 0.04 * width : -b.w - 0.04 * width) : face.x - b.w / 2;
+				const fromY = front ? b.y : face.y - b.h / 2;
 				const x = fromX + (b.x - fromX) * k;
-				const y = face.y - b.h / 2 + (b.y - (face.y - b.h / 2)) * k;
+				const y = fromY + (b.y - fromY) * k;
 				const art = artOf(card);
 				const artH = b.w * 0.8;
 				const title = str(card.title);
@@ -169,7 +191,7 @@ export function chartPoints(values: number[], w: number, h: number) {
 
 const formatValue = (v: number) => (Math.abs(v) >= 1000 ? `${Math.round(v / 100) / 10}k` : String(Math.round(v * 10) / 10));
 
-const Chart: React.FC<{g: Graphic; t: number; width: number; height: number; c: Colors}> = ({g, t, width, height, c}) => {
+const Chart: React.FC<{g: Graphic; t: number; width: number; height: number; c: Colors; area?: {top: number; height: number}}> = ({g, t, width, height, c, area}) => {
 	const values = (Array.isArray(g.props.values) ? g.props.values : []).map(Number).filter(Number.isFinite);
 	if (values.length < 2) return null;
 	const labels = (Array.isArray(g.props.labels) ? g.props.labels : []).map((x) => str(x));
@@ -179,8 +201,11 @@ const Chart: React.FC<{g: Graphic; t: number; width: number; height: number; c: 
 	const inK = easeOutCubic(clamp01(e / 0.45));
 	const out = clamp01((g.end - t) / 0.35);
 	const [num, rest] = splitHeadline(str(g.props.headline));
-	const headSize = Math.min(0.16 * width, (0.92 * width) / Math.max(4, (num + ' ' + rest).length * 0.6));
-	const panel = {x: 0.04 * width, y: 0.155 * height, w: 0.92 * width, h: 0.4 * height};
+	// Behind a cut-out speaker the chart has the upper frame; over the real footage, the area clear of the face.
+	const box = area ?? {top: 0.05 * height, height: 0.505 * height};
+	const headSize = Math.min(0.16 * width, (0.92 * width) / Math.max(4, (num + ' ' + rest).length * 0.6), 0.3 * box.height);
+	const headH = area ? headSize * 1.15 : 0.105 * height;
+	const panel = {x: 0.04 * width, y: box.top + headH, w: 0.92 * width, h: box.height - headH};
 	const pad = {l: 0.07 * width, r: 0.09 * width, t: 0.07 * height, b: 0.06 * height};
 	const plotW = panel.w - pad.l - pad.r;
 	const plotH = panel.h - pad.t - pad.b;
@@ -200,7 +225,7 @@ const Chart: React.FC<{g: Graphic; t: number; width: number; height: number; c: 
 					position: 'absolute',
 					left: 0,
 					right: 0,
-					top: 0.05 * height,
+					top: box.top,
 					textAlign: 'center',
 					fontFamily: font,
 					fontWeight: 900,
@@ -211,7 +236,7 @@ const Chart: React.FC<{g: Graphic; t: number; width: number; height: number; c: 
 					textTransform: 'uppercase',
 					opacity: inK,
 					transform: `translateY(${(1 - inK) * 40}px)`,
-					textShadow: '0 10px 40px rgba(0,0,0,0.35)',
+					textShadow: area ? '0 4px 14px rgba(0,0,0,0.55), 0 10px 40px rgba(0,0,0,0.45)' : '0 10px 40px rgba(0,0,0,0.35)',
 				}}
 			>
 				{num ? <span>{num} </span> : null}
@@ -333,20 +358,27 @@ export function stageFootageFilter(stage: Graphic[]): string | undefined {
 	return stage.length ? 'blur(16px) brightness(0.6) saturate(0.8)' : undefined;
 }
 
-/** Stage graphics at source time t, drawn behind the cut-out speaker. `face` is the face before pull-back. */
-export const StageLayer: React.FC<{graphics: Graphic[]; t: number; plan: EditPlan; face: {x: number; y: number}; pull: number; shift: number}> = ({
+/**
+ * Stage graphics at source time t, drawn behind the cut-out speaker. `face` is the face before pull-back.
+ * With `captionY` (no cut-out, ADR 0614) they are drawn over the real footage instead: no studio, no
+ * pull-back, no scene, and kept clear of the face and the captions.
+ */
+export const StageLayer: React.FC<{graphics: Graphic[]; t: number; plan: EditPlan; face: {x: number; y: number}; pull: number; shift: number; captionY?: number}> = ({
 	graphics,
 	t,
 	plan,
 	face,
 	pull,
 	shift,
+	captionY,
 }) => {
 	const {width, height} = plan.output;
 	const c = colorsOf(plan);
+	const front = captionY !== undefined;
 	const f = pulledFace(face, height, pull, shift);
 	const side = freeSide(face.x, width);
-	const studio = !graphics.some((g) => g.type === 'scene');
+	const studio = !front && !graphics.some((g) => g.type === 'scene');
+	const area = front ? frontChartArea(face, width, height, captionY) : undefined;
 	return (
 		<AbsoluteFill>
 			{studio ? (
@@ -357,11 +389,11 @@ export const StageLayer: React.FC<{graphics: Graphic[]; t: number; plan: EditPla
 			) : null}
 			{graphics.map((g) =>
 				g.type === 'scene' ? (
-					<Scene key={g.id} g={g} t={t} width={width} height={height} c={c} />
+					front ? null : <Scene key={g.id} g={g} t={t} width={width} height={height} c={c} />
 				) : g.type === 'chart' ? (
-					<Chart key={g.id} g={g} t={t} width={width} height={height} c={c} />
+					<Chart key={g.id} g={g} t={t} width={width} height={height} c={c} area={area} />
 				) : g.type === 'card_stack' ? (
-					<Cards key={g.id} g={g} t={t} width={width} height={height} face={f} side={side} c={c} />
+					<Cards key={g.id} g={g} t={t} width={width} height={height} face={f} side={side} c={c} front={front} />
 				) : null,
 			)}
 		</AbsoluteFill>

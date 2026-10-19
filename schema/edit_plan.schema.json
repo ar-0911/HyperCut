@@ -2,7 +2,7 @@
   "$defs": {
     "BackgroundSpan": {
       "additionalProperties": false,
-      "description": "What is behind the cut-out speaker for a stretch of the source (needs `style.depth.enabled`).\n\noriginal: the real background. blur: the real background out of focus. dim: darkened, a spotlight on\nthe speaker. color / gradient: the studio set (a grid floor and wall, never a flat colour, ADR 0613), its\nlight washed with `color` (default: untinted).\nmedia: an imported picture or clip (`src`, a file in the job folder). Outside every span the style's\n`depth.background` applies.",
+      "description": "What is behind the cut-out speaker for a stretch of the source (needs `style.depth.cutout`).\n\noriginal: the real background. blur: the real background out of focus. dim: darkened, a spotlight on\nthe speaker. color / gradient: the studio set (a grid floor and wall, never a flat colour, ADR 0613), its\nlight washed with `color` (default: untinted).\nmedia: an imported picture or clip (`src`, a file in the job folder). Outside every span the style's\n`depth.background` applies.",
       "properties": {
         "start": {
           "minimum": 0,
@@ -215,12 +215,18 @@
     },
     "Depth": {
       "additionalProperties": false,
-      "description": "Green-screen effects: the speaker is cut out of the frame and things go behind them (ADR 0901).\n\nOff unless the user asks for it in their style prompt or in the editor.",
+      "description": "Effects around the speaker (ADR 0901), and, only when asked, the speaker cut out of the frame.\n\nOff unless the user asks for it in their style prompt or in the editor. The cut-out (`cutout`) is a\nsecond, narrower opt-in: a different background or things behind the speaker (ADR 0614).",
       "properties": {
         "enabled": {
           "default": false,
           "description": "True only if the user explicitly asks for a green-screen look: text or graphics behind the speaker, things happening around or in front of the speaker, a removed, replaced, blurred or dimmed background, or a 3D/depth effect.",
           "title": "Enabled",
+          "type": "boolean"
+        },
+        "cutout": {
+          "default": false,
+          "description": "True only if the user specifically asks for a different background (removed, replaced, blurred or dimmed) or for text or graphics behind the speaker. Otherwise every effect is animated over the real footage and the speaker is never cut out (ADR 0614).",
+          "title": "Cutout",
           "type": "boolean"
         },
         "background": {
@@ -702,7 +708,7 @@
         "transitions": {
           "$ref": "#/$defs/Transitions",
           "default": {
-            "style": "smooth",
+            "style": "editorial",
             "length": 0.2,
             "fade_in": 0.0,
             "fade_out": 0.8
@@ -712,6 +718,7 @@
           "$ref": "#/$defs/Depth",
           "default": {
             "enabled": false,
+            "cutout": false,
             "background": "original",
             "behind_titles": true,
             "around": true
@@ -746,11 +753,12 @@
       "description": "How one kept piece of footage meets the next, and how the reel starts and ends.",
       "properties": {
         "style": {
-          "default": "smooth",
+          "default": "editorial",
           "enum": [
             "hard",
             "smooth",
-            "zoom"
+            "zoom",
+            "editorial"
           ],
           "title": "Style",
           "type": "string"
@@ -991,12 +999,13 @@
           "fade_in": 0.0,
           "fade_out": 0.8,
           "length": 0.2,
-          "style": "smooth"
+          "style": "editorial"
         },
         "depth": {
           "around": true,
           "background": "original",
           "behind_titles": true,
+          "cutout": false,
           "enabled": false
         }
       }

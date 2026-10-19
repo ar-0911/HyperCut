@@ -7,6 +7,9 @@ moments that call for one. Three kinds, picked per moment by the main analyze ca
 - chart: an animated chart behind the pulled-back speaker, only for numbers that are actually said.
 
 Cards and scenes are drawn by the same illustrator as the layout visuals; charts are drawn by the renderer.
+
+Without the cut-out (`style.depth.cutout`, ADR 0614) the real room stays: cards and charts are animated over
+the footage beside the speaker, off the face, and there are no scenes.
 """
 
 from __future__ import annotations
@@ -29,6 +32,18 @@ PROMPT = """,
     {{"type": "scene", "start": <s>, "end": <s>, "title": "<1-3 words>", "brief": "<a full background world for what is said: place, objects, mood; no people>"}},  // to set where or what the story is about (an intro, a topic change)
     {{"type": "chart", "start": <s>, "end": <s>, "headline": "<number + 1-2 words, e.g. 20 YEARS>", "kind": "line"|"bars", "values": [<2-8 numbers>], "labels": ["<label per value>"], "unit": "<optional unit>"}}  // only for numbers actually said; values must tell the same story
   ]"""
+
+# The same, when the speaker is not cut out: drawn over the real footage, so no scene replacing the room.
+FRONT_PROMPT = """,
+  "stage": [  // graphics of what is said, animated OVER the real footage beside the speaker (never over the face; the background is not changed). Use them like a professional editor: only on the moments that really call for one (most reels need 1-3, never more than {max_stage}, [] when nothing does), not overlapping each other, 2.5-5 s each
+    {{"type": "card_stack", "start": <s>, "end": <s>, "cards": [{{"title": "<1-3 words, as said>", "brief": "<what to draw: a specific scene or object for this, not an icon>"}}]}},  // 1-3 cards, when the speaker names things (roles, steps, products, places)
+    {{"type": "chart", "start": <s>, "end": <s>, "headline": "<number + 1-2 words, e.g. 20 YEARS>", "kind": "line"|"bars", "values": [<2-8 numbers>], "labels": ["<label per value>"], "unit": "<optional unit>"}}  // only for numbers actually said; values must tell the same story
+  ]"""
+
+
+def prompt(max_stage: int, cutout: bool) -> str:
+    """The stage part of the analyze prompt: behind a cut-out speaker, or over the real footage."""
+    return (PROMPT if cutout else FRONT_PROMPT).format(max_stage=max_stage)
 
 
 def _num(v: Any) -> float | None:
@@ -71,11 +86,14 @@ def stage_props(kind: str, item: dict) -> dict | None:
     return None
 
 
-def parse_stage(items: Any, duration: float, limit: int) -> list[Graphic]:
-    """Valid, non-overlapping stage graphics from Claude's answer, capped in length and number."""
+def parse_stage(items: Any, duration: float, limit: int, cutout: bool = True) -> list[Graphic]:
+    """Valid, non-overlapping stage graphics from Claude's answer, capped in length and number. Without the
+    cut-out there are no scenes: they would replace the room."""
     out: list[Graphic] = []
     for item in items if isinstance(items, list) else []:
         if not isinstance(item, dict) or item.get("type") not in STAGE_GRAPHIC_TYPES:
+            continue
+        if item["type"] == "scene" and not cutout:
             continue
         start, end = _num(item.get("start")), _num(item.get("end"))
         if start is None or end is None or start < 0 or end - start < MIN_SECONDS or start >= duration:

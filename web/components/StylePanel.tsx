@@ -11,6 +11,7 @@ const PAUSES = [
 ];
 
 const CUTS: {value: TransitionStyle; label: string; hint: string}[] = [
+	{value: 'editorial', label: 'Editorial', hint: 'J-cuts (sound leads the picture), punch-ins across jump cuts, a settle on new shots'},
 	{value: 'hard', label: 'Hard cuts', hint: 'Straight cuts, fastest feel'},
 	{value: 'smooth', label: 'Smooth', hint: 'A quick crossfade at each cut'},
 	{value: 'zoom', label: 'Zoom cuts', hint: 'Alternating punch-in hides jump cuts'},
@@ -38,7 +39,7 @@ export default function StylePanel({
 	const [recutting, setRecutting] = useState(false);
 	const {pacing, transitions, caption} = plan.style;
 	const setCaption = (patch: Partial<CaptionStyle>) => onChange({...plan, style: {...plan.style, caption: {...caption, ...patch}}});
-	const depth: Depth = plan.style.depth ?? {enabled: false, background: 'original', behind_titles: true};
+	const depth: Depth = plan.style.depth ?? {enabled: false, cutout: false, background: 'original', behind_titles: true, around: true};
 	const setDepth = (patch: Partial<Depth>) => onChange({...plan, style: {...plan.style, depth: {...depth, ...patch}}});
 	const setTransitions = (patch: Partial<Transitions>) => onChange({...plan, style: {...plan.style, transitions: {...transitions, ...patch}}});
 	const pause = PAUSES.reduce((best, p) => (Math.abs(p.value - pacing.keep_pause) < Math.abs(best.value - pacing.keep_pause) ? p : best), PAUSES[0]);
@@ -101,10 +102,15 @@ export default function StylePanel({
 
 			<h3>Green screen</h3>
 			<label className="check">
-				<input type="checkbox" checked={depth.enabled} onChange={(e) => setDepth({enabled: e.target.checked})} /> Cut the speaker out
+				<input
+					type="checkbox"
+					checked={depth.enabled && depth.cutout}
+					onChange={(e) => setDepth(e.target.checked ? {enabled: true, cutout: true} : {cutout: false, background: 'original'})}
+				/>{' '}
+				Cut the speaker out
 			</label>
-			<p className="hint">Lets titles sit behind your head and swaps the background. Off unless you turn it on.</p>
-			{depth.enabled && (
+			<p className="hint">Lets titles sit behind your head and swaps the background. Edges can look rough, so it is off unless you turn it on; otherwise graphics play over your real background.</p>
+			{depth.enabled && depth.cutout && (
 				<div className="field">
 					<span>Background</span>
 					<div className="seg">

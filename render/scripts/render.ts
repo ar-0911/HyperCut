@@ -96,10 +96,10 @@ async function main() {
 		if (!fs.existsSync(from)) throw new Error(`imported file not found: ${from}`);
 		if (!fs.existsSync(path.join(publicDir, name))) place(from, name);
 	}
-	// Green-screen effects need the speaker cut-out; it sits next to the video unless --matte says otherwise.
-	// Without it the reel renders without those effects.
+	// A different background or things behind the speaker need the cut-out (ADR 0614); it sits next to the video
+	// unless --matte says otherwise. Without it the reel renders without those effects.
 	let matteSrc: string | undefined;
-	if (plan.style.depth.enabled) {
+	if (plan.style.depth.enabled && plan.style.depth.cutout) {
 		const matte = path.resolve(args.matte ?? path.join(path.dirname(videoPath), MATTE_FILE));
 		if (fs.existsSync(matte)) {
 			place(matte, MATTE_FILE);

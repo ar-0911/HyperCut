@@ -69,6 +69,10 @@ def test_needs_matte_only_when_asked():
     plan = EditPlan(source=SOURCE)
     assert not needs_matte(plan)
     plan.style = Style(depth={"enabled": True})
+    assert not needs_matte(plan)  # effects over the real footage need no cut-out (ADR 0614)
+    plan.style = Style(depth={"enabled": True, "cutout": True})
+    assert needs_matte(plan)
+    plan.style = Style(depth={"enabled": True, "background": "blur"})  # an older plan that changed its background
     assert needs_matte(plan)
 
 

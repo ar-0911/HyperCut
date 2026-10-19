@@ -90,15 +90,15 @@ lower_third {{"title","subtitle"}}
 - {{"op": "pacing", "speed": 0.7-1.3, "keep_pause": 0.08 (tight) | 0.15 (natural) | 0.3 (relaxed)}}  slow down or \
 speed up the whole reel; keep_pause is how much pause stays around each cut (re-cuts the video)
 - {{"op": "behind_text", "start": s, "end": e, "text": "1-3 words"}}  a big title BEHIND the speaker's head (green-screen look; turns the effects on and keeps the speaker full frame there)
-- {{"op": "stage", "type": "card_stack" | "scene" | "chart", "start": s, "end": e, ...}}  a graphic of what is said BEHIND the cut-out speaker (turns the effects on, keeps the speaker full frame there). card_stack: "cards": [{{"title": "1-3 words", "brief": "what to draw"}}] (1-3 illustrated cards sliding out from behind the speaker); scene: "title", "brief" (a drawn world replacing the room, speaker pulled back); chart: "headline", "kind": "line" | "bars", "values": [numbers], "labels": [..], "unit" (an animated chart, only for numbers said)
+- {{"op": "stage", "type": "card_stack" | "scene" | "chart", "start": s, "end": e, ...}}  a graphic of what is said, animated over the real footage beside the speaker (behind them only if the speaker is cut out), keeping the speaker full frame there. card_stack: "cards": [{{"title": "1-3 words", "brief": "what to draw"}}] (1-3 illustrated cards sliding in beside the speaker); scene: "title", "brief" (a drawn world replacing the room, speaker pulled back; only when a different background is asked for); chart: "headline", "kind": "line" | "bars", "values": [numbers], "labels": [..], "unit" (an animated chart, only for numbers said)
 - {{"op": "around", "type": "orbit" | "fly_out" | "particles", "start": s, "end": e, "items": ["objects to draw, 1-3 words each"], "kind": "sparkles" | "bokeh" | "confetti" | "embers"}}  an effect happening AROUND the speaker, passing behind and in front of them (never over the face): orbit = drawn graphics circling the shoulders, fly_out = drawn graphics bursting from behind the head toward the camera, particles = drifting atmosphere (kind); turns the green-screen effects on and keeps the speaker full frame there
 - {{"op": "layer", "key": "g1", "layer": "behind" | "front"}}  put a graphic behind the speaker or back in front
 - {{"op": "background", "kind": "original" | "blur" | "dim" | "color" | "media", "start": s, "end": e, "color": "#RRGGBB", "asset": "<file name, for media>", "parallax": 0-1}}  change what is behind the speaker (turns the effects on); color = a studio set with a grid floor, its light tinted with "color" (never a flat colour); without start/end it applies to the whole reel; parallax drifts a replaced background for a 3D feel
 - {{"op": "motion", "start": s, "end": e, "title": "1-4 words", "idea": "the one 3D object or moment to show"}}  a 2-3 s full-screen 3D motion graphic of what is said there (the speaker keeps talking)
 - {{"op": "cut_transition", "at": s, "kind": "drop" | "whip" | "zoom" | "push" | "none"}}  an animated transition at a cut or shot change: drop = the old shot falls off screen, whip = a fast blurred pan, zoom = pushing through, push = slides up; "none" removes the one there. Use sparingly
 - {{"op": "depth", "enabled": false}}  turn all green-screen effects off
-- {{"op": "transitions", "style": "hard" | "smooth" | "zoom", "fade_out": seconds}}  hard cuts, short crossfades, \
-or alternating punch-ins at cuts; fade to black at the end
+- {{"op": "transitions", "style": "editorial" | "hard" | "smooth" | "zoom", "fade_out": seconds}}  editorial (J-cuts, \
+punch-ins across jump cuts, a settle on new shots), hard cuts, short crossfades, or alternating punch-ins at cuts; fade to black at the end
 
 A new visual (illustration, footage, big text, stat card, list) replaces any visual already in that stretch.
 Use only what the request asks for; green-screen ops only when the user asks for something behind them,
@@ -158,7 +158,8 @@ def summarize(plan: EditPlan, assets: list[dict]) -> dict[str, str]:
         "layout": "\n".join(layout) or "(speaker throughout)",
         "zooms": "\n".join(zooms) or "(none)",
         "cuts": "\n".join(cuts) or "(none)",
-        "depth": f"on, default background {depth.background}" if depth.enabled else "off",
+        "depth": (f"on, speaker cut out, default background {depth.background}" if depth.cutout
+                  else "on, real background kept") if depth.enabled else "off",
         "backgrounds": "\n".join(backgrounds) or "(none)",
         "assets": "\n".join(asset_lines) or "(none)",
         "captions": "\n".join(captions) or "(none)",
@@ -288,7 +289,7 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
                 g = edit.add_graphic(plan, "kinetic_text", *span, {"text": text}, prefix="b")
                 g.layer = "behind"
                 edit.set_layout(plan, *span, "speaker")
-                plan.style.depth.enabled = True
+                plan.style.depth.enabled = plan.style.depth.cutout = True  # asked for: behind needs the cut-out
                 changes.append(f"Added {text!r} behind the speaker as {g.id}")
         elif kind == "stage" and op.get("type") in plan_mod.STAGE_GRAPHIC_TYPES:
             props = stage.stage_props(op["type"], op)
@@ -296,8 +297,10 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
             if span:
                 g = edit.add_graphic(plan, op["type"], *span, props, prefix="s")
                 edit.set_layout(plan, *span, "speaker")
-                plan.style.depth.enabled = True
-                changes.append(f"Added {op['type'].replace('_', ' ')} {g.id} behind the speaker")
+                if op["type"] == "scene":  # a scene replaces the room, so it was a background ask (ADR 0614)
+                    plan.style.depth.enabled = plan.style.depth.cutout = True
+                where = "behind the speaker" if plan.style.depth.enabled and plan.style.depth.cutout else "beside the speaker"
+                changes.append(f"Added {op['type'].replace('_', ' ')} {g.id} {where}")
         elif kind == "around" and op.get("type") in plan_mod.AROUND_GRAPHIC_TYPES:
             props = around_props(op["type"], op)
             span = span_of(op, 3.0, MAX_AROUND_SECONDS[op["type"]]) if props else None
@@ -310,7 +313,7 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
             g = by_key[op["key"]]
             g.layer = op["layer"]
             if g.layer == "behind":
-                plan.style.depth.enabled = True
+                plan.style.depth.enabled = plan.style.depth.cutout = True
             changes.append(f"Moved {g.id} {'behind the speaker' if g.layer == 'behind' else 'to the front'}")
         elif kind == "background" and op.get("kind") in BACKGROUND_KINDS:
             src = None
@@ -321,7 +324,7 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
                 src = a["name"]
             color = op.get("color") if isinstance(op.get("color"), str) and re.fullmatch(r"#[0-9A-Fa-f]{6}", op["color"]) else None
             parallax = min(1.0, max(0.0, _num(op.get("parallax")) or 0.0))
-            plan.style.depth.enabled = True
+            plan.style.depth.enabled = plan.style.depth.cutout = True  # a background asked for by name
             if op.get("start") is None and op.get("end") is None and src is None and color is None and not parallax:
                 plan.style.depth.background = op["kind"]
                 plan.backgrounds = []
@@ -354,7 +357,7 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
             changes.append("Turned green-screen effects off")
         elif kind == "transitions":
             t = plan.style.transitions
-            if op.get("style") in ("hard", "smooth", "zoom"):
+            if op.get("style") in ("editorial", "hard", "smooth", "zoom"):
                 t.style = op["style"]
                 changes.append(f"Cuts: {t.style}")
             if _num(op.get("fade_out")) is not None:

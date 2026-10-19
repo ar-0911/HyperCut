@@ -1,7 +1,8 @@
 import {describe, expect, it} from 'vitest';
 import {CARD_FACE_X, depthAt, modeAt, PULL_BACK, pullAt, shiftAt} from './layout';
 import {normalizePlan} from './plan';
-import {cardBoxes, chartPoints, freeSide, pulledFace, scopeIds, splitHeadline, stageFootageFilter} from './Stage';
+import {faceBox} from './Around';
+import {cardBoxes, chartPoints, freeSide, frontCardWidth, frontChartArea, pulledFace, scopeIds, splitHeadline, stageFootageFilter} from './Stage';
 
 const base = {source: {path: 'v.mp4', width: 1920, height: 1080, fps: 30, duration: 20}};
 const chart = {id: 's1', type: 'chart', start: 2, end: 6, props: {headline: '20 YEARS', values: [1, 4, 9]}};
@@ -58,5 +59,24 @@ describe('stage graphics', () => {
 		const g = (type: string) => ({id: 'x', type, start: 0, end: 1, props: {}, anchor: 'auto'}) as never;
 		expect(stageFootageFilter([g('card_stack')])).toContain('blur');
 		expect(stageFootageFilter([])).toBeUndefined();
+	});
+
+	it('over the real footage, keeps cards and charts clear of the face and the captions (ADR 0614)', () => {
+		const face = {x: 540, y: 700};
+		const box = faceBox(face, 1080, 1920);
+		const w = frontCardWidth(face, 'right', 1080, 1920);
+		for (const b of cardBoxes(3, 'right', 1080, 1920, w)) expect(b.x).toBeGreaterThanOrEqual(box.x1 - 1);
+		const area = frontChartArea(face, 1080, 1920, 0.8);
+		// The face sits high, so the chart goes between it and the captions.
+		expect(area.top).toBeGreaterThan(box.y1);
+		expect(area.top + area.height).toBeLessThanOrEqual(0.8 * 1920);
+		const low = frontChartArea({x: 540, y: 1250}, 1080, 1920, 0.8);
+		expect(low.top + low.height).toBeLessThan(faceBox({x: 540, y: 1250}, 1080, 1920).y0);
+	});
+
+	it('a plan from before cutout keeps a changed background cut out', () => {
+		expect(normalizePlan({...base, style: {depth: {enabled: true}}}).style.depth.cutout).toBe(false);
+		expect(normalizePlan({...base, style: {depth: {enabled: true, background: 'blur'}}}).style.depth.cutout).toBe(true);
+		expect(normalizePlan({...base, backgrounds: [{start: 1, end: 2, kind: 'dim'}], style: {depth: {enabled: true}}}).style.depth.cutout).toBe(true);
 	});
 });

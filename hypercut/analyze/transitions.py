@@ -4,6 +4,9 @@ Most cuts stay as they are (`style.transitions`). A few get a designed move: the
 screen, whips sideways, pushes through or slides up while the next shot plays. They go where the picture
 really changes: the cold open handing over to the body, and hard cuts between shots in the source. Nothing
 here calls Claude; it needs the shot changes from reframe, so it runs once the plan is put together.
+
+With editorial cuts (the default, ADR 0614) only the cold open gets one: J-cuts, punch-ins and a settle on new
+shots join the rest, the way an editor would, and more can be added in the editor or the AI box.
 """
 
 from __future__ import annotations
@@ -59,6 +62,8 @@ def plan_transitions(plan: EditPlan) -> list[CutTransition]:
     total = plan.output_duration()
     limit = max(1, int(PER_MIN * total / 60))
     places = candidates(plan)
+    if plan.style.transitions.style == "editorial":
+        places = [p for p in places if p[0] == 0]
     hook_end = places[0][1] if places and places[0][0] == 0 else None
     chosen: list[tuple[float, float]] = []  # (output time, source time)
     for _, t in places:

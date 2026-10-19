@@ -235,11 +235,12 @@
       "keep_pause": 0.15
     },
     "transitions": {
-      "style": "smooth",
+      "style": "editorial",
       "fade_out": 0.8
     },
     "depth": {
       "enabled": true,
+      "cutout": false,
       "background": "original",
       "behind_titles": true,
       "around": true

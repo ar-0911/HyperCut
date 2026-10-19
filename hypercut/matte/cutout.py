@@ -43,8 +43,9 @@ Segmenter = Callable[[object], tuple[object, object]]
 
 
 def needs_matte(plan: EditPlan) -> bool:
-    """Whether the plan uses green-screen effects, so the render needs the cut-out video."""
-    return plan.style.depth.enabled
+    """Whether the plan cuts the speaker out (a different background or things behind them, ADR 0614), so
+    the render needs the cut-out video."""
+    return plan.style.depth.enabled and plan.style.depth.cutout
 
 
 def _model_path(name: str) -> str:

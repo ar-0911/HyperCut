@@ -253,8 +253,8 @@ export default function Inspector({
 						onChange={(e) =>
 							onChange({
 								...plan,
-								// Behind the speaker needs the speaker cut out, so this turns green-screen effects on.
-								style: e.target.checked ? {...plan.style, depth: {...plan.style.depth, enabled: true}} : plan.style,
+								// Behind the speaker needs the speaker cut out, so this turns the cut-out on.
+								style: e.target.checked ? {...plan.style, depth: {...plan.style.depth, enabled: true, cutout: true}} : plan.style,
 								graphics: plan.graphics.map((x) => (x.id === g.id ? {...x, layer: e.target.checked ? 'behind' : 'front'} : x)),
 							})
 						}
