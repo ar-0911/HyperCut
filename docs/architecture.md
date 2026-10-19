@@ -97,8 +97,8 @@ background or a depth look; a keyword check overrules Claude if it turns it on f
 gets the transcript as `index time word` lines and the style, and returns as JSON:
 - up to three hook candidates as word-index spans with a score and a reason (bold claim, surprising number,
   question, conflict, payoff tease); code converts them to times and text;
-- graphics: each a span, a template type (`kinetic_text`, `stat_card`, `emoji_burst`, `list_build`,
-  `lower_third`, `progress_bar`) and its props, capped per minute by `style.graphics.density`;
+- graphics: each a span, a template type (`kinetic_text`, `stat_card`, `list_build`, `lower_third`,
+  `progress_bar`) and its props, capped per minute by `style.graphics.density`;
 - punch-in zooms on emphasis and topic changes, capped per minute by `style.camera.zoom_frequency`.
 
 Every item is validated against the source duration and dropped if invalid. Cuts never involve Claude:
@@ -122,13 +122,21 @@ share the panel with a visual are dropped.
 
 With `style.depth.enabled` the same main call also returns a few big titles to place behind the speaker's
 head (`kinetic_text` with `layer: "behind"`, ids `b1`..., about three a minute, only in speaker stretches)
-and optional `backgrounds` stretches (blur, dim, gradient) for emphasis (decision 0901), plus a few effects
+and optional `backgrounds` stretches (blur or dim, never a plain colour or gradient, decision 0613) for emphasis (decision 0901), plus a few effects
 around the speaker (`orbit`, `fly_out`, `particles`, ids `o1`..., only where a moment calls for one, at most
 one a minute, with `style.depth.around`), capped in length, never overlapping, only in speaker stretches.
 Orbit and fly-out items are drawn by Claude as small sticker SVGs (`visuals.draw_icons`, `props.art`), and
 items added in the editor are drawn before the render (decision 0610). Analyze now proposes stage graphics
 instead (`hypercut/analyze/stage.py`, decision 0611): `card_stack`, `scene` and `chart`, ids `s1`..., at most
 two a minute and only where a moment calls for one; cards and scenes are drawn by the illustrator.
+
+The main call also picks a few full-screen motion graphics (`hypercut/analyze/motion.py`, decision 0612):
+`"motion"` moments of 1.8-3.2 s, at most two a minute, each with a short title and the idea of the one thing
+to show. They get the whole frame (layout `visual`, other visuals there cleared), and one more Claude call
+designs each as a 3D scene in a small validated JSON scene language (shapes, finishes, moves, camera, a light
+or dark studio). After reframe, `analyze/transitions.py` picks a few animated transitions (`plan.cuts`,
+decision 0613): a drop where the cold open hands over to the story, and whip, zoom or push at hard cuts between
+shots that land on the speaker alone, at most three a minute and 12 s apart. No Claude call.
 
 **Reframe.** `reframe(video, source)` samples ~5 frames/s with OpenCV and takes the largest MediaPipe face per
 frame. The track is smoothed (exponential, with a dead zone so the crop ignores small movements), clamped so the
@@ -142,7 +150,8 @@ montages of several speakers stay framed. The renderer also uses the track to ke
 decision 0501. Small faces in wide shots are found by also searching full-height square tiles of the frame,
 cuts are checked on every frame, and in each shot the crop follows the face with the strongest track across
 the shot rather than the biggest face-like thing in each frame (a shirt pattern, hands), with stray points
-dropped by a running median; a shot with no face is centred (decision 0505).
+dropped by a running median; a shot with no face is centred (decision 0505). The hard cuts are also kept as
+`reframe.shots` (source times), where animated transitions can go (decision 0613).
 
 **Matte.** Only when the plan asks for green-screen effects (`style.depth.enabled`), `matte(video, source,
 reframe, out)` cuts the speaker out of every frame and writes `matte.webm`: VP9 with an alpha channel, frame
@@ -167,8 +176,7 @@ length taken from the plan. The video layer is one Remotion sequence per segment
 and cut material shows nothing. The logic is in pure, unit-tested modules (`timing.ts`, `layout.ts`,
 `captions.ts`); `sceneAt(plan, t)` gives both layers the frame's layout mode, speaker panel, crop, zoom and
 face point. `plan.layout` switches between three modes (decision 0605): `speaker` (full frame; the default),
-`split` (speaker slides into the bottom half, visuals above on an animated accent backdrop, captions on the
-seam) and `visual` (the visual graphic fills the frame while the speaker keeps talking underneath); a
+`split` (speaker slides into the bottom half, visuals above on the studio set, captions on the seam) and `visual` (the visual graphic fills the frame while the speaker keeps talking underneath); a
 split/visual span with no visual graphic on screen plays as speaker. Crop follows the interpolated reframe
 keys (center crop without them); zooms scale about the face (`cx`, `cy` from the track, decision 0606);
 in speaker mode graphics take one of three vertical bands chosen to stay clear of the face and the captions.
@@ -181,10 +189,18 @@ outlasts the clip. In the browser preview they load from the `assetBase` prop; i
 next to the video. `pacing.speed` slows or speeds the whole reel (segments last `duration / speed`, video
 plays at that rate, B-roll at normal speed). `transitions.style` is `hard`, `smooth` (each segment overlaps
 the next by `length` and crossfades) or `zoom` (alternate segments punched in); audio eases at every cut,
-and `fade_in`/`fade_out` fade picture and sound at the ends. Caption fonts are ten bundled Google fonts
-(`src/fonts.ts`). See decision 0608. Green-screen effects (decision 0609) need the `matteSrc` prop (the
+and `fade_in`/`fade_out` fade picture and sound at the ends. Caption fonts are twelve bundled Google fonts
+(`src/fonts.ts`), and `caption.box` puts each line in a rounded box instead of an outline. See decisions 0608
+and 0613. A few cuts are animated (`plan.cuts`, `src/cuts.ts`, decision 0613): for a few frames the last frame
+before the cut, footage, graphics and captions together, is held (Remotion `Freeze`) and dropped, whipped,
+pushed through or slid away over the live incoming footage. Backdrops are never a flat colour: split and
+visual stretches, cards, charts and colour backgrounds stand on a studio set with a grid floor
+(`src/Backdrop.tsx`). A `motion` graphic (`src/Motion.tsx`, decision 0612) fills the frame with a 3D scene
+drawn by three.js through `@remotion/three` (software WebGL in the render): the scene is measured at rest
+and fitted under its serif title, lit by three's built-in room environment, with sprung entrances and a slow
+camera push, all pure functions of time. Green-screen effects (decision 0609) need the `matteSrc` prop (the
 cut-out video): the video layer then draws the footage with its background kept, blurred, dimmed or covered
-by a colour, gradient or imported picture/clip (`plan.backgrounds`, else `style.depth.background`, with optional
+by the studio set (tinted with a colour if asked) or an imported picture/clip (`plan.backgrounds`, else `style.depth.background`, with optional
 parallax drift), then graphics with `layer: "behind"` (big titles around the head, or any visual filling the
 frame), then the cut-out speaker on top, then the usual overlays. The cut-out pass is only mounted on frames
 that need it. Without a cut-out, or in split and visual stretches, behind graphics are placed in front like
@@ -198,7 +214,7 @@ about the bottom of the frame (and moved aside for cards).
 Run it with `npm run render -- --plan plan.json --video normalized.mp4 --out out.mp4 [--assets DIR] [--matte matte.webm]` in
 `render/` (`REMOTION_BROWSER` selects a Chromium; imported files are read from the video's folder unless
 `--assets` says otherwise). See ADRs [0601](decisions/0601-render-architecture.md) to
-[0611](decisions/0611-stage-graphics.md).
+[0613](decisions/0613-editorial-look-and-animated-transitions.md).
 
 **API.** `uvicorn api.main:app` serves a job per upload. `POST /jobs` (multipart `video`, `style`,
 `hook_strategy`) saves to `media/<job_id>/` and returns an id; a background thread runs
@@ -237,7 +253,8 @@ renderer's own `buildTimeline`, with undo/redo in `web/lib/history.ts`; somethin
 shows twice and both copies move together. A Style tab in the bin sets speed, pauses (re-cut on the
 server), cut style, end fade, the caption font and look, and the green-screen switch with its background; the
 inspector can put any graphic behind the speaker, the bin adds effects around the speaker (orbit, fly out,
-particles, decision 0610), and turning any of them on asks the API for the cut-out, which the preview uses once
+particles, decision 0610) and full-screen motion graphics (title and idea; the scene is designed at render,
+decision 0612), and turning any of them on asks the API for the cut-out, which the preview uses once
 it exists (decision 0805, 0901). Picking a hook or editing a word still goes through
 `web/lib/rehook.ts`. Save and Render `PUT` the plan first. `npm test` in `web/` runs vitest (API client, hook
 logic, timeline edits) and a production build. See

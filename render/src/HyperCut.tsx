@@ -1,12 +1,16 @@
 import React, {useMemo} from 'react';
 import {AbsoluteFill, Freeze, Img, OffthreadVideo, Sequence, staticFile, useCurrentFrame} from 'remotion';
 import {AroundLayer} from './Around';
+import {StudioBackdrop} from './Backdrop';
+import {captionFamily} from './fonts';
+import {MotionGraphic, type SceneSpec} from './Motion';
 import {Captions} from './Captions';
 import {StageLayer, stageFootageFilter} from './Stage';
 import {BackgroundFill, backgroundFilter, BehindLayer, replacesBackground} from './Depth';
 import {GraphicBody, GraphicView} from './Graphics';
 import {aroundAt, depthAt, isAroundType, isStageType, isVisualType, PULL_BACK, sceneAt, SPLIT, SPLIT_AREA, VISUAL_AREA, VISUAL_IN} from './layout';
 import {normalizePlan, type CompositionProps, type EditPlan, type Graphic} from './plan';
+import {cutAt, cutStyles, cutWindows} from './cuts';
 import {buildTimeline, frameToSource, isKept, mediaRuns, type Timeline, type TimelineSegment} from './timing';
 
 const isUrl = (s: string) => /^(https?:|blob:|data:)/.test(s);
@@ -75,7 +79,8 @@ const VideoSegment: React.FC<{
 	part?: 'full' | 'cutout';
 	matteSrc?: string;
 	assetBase?: string;
-}> = ({plan, tl, seg, src, tail, last, part = 'full', matteSrc, assetBase}) => {
+	silent?: boolean;
+}> = ({plan, tl, seg, src, tail, last, part = 'full', matteSrc, assetBase, silent}) => {
 	const local = useCurrentFrame();
 	const {fps, width} = plan.output;
 	const tr = plan.style.transitions;
@@ -131,7 +136,8 @@ const VideoSegment: React.FC<{
 						src={src}
 						startFrom={Math.round(seg.start * fps)}
 						playbackRate={tl.speed}
-						volume={volume}
+						volume={silent ? 0 : volume}
+						muted={silent}
 						style={{...placed, filter: backgroundFilter(kind) ?? (depth ? stageFootageFilter(depth.stage) : undefined)}}
 					/>
 				</AbsoluteFill>
@@ -141,7 +147,7 @@ const VideoSegment: React.FC<{
 						accent={plan.style.graphics.accent_color}
 						seconds={t}
 						mediaSrc={(name) => mediaSrc(name, assetBase)}
-						backdrop={<Backdrop frame={Math.round(t * fps)} fps={fps} accent={depth.background.color || plan.style.graphics.accent_color} />}
+						backdrop={<StudioBackdrop seconds={t} accent={plan.style.graphics.accent_color} />}
 					/>
 				) : null}
 			</div>
@@ -193,30 +199,10 @@ export function tailFrames(plan: EditPlan, tl: Timeline, i: number): number {
 	if (tr.style !== 'smooth' || !next) return 0;
 	const want = Math.round(tr.length * plan.output.fps);
 	const room = Math.floor(((plan.source.duration - seg.end) * plan.output.fps) / tl.speed) - 1;
-	// A split (one source piece continuing into the next) needs no transition.
-	if (Math.abs(next.start - seg.end) < 1e-3) return 0;
+	// A split (one source piece continuing into the next) needs no transition, nor one an animated cut covers.
+	if (Math.abs(next.start - seg.end) < 1e-3 || plan.cuts.some((c) => Math.abs(c.at - next.start) < 1e-3)) return 0;
 	return Math.max(0, Math.min(want, room, next.frames - 1));
 }
-
-/** Dark gradient with a slow accent glow drifting across it; a pure function of the frame. */
-const Backdrop: React.FC<{frame: number; fps: number; accent: string}> = ({frame, fps, accent}) => {
-	const s = frame / fps;
-	const x = 50 + 28 * Math.sin(s * 0.45);
-	const y = 40 + 22 * Math.cos(s * 0.33);
-	const x2 = 50 - 30 * Math.cos(s * 0.27);
-	const y2 = 75 + 15 * Math.sin(s * 0.38);
-	return (
-		<AbsoluteFill
-			style={{
-				background: [
-					`radial-gradient(circle at ${x}% ${y}%, color-mix(in srgb, ${accent} 34%, transparent) 0%, transparent 46%)`,
-					`radial-gradient(circle at ${x2}% ${y2}%, color-mix(in srgb, ${accent} 16%, transparent) 0%, transparent 40%)`,
-					'linear-gradient(160deg, #14141F 0%, #0B0B12 55%, #050507 100%)',
-				].join(', '),
-			}}
-		/>
-	);
-};
 
 /** Visual graphics stacked and centered in a box (output pixels); each fills what it can of it. */
 const VisualBox: React.FC<{
@@ -235,6 +221,9 @@ const VisualBox: React.FC<{
 		))}
 	</div>
 );
+
+/** The editorial serif motion-graphic titles are set in (ADR 0613). */
+export const MOTION_TITLE_FONT = 'Instrument Serif';
 
 const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string; hasMatte: boolean}> = ({plan, tl, assetBase, hasMatte}) => {
 	const frame = useCurrentFrame();
@@ -260,6 +249,8 @@ const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string; hasM
 	const placed = active.filter((g) => !visuals.includes(g));
 	const mediaLayer = media.map((g) => <MediaFill key={g.id} graphic={g} tl={tl} t={t} frame={frame} assetBase={assetBase} />);
 	const accent = plan.style.graphics.accent_color;
+	// A full-screen motion graphic (ADR 0612) takes the whole frame; only one plays at a time.
+	const motion = mode === 'visual' ? boxed.find((g) => g.type === 'motion') : undefined;
 	const visualK = Math.min(1, Math.max(0, scene.enter / VISUAL_IN));
 
 	return (
@@ -267,7 +258,7 @@ const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string; hasM
 			{mode === 'split' ? (
 				// The top panel is revealed as the speaker panel slides down; nothing spills below it.
 				<div style={{position: 'absolute', left: 0, top: 0, width, height: scene.panel.top, overflow: 'hidden'}}>
-					<Backdrop frame={frame} fps={fps} accent={accent} />
+					<StudioBackdrop seconds={frame / fps} accent={accent} horizon={0.7} />
 					{/* Imported media fills the panel at its final size, so the reveal uncovers it rather than squashing it. */}
 					<div style={{position: 'absolute', left: 0, top: 0, width, height: SPLIT * height, overflow: 'hidden'}}>{mediaLayer}</div>
 					<VisualBox graphics={boxed} t={t} plan={plan} mode="split" top={SPLIT_AREA.top * height} height={(SPLIT_AREA.bottom - SPLIT_AREA.top) * height} />
@@ -276,9 +267,21 @@ const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string; hasM
 			) : null}
 			{mode === 'visual' ? (
 				<AbsoluteFill style={{opacity: visualK, transform: `scale(${1.06 - 0.06 * visualK})`}}>
-					<Backdrop frame={frame} fps={fps} accent={accent} />
+					<StudioBackdrop seconds={frame / fps} accent={accent} />
 					{mediaLayer}
-					<VisualBox graphics={boxed} t={t} plan={plan} mode="visual" top={VISUAL_AREA.top * height} height={(VISUAL_AREA.bottom - VISUAL_AREA.top) * height} />
+					<VisualBox graphics={boxed.filter((g) => g.type !== 'motion')} t={t} plan={plan} mode="visual" top={VISUAL_AREA.top * height} height={(VISUAL_AREA.bottom - VISUAL_AREA.top) * height} />
+					{motion ? (
+						<MotionGraphic
+							scene={(motion.props.scene ?? {objects: []}) as SceneSpec}
+							title={String(motion.props.title ?? '')}
+							t={t - motion.start}
+							dur={motion.end - motion.start}
+							width={width}
+							height={height}
+							font={captionFamily(MOTION_TITLE_FONT)}
+							colors={{accent, secondary: plan.style.graphics.secondary_color || '#4C8DFF', panel: '#1A1B22'}}
+						/>
+					) : null}
 				</AbsoluteFill>
 			) : null}
 			{placed.map((g) => (
@@ -300,21 +303,20 @@ const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string; hasM
 	);
 };
 
-export const HyperCut: React.FC<CompositionProps> = ({plan: rawPlan, videoSrc, assetBase, matteSrc: rawMatte}) => {
-	const plan = useMemo(() => normalizePlan(rawPlan), [rawPlan]);
-	const tl = useMemo(() => buildTimeline(plan.segments, plan.source.duration, plan.output.fps, plan.style.pacing.speed), [plan]);
-	const src = resolveSrc(videoSrc);
-	// The cut-out is only fetched when the plan asks for green-screen effects.
-	const matteSrc = rawMatte && plan.style.depth.enabled ? resolveSrc(rawMatte) : undefined;
+/**
+ * The footage layers: every kept piece, and with green-screen effects the graphics behind the speaker and the
+ * cut-out on top. `silent` for the held copy an animated transition moves away (the live copy has the sound).
+ */
+const Footage: React.FC<{plan: EditPlan; tl: Timeline; src: string; matteSrc?: string; assetBase?: string; silent?: boolean}> = ({plan, tl, src, matteSrc, assetBase, silent}) => {
 	const n = tl.segments.length;
 	return (
-		<AbsoluteFill style={{background: '#000'}}>
+		<>
 			{/* Drawn last to first, so a segment's fading tail lies over the start of the next one. */}
 			{[...tl.segments].reverse().map((seg) => {
 				const tail = tailFrames(plan, tl, seg.index);
 				return (
 					<Sequence key={seg.index} from={seg.outFrom} durationInFrames={seg.frames + tail} layout="none">
-						<VideoSegment plan={plan} tl={tl} seg={seg} src={src} tail={tail} last={seg.index === n - 1} matteSrc={matteSrc} assetBase={assetBase} />
+						<VideoSegment plan={plan} tl={tl} seg={seg} src={src} tail={tail} last={seg.index === n - 1} matteSrc={matteSrc} assetBase={assetBase} silent={silent} />
 					</Sequence>
 				);
 			})}
@@ -331,7 +333,36 @@ export const HyperCut: React.FC<CompositionProps> = ({plan: rawPlan, videoSrc, a
 					})}
 				</>
 			) : null}
+		</>
+	);
+};
+
+export const HyperCut: React.FC<CompositionProps> = ({plan: rawPlan, videoSrc, assetBase, matteSrc: rawMatte}) => {
+	const plan = useMemo(() => normalizePlan(rawPlan), [rawPlan]);
+	const tl = useMemo(() => buildTimeline(plan.segments, plan.source.duration, plan.output.fps, plan.style.pacing.speed), [plan]);
+	const windows = useMemo(() => cutWindows(plan, tl), [plan, tl]);
+	const frame = useCurrentFrame();
+	const src = resolveSrc(videoSrc);
+	// The cut-out is only fetched when the plan asks for green-screen effects.
+	const matteSrc = rawMatte && plan.style.depth.enabled ? resolveSrc(rawMatte) : undefined;
+	// An animated transition (ADR 0613): the held last frame moves away over the live incoming footage.
+	const cut = cutAt(windows, frame);
+	const moves = cut ? cutStyles(cut.kind, cut.k, plan.output.width, plan.output.height) : null;
+	return (
+		<AbsoluteFill style={{background: '#000'}}>
+			<AbsoluteFill style={moves?.in}>
+				<Footage plan={plan} tl={tl} src={src} matteSrc={matteSrc} assetBase={assetBase} />
+			</AbsoluteFill>
 			<Overlays plan={plan} tl={tl} assetBase={assetBase} hasMatte={Boolean(matteSrc)} />
+			{/* The whole last frame, graphics and captions included, over the incoming one. */}
+			{cut && moves ? (
+				<AbsoluteFill style={{...moves.out, overflow: 'hidden'}}>
+					<Freeze frame={cut.hold}>
+						<Footage plan={plan} tl={tl} src={src} matteSrc={matteSrc} assetBase={assetBase} silent />
+						<Overlays plan={plan} tl={tl} assetBase={assetBase} hasMatte={Boolean(matteSrc)} />
+					</Freeze>
+				</AbsoluteFill>
+			) : null}
 			<Fades plan={plan} total={tl.durationInFrames} />
 		</AbsoluteFill>
 	);

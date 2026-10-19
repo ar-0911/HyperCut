@@ -4,7 +4,7 @@ from typing import Any
 
 from hypercut import llm
 from hypercut.analyze import cuts as cutting
-from hypercut.analyze import stage
+from hypercut.analyze import motion, stage
 from hypercut.analyze.visuals import merge_graphics, plan_visuals
 from hypercut.plan import (
     AROUND_GRAPHIC_TYPES, GENERATED_GRAPHIC_TYPES, BackgroundSpan, EditPlan, Graphic, Hook, HookCandidate, Source, Style, Transcript, Zoom,
@@ -22,7 +22,8 @@ ANCHORS = ("auto", "top", "center", "bottom")
 BEHIND_PER_MIN = 3  # big titles behind the speaker per minute, with green-screen effects on
 PARTICLE_KINDS = ("sparkles", "bokeh", "confetti", "embers")
 MAX_AROUND_SECONDS = {"orbit": 6.0, "fly_out": 3.5, "particles": 12.0}
-BACKGROUNDS = ("original", "blur", "dim", "gradient")
+# Never a plain colour or gradient behind the speaker (ADR 0613): Claude only picks among the real background.
+BACKGROUNDS = ("original", "blur", "dim")
 
 SYSTEM = (
     "You are the editor of a short-form vertical video (TikTok/Reels/Shorts). "
@@ -45,12 +46,11 @@ Return one JSON object:
   "zooms": [  // at most {max_zooms} punch-ins on emphasised words or topic changes; 1-3 s each
     {{"start": <s>, "end": <s>, "ease": "ease_in_out"|"snap"|"linear"}}
   ],
-  "ending": {{"word": <index of the last word to keep>, "why": "<...>"}}  // where the video should end: \
+{motion}  "ending": {{"word": <index of the last word to keep>, "why": "<...>"}}  // where the video should end: \
 the last word of a complete sentence that lands as a conclusion (a payoff, a recommendation, a call to action), \
 never a trailing fragment, a half sentence or a line cut off by the recording
 }}
-Graphic props: kinetic_text {{"text"}}; stat_card {{"value","label"}}; emoji_burst {{"emoji"}}; \
-list_build {{"items": [..]}}; lower_third {{"title","subtitle"}}; progress_bar {{}}.
+Graphic props: kinetic_text {{"text"}}; stat_card {{"value","label"}}; list_build {{"items": [..]}}; lower_third {{"title","subtitle"}}; progress_bar {{}}.
 All times are source seconds within 0..{duration:.1f}."""
 
 # Added to the prompt only when the style asks for green-screen effects (ADR 0901).
@@ -62,7 +62,7 @@ Also return these keys in the same object:
     {{"start": <s>, "end": <s>, "text": "<1-3 words>"}}
   ],
   "backgrounds": [  // optional stretches where the background changes, for emphasis; the rest stays "{background}"
-    {{"start": <s>, "end": <s>, "kind": "original"|"blur"|"dim"|"gradient"}}
+    {{"start": <s>, "end": <s>, "kind": "original"|"blur"|"dim"}}
   ]{stage}"""
 
 
@@ -92,6 +92,7 @@ def analyze(
     depth = style.depth.enabled
     max_behind = _cap(BEHIND_PER_MIN, minutes) if depth and style.depth.behind_titles else 0
     max_stage = _cap(stage.STAGE_PER_MIN, minutes) if depth and style.depth.around else 0
+    max_motion = _cap(motion.MOTION_PER_MIN, minutes)
     extra = DEPTH_PROMPT.format(
         max_behind=max_behind, background=style.depth.background,
         stage=stage.PROMPT.format(max_stage=max_stage) if max_stage else "",
@@ -106,6 +107,7 @@ def analyze(
             max_graphics=max_graphics,
             max_zooms=max_zooms,
             types=list(GENERATED_GRAPHIC_TYPES),
+            motion=motion.PROMPT.format(max_motion=max_motion),
         ) + extra,
         system=SYSTEM,
     )
@@ -136,6 +138,11 @@ def analyze(
         plan.graphics = add_behind(plan.graphics, _behind(raw.get("behind"), source.duration, max_behind), plan.layout)
         stage.add_stage(plan, stage.parse_stage(raw.get("stage"), source.duration, max_stage))
         stage.draw_stage(plan.graphics, style)
+    # A few seconds of full-screen motion graphics (ADR 0612), then one more call designs their scenes.
+    moments = motion.parse_motion(raw.get("motion"), source.duration, max_motion)
+    if moments:
+        motion.add_motion(plan, moments)
+        motion.design_scenes(plan.graphics, transcript, style)
     return plan
 
 

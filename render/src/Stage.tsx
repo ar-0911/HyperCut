@@ -4,6 +4,7 @@
 
 import React from 'react';
 import {AbsoluteFill} from 'remotion';
+import {StudioBackdrop} from './Backdrop';
 import {captionFamily} from './fonts';
 import {freeSide, PULL_BACK} from './layout';
 import type {EditPlan, Graphic} from './plan';
@@ -140,7 +141,7 @@ const Scene: React.FC<{g: Graphic; t: number; width: number; height: number; c: 
 	const p = clamp01((t - g.start) / Math.max(0.1, g.end - g.start));
 	return (
 		<AbsoluteFill style={{opacity: k}}>
-			<AbsoluteFill style={{background: art ? '#F6F4EF' : `linear-gradient(170deg, ${c.second}, ${c.panel})`}} />
+			{art ? <AbsoluteFill style={{background: '#F6F4EF'}} /> : <StudioBackdrop seconds={t} accent={c.accent} />}
 			{art ? (
 				<AbsoluteFill style={{transform: `scale(${1.04 + 0.06 * p})`, filter: 'blur(2px) saturate(1.05)'}}>
 					<ArtSvg art={art} prefix={`${g.id}-`} width={width} height={height} slice />
@@ -349,17 +350,10 @@ export const StageLayer: React.FC<{graphics: Graphic[]; t: number; plan: EditPla
 	return (
 		<AbsoluteFill>
 			{studio ? (
-				// A dark studio backdrop behind a chart, with a soft glow of the accent.
-				<AbsoluteFill
-					style={{
-						opacity: pull,
-						background: [
-							`radial-gradient(circle at 50% 30%, color-mix(in srgb, ${c.second} 30%, transparent) 0%, transparent 55%)`,
-							`radial-gradient(circle at 80% 85%, color-mix(in srgb, ${c.accent} 18%, transparent) 0%, transparent 45%)`,
-							`linear-gradient(170deg, color-mix(in srgb, ${c.panel} 80%, #fff) 0%, ${c.panel} 60%, #05060F 100%)`,
-						].join(', '),
-					}}
-				/>
+				// The studio set behind cards and charts (never a flat colour, ADR 0613), faded in with the pull.
+				<AbsoluteFill style={{opacity: pull}}>
+					<StudioBackdrop seconds={t} accent={c.accent} />
+				</AbsoluteFill>
 			) : null}
 			{graphics.map((g) =>
 				g.type === 'scene' ? (

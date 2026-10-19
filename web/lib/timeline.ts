@@ -99,6 +99,7 @@ export const GRAPHIC_NAMES: Record<GraphicType, string> = {
 	card_stack: 'Cards',
 	scene: 'Scene',
 	chart: 'Chart',
+	motion: 'Motion graphic',
 };
 
 export function graphicLabel(g: Graphic): string {
@@ -284,6 +285,7 @@ export const NEW_PROPS: Partial<Record<GraphicType, Record<string, unknown>>> = 
 	particles: {kind: 'sparkles'},
 	card_stack: {cards: [{title: 'First thing', brief: 'First thing'}, {title: 'Second thing', brief: 'Second thing'}]},
 	scene: {title: '', brief: 'a bright modern studio with plants and soft daylight'},
+	motion: {title: 'Your title', idea: 'the one object to show in 3D, e.g. a coffee cup steaming'},
 	chart: {headline: '10X GROWTH', kind: 'line', values: [1, 2, 4, 10], labels: ['2021', '2022', '2023', '2024'], unit: 'x'},
 };
 

@@ -127,7 +127,7 @@ export const SPLIT_AREA = {top: 0.03, bottom: 0.44};
 export const VISUAL_AREA = {top: 0.06, bottom: 0.74};
 
 /** Graphic types that can carry a split top panel or a full-frame visual. */
-export const VISUAL_TYPES: readonly GraphicType[] = ['illustration', 'kinetic_text', 'stat_card', 'list_build', 'media'];
+export const VISUAL_TYPES: readonly GraphicType[] = ['illustration', 'kinetic_text', 'stat_card', 'list_build', 'media', 'motion'];
 export const isVisualType = (type: GraphicType) => VISUAL_TYPES.includes(type);
 /** Effects around the cut-out speaker (ADR 0610): drawn by Around.tsx, behind and in front of the speaker. */
 export const AROUND_TYPES: readonly GraphicType[] = ['orbit', 'fly_out', 'particles'];
@@ -172,8 +172,9 @@ export function modeAt(spans: LayoutSpan[], graphics: Graphic[], t: number): {mo
 	const vis = graphics.filter((g) => isVisualType(g.type) && g.layer !== 'behind');
 	const active = vis.filter((g) => t >= g.start && t < g.end);
 	if (!active.length) return {mode: 'speaker', enter: Infinity};
-	// A visual during a speaker span opens the split panel rather than covering the speaker's face.
-	const mode: LayoutMode = l.mode === 'speaker' ? 'split' : l.mode;
+	// A visual during a speaker span opens the split panel rather than covering the speaker's face; a motion
+	// graphic always takes the whole frame (ADR 0612).
+	const mode: LayoutMode = active.some((g) => g.type === 'motion') ? 'visual' : l.mode === 'speaker' ? 'split' : l.mode;
 	// Walk back through overlapping / touching visuals to the start of this run of coverage.
 	let start = Math.min(...active.map((g) => g.start));
 	for (let moved = true; moved; ) {

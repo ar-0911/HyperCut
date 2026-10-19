@@ -144,3 +144,9 @@ def test_main_face_is_followed_as_it_moves():
     xs = [0.3, 0.35, 0.4, 0.45, 0.5, 0.55]
     d = [Detection(i * 0.2, x, 0.3, candidates=((x, 0.3, 0.9), (0.8, 0.6, 0.6))) for i, x in enumerate(xs)]
     assert [x.cx for x in follow_main_face(d)] == xs
+
+
+def test_hard_cuts_are_kept_as_shots_for_transitions():
+    d = [Detection(0.0, 0.35), Detection(0.2, 0.35), Detection(0.4, 0.65, cut=True), Detection(0.6, None, cut=True)]
+    assert smooth_track(d, LANDSCAPE).shots == [0.4, 0.6]
+    assert smooth_track([Detection(0.0, None), Detection(0.2, None, cut=True)], LANDSCAPE).shots == [0.2]

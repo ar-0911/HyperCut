@@ -115,7 +115,7 @@ def test_invalid_claude_items_are_dropped(sample, fake_llm):
 
 
 def test_density_and_zoom_frequency_cap_counts(sample, fake_llm):
-    many = [{"type": "emoji_burst", "start": float(i), "end": i + 0.5} for i in range(10)]
+    many = [{"type": "kinetic_text", "start": float(i), "end": i + 0.5} for i in range(10)]
     zooms = [{"start": float(i), "end": i + 0.5} for i in range(10)]
     fake_llm({"hooks": [], "graphics": many, "zooms": zooms})
     style = Style(
@@ -336,3 +336,21 @@ def test_drawn_graphics_are_keyed_by_item():
     orbit.props["items"] = ["rocket", "moon"]  # renamed in the editor: only the new one is drawn
     draw_around([orbit, fly], Style(), draw)
     assert asked[-1] == ["moon"] and set(orbit.props["art"]) == {"rocket", "moon"}
+
+
+def test_motion_moments_are_picked_and_designed(sample, fake_llm):
+    answer = {**GOOD, "motion": [{"start": 3.0, "end": 5.5, "title": "Ten hours", "idea": "a clock spinning"}],
+              "scenes": [{"id": "m1", "scene": {"look": "dark", "objects": [{"shape": "torus", "radius": 1}]}}]}
+    calls = fake_llm(answer)
+    p = run(sample)
+    assert '"motion"' in calls[0] and len(calls) == 2  # pick, then design
+    m = next(g for g in p.graphics if g.type == "motion")
+    assert m.id == "m1" and m.props["scene"]["look"] == "dark"
+    assert any(s.mode == "visual" and s.start == 3.0 for s in p.layout)
+    plan.EditPlan.model_validate(p.model_dump())
+
+
+def test_never_a_plain_background(sample, fake_llm):
+    fake_llm({**GOOD, "backgrounds": [{"start": 1, "end": 3, "kind": "gradient"}, {"start": 4, "end": 6, "kind": "dim"}]})
+    style = Style(depth=plan.Depth(enabled=True))
+    assert [b.kind for b in run(sample, style=style).backgrounds] == ["dim"]

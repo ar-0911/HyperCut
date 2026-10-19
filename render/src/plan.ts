@@ -29,6 +29,8 @@ export const GRAPHIC_TYPES = [
 	'card_stack',
 	'scene',
 	'chart',
+	// A full-screen 3D motion graphic for a few seconds (ADR 0612). props: {title, idea, scene: {objects, camera, look}}
+	'motion',
 ] as const;
 export type GraphicType = (typeof GRAPHIC_TYPES)[number];
 export type Anchor = 'auto' | 'top' | 'center' | 'bottom';
@@ -50,6 +52,9 @@ export type Depth = {enabled: boolean; background: BackgroundKind; behind_titles
 export type LayoutMode = 'speaker' | 'split' | 'visual';
 /** How the frame is arranged for a stretch of source time. Outside every span: speaker. */
 export type LayoutSpan = Span & {mode: LayoutMode};
+export type CutKind = 'drop' | 'whip' | 'zoom' | 'push';
+/** An animated transition into the footage that starts at source time `at`: the frame before it is held and moved away. */
+export type CutTransition = {at: number; kind: CutKind; length: number};
 export type Zoom = Span & {scale: number; ease: 'linear' | 'ease_in_out' | 'snap'};
 /** cx: horizontal crop center; cy: the face's height in the source frame (0.5 in older plans). */
 export type ReframeKey = {t: number; cx: number; cy: number};
@@ -67,6 +72,8 @@ export type CaptionStyle = {
 	position: 'top' | 'middle' | 'bottom';
 	words_per_line: number;
 	animation: CaptionAnimation;
+	/** A rounded box behind each line (a CSS colour) instead of an outline; null/undefined: none. */
+	box?: string | null;
 };
 export type GraphicsStyle = {
 	density: 'minimal' | 'balanced' | 'heavy';
@@ -104,8 +111,10 @@ export type EditPlan = {
 	layout: LayoutSpan[];
 	/** Only used with style.depth.enabled and a matte. */
 	backgrounds: BackgroundSpan[];
-	reframe: {keys: ReframeKey[]};
+	reframe: {keys: ReframeKey[]; shots: number[]};
 	style: Style;
+	/** Animated transitions (ADR 0613); elsewhere footage meets by style.transitions. */
+	cuts: CutTransition[];
 };
 
 /**
@@ -166,7 +175,8 @@ export function normalizePlan(raw: unknown): EditPlan {
 		zooms: (r.zooms ?? []).map((z: object) => ({scale: 1.15, ease: 'ease_in_out' as const, ...z})),
 		layout: (r.layout ?? []).map((l: object) => ({mode: 'speaker' as const, ...l})),
 		backgrounds: (r.backgrounds ?? []).map((b: object) => ({kind: 'blur' as const, parallax: 0, ...b})),
-		reframe: {keys: [], ...(r.reframe ?? {})},
+		reframe: {keys: [], shots: [], ...(r.reframe ?? {})},
+		cuts: (r.cuts ?? []).map((c: object) => ({kind: 'drop' as const, length: 0.5, ...c})),
 		style: {
 			...DEFAULT_STYLE,
 			...style,

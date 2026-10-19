@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from hypercut.plan import BackgroundSpan, EditPlan, Graphic, LayoutSpan, Segment, Zoom
 
 # Graphics that fill the split panel or the whole frame; only one shows well at a time.
-VISUAL_TYPES = {"illustration", "kinetic_text", "stat_card", "list_build", "media"}
+VISUAL_TYPES = {"illustration", "kinetic_text", "stat_card", "list_build", "media", "motion"}
 
 EPS = 1e-6
 MIN_SPAN = 0.1
