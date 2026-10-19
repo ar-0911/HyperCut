@@ -105,15 +105,21 @@ GraphicType = Literal[
     # chart props: {"headline", "kind": "line" | "bars", "values": [numbers], "labels": [str], "unit"}: an
     #   animated chart panel behind the pulled-back speaker, for numbers that are actually said.
     "chart",
+    # Motion graphic (ADR 0612): the reel cuts away from the speaker to a full-screen 3D scene of what is
+    # said for 2-3 s (the speaker keeps talking). props: {"title": 1-4 words, "idea": what to show,
+    # "scene": {"objects": [...], "camera": {...}}}: the scene Claude designed (hypercut.analyze.motion).
+    "motion",
 ]
 
 # Effects around the cut-out speaker; analyze only proposes them when green-screen effects are on.
 AROUND_GRAPHIC_TYPES: tuple[str, ...] = ("orbit", "fly_out", "particles")
 # Stage graphics behind the cut-out speaker (ADR 0611); also only with green-screen effects on.
 STAGE_GRAPHIC_TYPES: tuple[str, ...] = ("card_stack", "scene", "chart")
-# Graphic types the analyze stage's main list offers; "media" only comes from the user's own uploads.
+# Graphic types the analyze stage's main list offers; "media" only comes from the user's own uploads,
+# motion graphics have their own list, and emoji are never proposed (Adi, 2026-10-18).
 GENERATED_GRAPHIC_TYPES: tuple[str, ...] = tuple(
-    t for t in get_args(GraphicType) if t != "media" and t not in AROUND_GRAPHIC_TYPES + STAGE_GRAPHIC_TYPES
+    t for t in get_args(GraphicType)
+    if t not in ("media", "motion", "emoji_burst") and t not in AROUND_GRAPHIC_TYPES + STAGE_GRAPHIC_TYPES
 )
 
 
@@ -146,7 +152,8 @@ class BackgroundSpan(Span):
     """What is behind the cut-out speaker for a stretch of the source (needs `style.depth.enabled`).
 
     original: the real background. blur: the real background out of focus. dim: darkened, a spotlight on
-    the speaker. color / gradient: a flat colour or the style's accent glow (`color`, default the accent).
+    the speaker. color / gradient: the studio set (a grid floor and wall, never a flat colour, ADR 0613), its
+    light washed with `color` (default: untinted).
     media: an imported picture or clip (`src`, a file in the job folder). Outside every span the style's
     `depth.background` applies.
     """
@@ -173,12 +180,14 @@ class ReframeKey(_Model):
 
 class Reframe(_Model):
     keys: list[ReframeKey] = []  # empty: center crop
+    # Source times where a new shot starts (hard cuts in the source), for animated transitions (ADR 0613).
+    shots: list[float] = []
 
 
 # Caption fonts the renderer bundles (Google Fonts). Any other name falls back to a system sans-serif.
 CAPTION_FONTS = (
     "Montserrat", "Inter", "Poppins", "Bebas Neue", "Anton", "Oswald", "Archivo Black",
-    "Playfair Display", "Permanent Marker", "Bangers",
+    "Playfair Display", "Instrument Serif", "Archivo Expanded", "Permanent Marker", "Bangers",
 )
 
 
@@ -194,6 +203,8 @@ class CaptionStyle(_Model):
     position: Literal["top", "middle", "bottom"] = "bottom"
     words_per_line: int = Field(default=3, ge=1, le=8)
     animation: Literal["karaoke", "pop", "typewriter", "bounce"] = "pop"
+    # A rounded box behind each caption line (a CSS colour, e.g. "#000000B3"), instead of an outline.
+    box: str | None = None
 
 
 class GraphicsStyle(_Model):
@@ -224,6 +235,22 @@ class Transitions(_Model):
     length: float = Field(default=0.2, ge=0, le=1)  # seconds, for smooth
     fade_in: float = Field(default=0.0, ge=0, le=3)  # seconds from black at the start
     fade_out: float = Field(default=0.8, ge=0, le=3)  # seconds to black (and silence) at the end
+
+
+CutKind = Literal["drop", "whip", "zoom", "push"]
+
+
+class CutTransition(_Model):
+    """An animated transition into the shot or piece that starts at source time `at` (ADR 0613).
+
+    The last frame before it is held and animated away over the incoming footage: drop (it falls off the
+    bottom of the frame), whip (a fast blurred pan sideways), zoom (it pushes through toward the viewer),
+    push (it slides up as the new shot slides in). Used sparingly, at shot and topic changes.
+    """
+
+    at: float = Field(ge=0)
+    kind: CutKind = "drop"
+    length: float = Field(default=0.5, ge=0.2, le=1.2)  # seconds
 
 
 class Camera(_Model):
@@ -272,6 +299,7 @@ class EditPlan(_Model):
     backgrounds: list[BackgroundSpan] = []  # only used with style.depth.enabled
     reframe: Reframe = Reframe()
     style: Style = Style()
+    cuts: list[CutTransition] = []  # animated transitions; elsewhere footage meets by `style.transitions`
 
     @model_validator(mode="after")
     def _within_source(self) -> "EditPlan":

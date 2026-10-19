@@ -7,6 +7,8 @@ import anton from './font-files/anton-latin-400-normal.woff2';
 import archivoBlack from './font-files/archivo-black-latin-400-normal.woff2';
 import bangers from './font-files/bangers-latin-400-normal.woff2';
 import bebasNeue from './font-files/bebas-neue-latin-400-normal.woff2';
+import archivoWide from './font-files/archivo-latin-wdth-normal.woff2';
+import instrumentSerif from './font-files/instrument-serif-latin-400-normal.woff2';
 import inter from './font-files/inter-latin-wght-normal.woff2';
 import montserrat from './font-files/montserrat-latin-wght-normal.woff2';
 import oswald from './font-files/oswald-latin-wght-normal.woff2';
@@ -19,8 +21,8 @@ import poppins800 from './font-files/poppins-latin-800-normal.woff2';
 import poppins900 from './font-files/poppins-latin-900-normal.woff2';
 
 /** One file of a font: a static weight ('700') or a variable range ('100 900'). */
-type FontFile = {url: string; weight: string};
-type FontDef = {name: string; files: FontFile[]; weights: string[]; feel: string};
+type FontFile = {url: string; weight: string; stretch?: string};
+type FontDef = {name: string; files: FontFile[]; weights: string[]; feel: string; stretch?: string};
 
 const variable = (url: string, from: number, to: number): FontFile[] => [{url, weight: `${from} ${to}`}];
 const WEIGHTS = ['500', '600', '700', '800', '900'];
@@ -39,6 +41,9 @@ export const CAPTION_FONTS: FontDef[] = [
 	{name: 'Oswald', files: variable(oswald, 200, 700), weights: ['500', '600', '700'], feel: 'Condensed, news'},
 	{name: 'Archivo Black', files: [{url: archivoBlack, weight: '400'}], weights: ['400'], feel: 'Wide and punchy'},
 	{name: 'Playfair Display', files: variable(playfairDisplay, 400, 900), weights: WEIGHTS, feel: 'Elegant serif'},
+	// The editorial look of tech-explainer reels (ADR 0613): a tall serif for titles, and a wide heavy sans.
+	{name: 'Instrument Serif', files: [{url: instrumentSerif, weight: '400'}], weights: ['400'], feel: 'Tall editorial serif'},
+	{name: 'Archivo Expanded', files: [{url: archivoWide, weight: '100 900', stretch: '62% 125%'}], weights: WEIGHTS, feel: 'Wide and heavy', stretch: '125%'},
 	{name: 'Permanent Marker', files: [{url: permanentMarker, weight: '400'}], weights: ['400'], feel: 'Handwritten'},
 	{name: 'Bangers', files: [{url: bangers, weight: '400'}], weights: ['400'], feel: 'Comic'},
 ];
@@ -56,7 +61,7 @@ export function captionFamily(name: string): string {
 	if (typeof document !== 'undefined' && typeof FontFace !== 'undefined') {
 		for (const file of def.files) {
 			const handle = delayRender(`Loading caption font ${def.name} ${file.weight}`);
-			const face = new FontFace(family, `url(${file.url}) format('woff2')`, {weight: file.weight});
+			const face = new FontFace(family, `url(${file.url}) format('woff2')`, {weight: file.weight, ...(file.stretch ? {stretch: file.stretch} : {})});
 			face
 				.load()
 				.then(() => document.fonts.add(face))
@@ -65,6 +70,11 @@ export function captionFamily(name: string): string {
 		}
 	}
 	return family;
+}
+
+/** CSS font-stretch a font is drawn at ('125%' for the expanded display face), or undefined. */
+export function captionStretch(name: string): string | undefined {
+	return CAPTION_FONTS.find((f) => f.name === name)?.stretch;
 }
 
 /** The closest weight the font has, so single-weight display fonts aren't smeared by fake bold. */

@@ -3,6 +3,7 @@
 
 import React from 'react';
 import {AbsoluteFill, Img, OffthreadVideo} from 'remotion';
+import {StudioBackdrop} from './Backdrop';
 import {captionFamily} from './fonts';
 import {GraphicBody} from './Graphics';
 import type {BackgroundSpan, EditPlan, Graphic} from './plan';
@@ -50,7 +51,7 @@ export function parallaxTransform(parallax: number, seconds: number): string {
 	return `scale(${scale}) translate(${x}%, ${y}%)`;
 }
 
-/** The replacement background (colour, gradient or an imported picture/clip) filling its box. */
+/** The replacement background (the studio set, tinted or not, or an imported picture/clip) filling its box. */
 export const BackgroundFill: React.FC<{
 	bg: BackgroundSpan;
 	accent: string;
@@ -63,7 +64,8 @@ export const BackgroundFill: React.FC<{
 	let body: React.ReactNode = backdrop;
 	if (bg.kind === 'color') {
 		const c = bg.color || accent;
-		body = <AbsoluteFill style={{background: `radial-gradient(circle at 50% 35%, ${c} 0%, color-mix(in srgb, ${c} 55%, #000) 100%)`}} />;
+		// Never a flat colour (ADR 0613): the studio set, its light washed with the colour asked for.
+		body = <StudioBackdrop seconds={seconds} tint={c} />;
 	} else if (bg.kind === 'media' && bg.src && mediaSrc) {
 		const src = mediaSrc(bg.src);
 		body = /\.(mp4|mov|webm|m4v)$/i.test(bg.src) ? <OffthreadVideo src={src} muted style={fill} /> : <Img src={src} style={fill} />;

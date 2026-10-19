@@ -151,3 +151,25 @@ def test_stage_ops():
     chart, cards = (next(g for g in plan.graphics if g.id == i) for i in ("s1", "s2"))
     assert chart.type == "chart" and chart.props["values"] == [1.0, 5.0, 20.0] and chart.end - chart.start == 5.0
     assert cards.props["cards"][0]["layers"] == ["<g/>"]
+
+
+def test_motion_graphic_and_animated_transition_ops():
+    designed = []
+
+    def design(prompt, system=""):
+        designed.append(prompt)
+        return {"scenes": [{"id": "m1", "scene": {"objects": [{"shape": "sphere", "radius": 1}]}}]}
+
+    ops = [
+        {"op": "motion", "start": 7, "end": 12, "title": "Rocket launch", "idea": "a rocket lifting off"},
+        {"op": "cut_transition", "at": 14, "kind": "whip"},
+        {"op": "cut_transition", "at": 16, "kind": "spin"},
+    ]
+    plan, changes = assistant.apply_ops(_plan(), ops, playhead=0, assets=[], design=design)
+    m = next(g for g in plan.graphics if g.type == "motion")
+    assert (m.start, m.end) == (5, 5 + 3.2) and m.props["scene"]["objects"][0]["shape"] == "sphere"
+    assert "v1" not in {g.id for g in plan.graphics}  # the illustration there made way
+    assert [(c.at, c.kind) for c in plan.cuts] == [(12, "whip")]  # reel 14 is source 12 after the hook
+    assert any("motion graphic" in c for c in changes)
+    plan, _ = assistant.apply_ops(plan, [{"op": "cut_transition", "at": 14.3, "kind": "none"}], playhead=0, assets=[])
+    assert plan.cuts == []

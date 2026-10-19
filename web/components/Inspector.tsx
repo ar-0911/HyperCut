@@ -98,6 +98,20 @@ function GraphicFields({plan, g, onChange}: {plan: EditPlan; g: Graphic; onChang
 				</>
 			);
 		}
+		case 'motion':
+			return (
+				<>
+					{text('title', 'Title')}
+					<Field label="What to show in 3D">
+						<textarea
+							value={String(g.props.idea ?? '')}
+							// A new idea is designed again when you render.
+							onChange={(e) => set({idea: e.target.value, scene: null})}
+						/>
+					</Field>
+					<p className="hint">Takes the whole frame for a few seconds while the speaker keeps talking.</p>
+				</>
+			);
 		case 'scene':
 			return (
 				<>

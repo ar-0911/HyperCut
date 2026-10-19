@@ -55,10 +55,12 @@ def smooth_track(
     cx is clamped so the crop window never leaves the frame. cy is the face's own height in the
     frame (smoothed the same way): the full-height crop never moves vertically, so the renderer
     uses it only to zoom in on the face and keep graphics off it (ADR 0504).
+    The hard cuts are kept as `shots`, where animated transitions can go (ADR 0613).
     """
     half = _crop_half_width(source)
+    shots = [round(d.t, 3) for i, d in enumerate(detections) if d.cut and i > 0]
     if half >= 0.5 or not any(d.cx is not None for d in detections):
-        return Reframe()  # already vertical (or narrower), or no face: center crop
+        return Reframe(shots=shots)  # already vertical (or narrower), or no face: center crop
     detections = drop_outliers(follow_main_face(detections))
 
     lo, hi = half, 1 - half
@@ -95,7 +97,7 @@ def smooth_track(
             if abs(target_y - pos_y) > dead_zone:
                 pos_y += alpha * (target_y - pos_y)
         keys.append(key(d.t))
-    return Reframe(keys=keys)
+    return Reframe(keys=keys, shots=shots)
 
 
 def _shots(detections: list[Detection]) -> list[list[int]]:

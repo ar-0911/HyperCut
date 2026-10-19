@@ -137,6 +137,10 @@ describe('modeAt', () => {
 		expect(modeAt([], [g('a', 'kinetic_text', 2, 4)], 2.5)).toEqual({mode: 'split', enter: expect.closeTo(0.5)});
 		expect(modeAt([], [g('a', 'emoji_burst', 2, 4)], 2.5).mode).toBe('speaker');
 	});
+	it('gives a motion graphic the whole frame, whatever the span says', () => {
+		expect(modeAt([], [g('m', 'motion', 2, 4)], 2.5).mode).toBe('visual');
+		expect(modeAt([{start: 0, end: 9, mode: 'split'}], [g('m', 'motion', 2, 4)], 2.5).mode).toBe('visual');
+	});
 	it('never counts from before the span', () => {
 		expect(modeAt([{start: 5, end: 9, mode: 'visual'}], [g('a', 'illustration', 0, 9)], 6).enter).toBeCloseTo(1);
 	});

@@ -223,6 +223,9 @@
         "cx": 0.5,
         "cy": 0.42
       }
+    ],
+    "shots": [
+      5.9
     ]
   },
   "style": {
@@ -264,6 +267,13 @@
       "end": 12.0,
       "kind": "blur",
       "parallax": 0
+    }
+  ],
+  "cuts": [
+    {
+      "at": 0.0,
+      "kind": "drop",
+      "length": 0.6
     }
   ]
 }

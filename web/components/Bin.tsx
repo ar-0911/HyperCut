@@ -10,13 +10,13 @@ import {DRAG_TYPE} from './Timeline';
 
 type Tab = 'add' | 'media' | 'style' | 'hook' | 'captions';
 
-const ADDABLE: GraphicType[] = ['kinetic_text', 'stat_card', 'list_build', 'lower_third', 'emoji_burst', 'progress_bar', 'card_stack', 'scene', 'chart', 'particles'];
+const ADDABLE: GraphicType[] = ['kinetic_text', 'stat_card', 'list_build', 'lower_third', 'progress_bar', 'motion', 'card_stack', 'scene', 'chart', 'particles'];
 const ICONS: Partial<Record<GraphicType, string>> = {
 	kinetic_text: 'Aa',
 	stat_card: '10x',
 	list_build: '☰',
 	lower_third: '▭',
-	emoji_burst: '🔥',
+	emoji_burst: '✱',
 	progress_bar: '━',
 	illustration: '✎',
 	media: '▶',
@@ -26,6 +26,7 @@ const ICONS: Partial<Record<GraphicType, string>> = {
 	card_stack: '▤',
 	scene: '⛰',
 	chart: '↗',
+	motion: '◆',
 };
 
 /** A draggable tile; clicking it adds the thing at the playhead instead (for trackpads and touch). */

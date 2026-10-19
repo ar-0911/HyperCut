@@ -19,6 +19,7 @@ from typing import Callable
 
 from hypercut import plan as plan_mod
 from hypercut.analyze import analyze
+from hypercut.analyze.transitions import plan_transitions
 from hypercut.ingest import ingest
 from hypercut.matte import MATTE_FILE, matte, needs_matte, place_titles
 from hypercut.plan import EditPlan
@@ -73,6 +74,8 @@ def run_pipeline(
                 log.warning("speaker cut-out failed, rendering without green-screen effects: %s", e)
                 cutout = None
     plan = plan.model_copy(update={"reframe": reframe_result})
+    # A few animated transitions at the shot changes face tracking found (ADR 0613).
+    plan.cuts = plan_transitions(plan)
     if cutout is not None:
         place_titles(plan, job_dir / MATTE_FILE)
     plan = EditPlan.model_validate(plan.model_dump())  # fail here, not in the renderer
@@ -108,18 +111,24 @@ def place_new_titles(job_dir: str | Path) -> None:
         plan_mod.save(place_titles(plan, out), path)
 
 
-def draw_new_around(job_dir: str | Path, draw=None, illustrate=None) -> None:
+def draw_new_around(job_dir: str | Path, draw=None, illustrate=None, design=None) -> None:
     """Draw the graphics added or changed in the editor before a render: orbit / fly-out items (ADR 0610),
-    cards and scenes (ADR 0611)."""
+    cards and scenes (ADR 0611), motion graphics (ADR 0612)."""
     from hypercut.analyze.analyze import draw_around
     from hypercut.analyze.stage import draw_stage
 
+    from hypercut.analyze.motion import design_scenes
+
     path = Path(job_dir) / "plan.json"
     plan = plan_mod.load(path)
+    # Motion graphics added in the editor (or whose idea was changed) get their 3D scene designed (ADR 0612).
+    scenes = design_scenes(plan.graphics, plan.transcript, plan.style, design)
     if not plan.style.depth.enabled:
+        if scenes:
+            plan_mod.save(plan, path)
         return
     icons = draw_around(plan.graphics, plan.style, draw)
-    if draw_stage(plan.graphics, plan.style, illustrate) or icons:
+    if draw_stage(plan.graphics, plan.style, illustrate) or icons or scenes:
         plan_mod.save(plan, path)
 
 

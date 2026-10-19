@@ -2,7 +2,7 @@
   "$defs": {
     "BackgroundSpan": {
       "additionalProperties": false,
-      "description": "What is behind the cut-out speaker for a stretch of the source (needs `style.depth.enabled`).\n\noriginal: the real background. blur: the real background out of focus. dim: darkened, a spotlight on\nthe speaker. color / gradient: a flat colour or the style's accent glow (`color`, default the accent).\nmedia: an imported picture or clip (`src`, a file in the job folder). Outside every span the style's\n`depth.background` applies.",
+      "description": "What is behind the cut-out speaker for a stretch of the source (needs `style.depth.enabled`).\n\noriginal: the real background. blur: the real background out of focus. dim: darkened, a spotlight on\nthe speaker. color / gradient: the studio set (a grid floor and wall, never a flat colour, ADR 0613), its\nlight washed with `color` (default: untinted).\nmedia: an imported picture or clip (`src`, a file in the job folder). Outside every span the style's\n`depth.background` applies.",
       "properties": {
         "start": {
           "minimum": 0,
@@ -96,7 +96,7 @@
       "properties": {
         "font": {
           "default": "Montserrat",
-          "description": "One of: Montserrat, Inter, Poppins, Bebas Neue, Anton, Oswald, Archivo Black, Playfair Display, Permanent Marker, Bangers",
+          "description": "One of: Montserrat, Inter, Poppins, Bebas Neue, Anton, Oswald, Archivo Black, Playfair Display, Instrument Serif, Archivo Expanded, Permanent Marker, Bangers",
           "title": "Font",
           "type": "string"
         },
@@ -162,9 +162,55 @@
           ],
           "title": "Animation",
           "type": "string"
+        },
+        "box": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Box"
         }
       },
       "title": "CaptionStyle",
+      "type": "object"
+    },
+    "CutTransition": {
+      "additionalProperties": false,
+      "description": "An animated transition into the shot or piece that starts at source time `at` (ADR 0613).\n\nThe last frame before it is held and animated away over the incoming footage: drop (it falls off the\nbottom of the frame), whip (a fast blurred pan sideways), zoom (it pushes through toward the viewer),\npush (it slides up as the new shot slides in). Used sparingly, at shot and topic changes.",
+      "properties": {
+        "at": {
+          "minimum": 0,
+          "title": "At",
+          "type": "number"
+        },
+        "kind": {
+          "default": "drop",
+          "enum": [
+            "drop",
+            "whip",
+            "zoom",
+            "push"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "length": {
+          "default": 0.5,
+          "maximum": 1.2,
+          "minimum": 0.2,
+          "title": "Length",
+          "type": "number"
+        }
+      },
+      "required": [
+        "at"
+      ],
+      "title": "CutTransition",
       "type": "object"
     },
     "Depth": {
@@ -236,7 +282,8 @@
             "particles",
             "card_stack",
             "scene",
-            "chart"
+            "chart",
+            "motion"
           ],
           "title": "Type",
           "type": "string"
@@ -490,6 +537,14 @@
           },
           "title": "Keys",
           "type": "array"
+        },
+        "shots": {
+          "default": [],
+          "items": {
+            "type": "number"
+          },
+          "title": "Shots",
+          "type": "array"
         }
       },
       "title": "Reframe",
@@ -614,7 +669,8 @@
             "uppercase": true,
             "position": "bottom",
             "words_per_line": 3,
-            "animation": "pop"
+            "animation": "pop",
+            "box": null
           }
         },
         "graphics": {
@@ -892,7 +948,8 @@
     "reframe": {
       "$ref": "#/$defs/Reframe",
       "default": {
-        "keys": []
+        "keys": [],
+        "shots": []
       }
     },
     "style": {
@@ -901,6 +958,7 @@
         "name": "bold_creator",
         "caption": {
           "animation": "pop",
+          "box": null,
           "color": "#FFFFFF",
           "font": "Montserrat",
           "highlight_color": "#FFE600",
@@ -942,6 +1000,14 @@
           "enabled": false
         }
       }
+    },
+    "cuts": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/CutTransition"
+      },
+      "title": "Cuts",
+      "type": "array"
     }
   },
   "required": [

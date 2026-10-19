@@ -23,13 +23,16 @@ from typing import Any
 from hypercut import edit, llm
 from hypercut import plan as plan_mod
 from hypercut.analyze import cuts as cutting
-from hypercut.analyze import stage, visuals
+from hypercut.analyze import motion, stage, visuals
 from hypercut.analyze.analyze import MAX_AROUND_SECONDS, around_props, draw_around
+from hypercut.analyze.transitions import LENGTH as CUT_LENGTH
 from hypercut.plan import EditPlan
 
-TEXT_TYPES = ("kinetic_text", "stat_card", "list_build", "lower_third", "emoji_burst")
+TEXT_TYPES = ("kinetic_text", "stat_card", "list_build", "lower_third")
 MODES = ("speaker", "split", "visual")
+# "gradient" is still read from older answers; it is drawn as the studio set like "color" (ADR 0613).
 BACKGROUND_KINDS = ("original", "blur", "dim", "color", "gradient", "media")
+CUT_KINDS = ("drop", "whip", "zoom", "push")
 MAX_OPS = 20
 MAX_ADD_SECONDS = 8.0
 
@@ -52,6 +55,9 @@ visual = the visual fills the frame while the speaker keeps talking):
 Zooms:
 {zooms}
 
+Animated transitions:
+{cuts}
+
 Green-screen effects (speaker cut out of the frame): {depth}
 Background stretches:
 {backgrounds}
@@ -73,7 +79,7 @@ composition, palette", "layout": "split" | "visual"}}  a new drawn illustration;
 and subtitles below it, visual makes it full screen
 - {{"op": "add_text", "type": one of {text_types}, "start": s, "end": e, "props": {{...}}}}  props: \
 kinetic_text {{"text"}}; stat_card {{"value","label"}}; list_build {{"title","items"}}; \
-lower_third {{"title","subtitle"}}; emoji_burst {{"emoji"}}
+lower_third {{"title","subtitle"}}
 - {{"op": "add_media", "asset": "<file name>", "start": s, "end": e, "layout": "split" | "visual"}}
 - {{"op": "set_layout", "start": s, "end": e, "mode": "speaker" | "split" | "visual"}}
 - {{"op": "add_zoom", "start": s, "end": e, "scale": 1.05-1.5}}
@@ -87,7 +93,9 @@ speed up the whole reel; keep_pause is how much pause stays around each cut (re-
 - {{"op": "stage", "type": "card_stack" | "scene" | "chart", "start": s, "end": e, ...}}  a graphic of what is said BEHIND the cut-out speaker (turns the effects on, keeps the speaker full frame there). card_stack: "cards": [{{"title": "1-3 words", "brief": "what to draw"}}] (1-3 illustrated cards sliding out from behind the speaker); scene: "title", "brief" (a drawn world replacing the room, speaker pulled back); chart: "headline", "kind": "line" | "bars", "values": [numbers], "labels": [..], "unit" (an animated chart, only for numbers said)
 - {{"op": "around", "type": "orbit" | "fly_out" | "particles", "start": s, "end": e, "items": ["objects to draw, 1-3 words each"], "kind": "sparkles" | "bokeh" | "confetti" | "embers"}}  an effect happening AROUND the speaker, passing behind and in front of them (never over the face): orbit = drawn graphics circling the shoulders, fly_out = drawn graphics bursting from behind the head toward the camera, particles = drifting atmosphere (kind); turns the green-screen effects on and keeps the speaker full frame there
 - {{"op": "layer", "key": "g1", "layer": "behind" | "front"}}  put a graphic behind the speaker or back in front
-- {{"op": "background", "kind": "original" | "blur" | "dim" | "color" | "gradient" | "media", "start": s, "end": e, "color": "#RRGGBB", "asset": "<file name, for media>", "parallax": 0-1}}  change what is behind the speaker (turns the effects on); without start/end it applies to the whole reel; parallax drifts a replaced background for a 3D feel
+- {{"op": "background", "kind": "original" | "blur" | "dim" | "color" | "media", "start": s, "end": e, "color": "#RRGGBB", "asset": "<file name, for media>", "parallax": 0-1}}  change what is behind the speaker (turns the effects on); color = a studio set with a grid floor, its light tinted with "color" (never a flat colour); without start/end it applies to the whole reel; parallax drifts a replaced background for a 3D feel
+- {{"op": "motion", "start": s, "end": e, "title": "1-4 words", "idea": "the one 3D object or moment to show"}}  a 2-3 s full-screen 3D motion graphic of what is said there (the speaker keeps talking)
+- {{"op": "cut_transition", "at": s, "kind": "drop" | "whip" | "zoom" | "push" | "none"}}  an animated transition at a cut or shot change: drop = the old shot falls off screen, whip = a fast blurred pan, zoom = pushing through, push = slides up; "none" removes the one there. Use sparingly
 - {{"op": "depth", "enabled": false}}  turn all green-screen effects off
 - {{"op": "transitions", "style": "hard" | "smooth" | "zoom", "fade_out": seconds}}  hard cuts, short crossfades, \
 or alternating punch-ins at cuts; fade to black at the end
@@ -111,7 +119,7 @@ def _fmt(span: tuple[float, float] | None) -> str:
 
 
 def _detail(props: dict) -> str:
-    keys = ("title", "text", "value", "label", "emoji", "subtitle", "items", "label", "kind")
+    keys = ("title", "text", "value", "label", "emoji", "subtitle", "items", "label", "kind", "idea")
     bits = [f"{k}={json.dumps(props[k], ensure_ascii=False)[:60]}" for k in keys if k in props]
     return ", ".join(dict.fromkeys(bits))
 
@@ -126,6 +134,7 @@ def summarize(plan: EditPlan, assets: list[dict]) -> dict[str, str]:
     backgrounds = [f"bg{i}: {b.kind}, {_fmt(edit.first_reel(plan, b.start, b.end))}" for i, b in enumerate(plan.backgrounds)]
     layout = [f"l{i}: {s.mode}, {_fmt(edit.first_reel(plan, s.start, s.end))}" for i, s in enumerate(plan.layout)]
     zooms = [f"z{i}: x{z.scale}, {_fmt(edit.first_reel(plan, z.start, z.end))}" for i, z in enumerate(plan.zooms)]
+    cuts = [f"{c.kind} at {hits[0]:.1f}" for c in plan.cuts if (hits := edit.to_reel(plan, c.at))]
     lines, line, line_t = [], [], None
     for w in plan.transcript.words:
         hits = edit.to_reel(plan, (w.start + w.end) / 2)
@@ -148,6 +157,7 @@ def summarize(plan: EditPlan, assets: list[dict]) -> dict[str, str]:
         "items": "\n".join(items) or "(none)",
         "layout": "\n".join(layout) or "(speaker throughout)",
         "zooms": "\n".join(zooms) or "(none)",
+        "cuts": "\n".join(cuts) or "(none)",
         "depth": f"on, default background {depth.background}" if depth.enabled else "off",
         "backgrounds": "\n".join(backgrounds) or "(none)",
         "assets": "\n".join(asset_lines) or "(none)",
@@ -175,7 +185,7 @@ def _reel_span(op: dict, duration: float, playhead: float, default_len: float = 
 
 
 def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], draw=visuals.illustrate,
-              audio_wav: str | None = None, draw_icons=visuals.draw_icons) -> tuple[EditPlan, list[str]]:
+              audio_wav: str | None = None, draw_icons=visuals.draw_icons, design=None) -> tuple[EditPlan, list[str]]:
     """Validate and apply Claude's operations to a copy of the plan. Unknown or invalid ops are skipped."""
     plan = plan.model_copy(deep=True)
     duration = edit.reel_duration(plan)
@@ -198,6 +208,7 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
         return edit.source_span(plan, *r)
 
     pending_art: list[tuple[dict, tuple[float, float]]] = []
+    moments: list[plan_mod.Graphic] = []
     cuts: list[tuple[float, float]] = []
     caption_cuts: list[tuple[float, float]] = []
     doomed: list[Any] = []
@@ -322,6 +333,22 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
                     edit.set_background(plan, *span, plan_mod.BackgroundSpan(
                         start=span[0], end=span[1], kind=op["kind"], color=color, src=src, parallax=parallax))
                     changes.append(f"Background: {op['kind']}" + ("" if full else f" {_fmt(_reel_span(op, duration, playhead))}s"))
+        elif kind == "motion" and str(op.get("idea") or op.get("title") or "").strip():
+            span = span_of(op, 2.5, motion.MAX_SECONDS)
+            if span:
+                title = " ".join(str(op.get("title") or "").split()[:4])[:32]
+                moments.append(plan_mod.Graphic(id="", type="motion", start=span[0], end=span[1],
+                                                props={"title": title, "idea": str(op.get("idea") or title)[:400]}))
+        elif kind == "cut_transition" and (op.get("kind") in CUT_KINDS or op.get("kind") == "none"):
+            at = _num(op.get("at"))
+            at = playhead if at is None else min(max(at, 0.0), duration)
+            t = edit.to_source(plan, at)[0]
+            plan.cuts = [c for c in plan.cuts if abs(c.at - t) > 1.0]
+            if op["kind"] == "none":
+                changes.append(f"Removed the transition at {at:.1f}s")
+            else:
+                plan.cuts = sorted(plan.cuts + [plan_mod.CutTransition(at=t, kind=op["kind"], length=CUT_LENGTH[op["kind"]])], key=lambda c: c.at)
+                changes.append(f"Added a {op['kind']} transition at {at:.1f}s")
         elif kind == "depth" and op.get("enabled") is False:
             plan.style.depth.enabled = False
             changes.append("Turned green-screen effects off")
@@ -342,6 +369,10 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
             except ValueError:
                 pass
 
+    if moments:
+        motion.add_motion(plan, moments)
+        motion.design_scenes(plan.graphics, plan.transcript, plan.style, design)
+        changes += [f"Added motion graphic {g.id}" for g in moments]
     draw_around(plan.graphics, plan.style, draw_icons)
     stage.draw_stage(plan.graphics, plan.style, draw)
     if pending_art:
