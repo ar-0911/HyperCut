@@ -238,7 +238,9 @@ const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string; hasM
 	// Graphics drawn behind the speaker are not ours; the rest of the behind layer (no cut-out, or a split
 	// or visual stretch) is placed in front, off the face, like any other graphic.
 	const behind = depthAt(plan, t, mode, hasMatte)?.behind ?? [];
-	// Stage graphics are only drawn behind a cut-out speaker (Behind); without one they are left out.
+	// Stage graphics go behind a cut-out speaker (Behind); without one, over the real footage beside them
+	// (ADR 0614), only while the speaker fills the frame.
+	const stage = !hasMatte && mode === 'speaker' ? plan.graphics.filter((g) => isStageType(g.type) && t >= g.start && t < g.end) : [];
 	const active = plan.graphics.filter((g) => t >= g.start && t < g.end && !behind.includes(g) && !isAroundType(g.type) && !isStageType(g.type));
 	// Effects around the speaker: their near half here, in front of the cut-out; without one, all of them
 	// in front (kept off the face either way). Only in speaker stretches, and only when depth is on.
@@ -297,6 +299,7 @@ const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string; hasM
 					height={height}
 				/>
 			))}
+			{stage.length ? <StageLayer graphics={stage} t={t} plan={plan} face={scene.face} pull={0} shift={0} captionY={scene.captionY} /> : null}
 			{around.length ? <AroundLayer graphics={around} t={t} plan={plan} face={scene.face} pass={hasMatte ? 'front' : 'all'} /> : null}
 			<Captions words={words} style={plan.style.caption} t={t} height={height} y={scene.captionY} />
 		</AbsoluteFill>
@@ -344,7 +347,8 @@ export const HyperCut: React.FC<CompositionProps> = ({plan: rawPlan, videoSrc, a
 	const frame = useCurrentFrame();
 	const src = resolveSrc(videoSrc);
 	// The cut-out is only fetched when the plan asks for green-screen effects.
-	const matteSrc = rawMatte && plan.style.depth.enabled ? resolveSrc(rawMatte) : undefined;
+	// The speaker is cut out only when a different background or things behind them were asked for (ADR 0614).
+	const matteSrc = rawMatte && plan.style.depth.enabled && plan.style.depth.cutout ? resolveSrc(rawMatte) : undefined;
 	// An animated transition (ADR 0613): the held last frame moves away over the live incoming footage.
 	const cut = cutAt(windows, frame);
 	const moves = cut ? cutStyles(cut.kind, cut.k, plan.output.width, plan.output.height) : null;

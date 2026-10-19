@@ -57,6 +57,10 @@ def style_from_prompt(prompt: str) -> Style:
             style = _merge(get_preset(preset), answer.get("changes") or {})
             if style.depth.enabled and not asks_for_depth(prompt):
                 style.depth.enabled = False  # the user never asked for it (ADR 0901)
+            if not (style.depth.enabled and asks_for_cutout(prompt)):
+                # The real room stays unless a different background was specifically asked for (ADR 0614).
+                style.depth.cutout = False
+                style.depth.background = "original"
             return style
         except (llm.LLMError, ValidationError, ValueError, TypeError, AttributeError) as e:
             log.warning("style attempt %d/%d failed: %s", attempt, ATTEMPTS, e)
@@ -76,6 +80,20 @@ DEPTH_WORDS = re.compile(
 def asks_for_depth(prompt: str) -> bool:
     """Whether a style prompt could be asking for green-screen effects."""
     return bool(DEPTH_WORDS.search(prompt or ""))
+
+
+# Words a request to change the background or put things behind the speaker can't do without. The cut-out
+# can show rough edges, so it is used only when one of these is in the prompt (ADR 0614).
+CUTOUT_WORDS = re.compile(
+    r"background|backdrop|green ?screen|chroma|cut ?out|matte|behind (?:me|the speaker|him|her|them|my head)|"
+    r"(?:remove|replace|change|swap) (?:the|my) (?:room|wall|set)",
+    re.IGNORECASE,
+)
+
+
+def asks_for_cutout(prompt: str) -> bool:
+    """Whether a style prompt could be asking for a different background or things behind the speaker."""
+    return bool(CUTOUT_WORDS.search(prompt or ""))
 
 
 def _merge(base: Style, changes: dict) -> Style:
@@ -115,7 +133,9 @@ User request: {user_prompt}
 
 Green-screen effects (`depth`) stay off unless the request explicitly asks for them: text or graphics
 behind the speaker, things happening around or in front of the speaker (an immersive look), removing,
-replacing, blurring or dimming the background, a green-screen, cut-out or 3D depth look. Then set depth.enabled true and pick depth.background (original keeps the real room).
+replacing, blurring or dimming the background, a green-screen, cut-out or 3D depth look. Then set depth.enabled true.
+Effects are animated over the real footage. Set depth.cutout true (and pick depth.background) only if the
+request specifically asks for a different background or for text behind the speaker; otherwise keep the real room.
 
 Answer exactly: {{"preset": "<preset name>", "changes": {{...partial style, same nesting as the schema, omit `name`...}}}}
 Use an empty "changes" object if the preset already fits."""

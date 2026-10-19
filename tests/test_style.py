@@ -86,9 +86,11 @@ def test_green_screen_only_when_the_prompt_asks(monkeypatch):
     on = {"preset": "bold_creator", "changes": {"depth": {"enabled": True, "background": "blur"}}}
     fake(monkeypatch, on, on, on, on)
     asked = style_from_prompt("loud captions, put titles behind me and blur the background")
-    assert asked.depth.enabled and asked.depth.background == "blur"
+    assert asked.depth.enabled and asked.depth.cutout and asked.depth.background == "blur"
     # Claude turning it on for a prompt that never asked is overruled.
     assert not style_from_prompt("loud and energetic, yellow captions").depth.enabled
     assert not get_preset("cinematic").depth.enabled
-    assert style_from_prompt("immersive, emojis orbiting around me").depth.enabled
+    around = style_from_prompt("immersive, emojis orbiting around me").depth
+    # Effects asked for, a different background never: they go over the real room, no cut-out (ADR 0614).
+    assert around.enabled and not around.cutout and around.background == "original"
     assert style_from_prompt("confetti when I announce the launch").depth.enabled

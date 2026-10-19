@@ -327,8 +327,14 @@ export function dropOnTimeline(plan: EditPlan, payload: BinPayload, at: number, 
 								: 2.5;
 			const [start, end] = spanAt(plan, at, len);
 			const g: Graphic = {id: newGraphicId(plan, 'u'), type: payload.type, start, end, props: {...(NEW_PROPS[payload.type] ?? {})}, anchor: 'auto'};
-			// Effects around and behind the speaker need the speaker cut out, so adding one turns green-screen effects on.
-			const style = isAroundType(payload.type) || isStageType(payload.type) ? {...plan.style, depth: {...plan.style.depth, enabled: true}} : plan.style;
+			// Effects around the speaker turn those effects on; cards and charts play over the real footage as they are.
+			// A scene replaces the room, so it turns the speaker cut-out on (ADR 0614).
+			const depth = plan.style.depth;
+			const style = payload.type === 'scene'
+				? {...plan.style, depth: {...depth, enabled: true, cutout: true}}
+				: isAroundType(payload.type)
+					? {...plan.style, depth: {...depth, enabled: true}}
+					: plan.style;
 			return {plan: {...plan, style, graphics: [...plan.graphics, g]}, ref: {kind: 'graphic', id: g.id}};
 		}
 		case 'asset': {

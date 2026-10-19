@@ -132,7 +132,7 @@ class Graphic(Span):
     # graphics off the face using `reframe` when this is omitted.
     anchor: Literal["auto", "top", "center", "bottom"] = "auto"
     # front: over the speaker (the default). behind: between the background and the cut-out speaker, so
-    # the speaker's head and body pass in front of it (needs `style.depth.enabled`; ADR 0901). Big text
+    # the speaker's head and body pass in front of it (needs `style.depth.cutout`; ADR 0901, 0614). Big text
     # behind the speaker is drawn as a title around the head; any other type fills the frame behind them.
     layer: Literal["front", "behind"] = "front"
 
@@ -149,7 +149,7 @@ BackgroundKind = Literal["original", "blur", "dim", "color", "gradient", "media"
 
 
 class BackgroundSpan(Span):
-    """What is behind the cut-out speaker for a stretch of the source (needs `style.depth.enabled`).
+    """What is behind the cut-out speaker for a stretch of the source (needs `style.depth.cutout`).
 
     original: the real background. blur: the real background out of focus. dim: darkened, a spotlight on
     the speaker. color / gradient: the studio set (a grid floor and wall, never a flat colour, ADR 0613), its
@@ -259,9 +259,10 @@ class Camera(_Model):
 
 
 class Depth(_Model):
-    """Green-screen effects: the speaker is cut out of the frame and things go behind them (ADR 0901).
+    """Effects around the speaker (ADR 0901), and, only when asked, the speaker cut out of the frame.
 
-    Off unless the user asks for it in their style prompt or in the editor.
+    Off unless the user asks for it in their style prompt or in the editor. The cut-out (`cutout`) is a
+    second, narrower opt-in: a different background or things behind the speaker (ADR 0614).
     """
 
     enabled: bool = Field(
@@ -270,10 +271,25 @@ class Depth(_Model):
         "the speaker, things happening around or in front of the speaker, a removed, replaced, blurred or "
         "dimmed background, or a 3D/depth effect.",
     )
-    # Background where no `backgrounds` span says otherwise.
+    cutout: bool = Field(
+        default=False,
+        description="True only if the user specifically asks for a different background (removed, replaced, "
+        "blurred or dimmed) or for text or graphics behind the speaker. Otherwise every effect is animated "
+        "over the real footage and the speaker is never cut out (ADR 0614).",
+    )
+    # Background where no `backgrounds` span says otherwise. Anything but "original" needs `cutout`.
     background: BackgroundKind = "original"
-    behind_titles: bool = True  # analyze puts a few big titles behind the speaker's head
-    around: bool = True  # analyze adds a few effects around the speaker (orbit, fly_out, particles)
+    behind_titles: bool = True  # analyze puts a few big titles behind the speaker's head (with `cutout`)
+    # analyze adds a few cards and charts of what is said (over the real footage unless `cutout`) and, with
+    # `enabled`, effects around the speaker (orbit, fly_out, particles)
+    around: bool = True
+
+    @model_validator(mode="after")
+    def _replaced_background_is_cut_out(self) -> "Depth":
+        # Plans from before `cutout` existed: a background that was asked to change still changes.
+        if self.background != "original":
+            self.cutout = True
+        return self
 
 
 class Style(_Model):
@@ -296,7 +312,7 @@ class EditPlan(_Model):
     graphics: list[Graphic] = []
     zooms: list[Zoom] = []
     layout: list[LayoutSpan] = []  # empty: speaker full frame throughout
-    backgrounds: list[BackgroundSpan] = []  # only used with style.depth.enabled
+    backgrounds: list[BackgroundSpan] = []  # only used with style.depth.cutout
     reframe: Reframe = Reframe()
     style: Style = Style()
     cuts: list[CutTransition] = []  # animated transitions; elsewhere footage meets by `style.transitions`
@@ -310,6 +326,9 @@ class EditPlan(_Model):
                     raise ValueError(f"{name}: {item.end}s is past the source end ({self.source.duration}s)")
         if self.hook.candidates and not 0 <= self.hook.chosen < len(self.hook.candidates):
             raise ValueError("hook.chosen is not a valid candidate index")
+        # Plans from before `style.depth.cutout`: stretches whose background was changed keep changing.
+        if any(b.kind != "original" for b in self.backgrounds):
+            self.style.depth.cutout = True
         return self
 
     def output_duration(self) -> float:

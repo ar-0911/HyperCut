@@ -147,7 +147,8 @@ def test_stage_ops():
     ]
     art = {"viewBox": "0 0 1000 800", "defs": "", "layers": ["<g/>"]}
     plan, changes = assistant.apply_ops(_plan(), ops, playhead=0, assets=[], draw=lambda briefs, *a: [art for _ in briefs])
-    assert plan.style.depth.enabled and len(changes) == 2
+    assert not plan.style.depth.enabled and len(changes) == 2  # over the real footage: nothing switched on (ADR 0614)
+    assert all("beside the speaker" in c for c in changes)
     chart, cards = (next(g for g in plan.graphics if g.id == i) for i in ("s1", "s2"))
     assert chart.type == "chart" and chart.props["values"] == [1.0, 5.0, 20.0] and chart.end - chart.start == 5.0
     assert cards.props["cards"][0]["layers"] == ["<g/>"]

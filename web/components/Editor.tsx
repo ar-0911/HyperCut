@@ -63,7 +63,7 @@ export default function Editor({job}: {job: Job}) {
 	const [busy, setBusy] = useState(false);
 	// The speaker cut-out behind green-screen effects: made once, when the plan first asks for them.
 	const [matte, setMatte] = useState<Job['matte']>(job.files.includes('matte.webm') ? 'done' : job.matte === 'error' ? 'error' : null);
-	const wantsMatte = Boolean(plan.style.depth?.enabled);
+	const wantsMatte = Boolean(plan.style.depth?.enabled && plan.style.depth?.cutout);
 	const playerRef = useRef<PlayerRef>(null);
 	const dirty = plan !== saved;
 

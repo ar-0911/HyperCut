@@ -73,6 +73,10 @@ def test_cut_out_only_when_the_style_asks(tmp_path, stages, monkeypatch):
     assert made == [] and "matte" not in stage_names
 
     monkeypatch.setattr(run, "style_from_prompt", lambda prompt: Style(depth={"enabled": True}))
+    run.run_pipeline("in.mp4", tmp_path / "e", "particles around me", on_stage=stage_names.append)
+    assert made == [] and "matte" not in stage_names  # effects over the real footage: no cut-out
+
+    monkeypatch.setattr(run, "style_from_prompt", lambda prompt: Style(depth={"enabled": True, "cutout": True}))
     run.run_pipeline("in.mp4", tmp_path / "b", "text behind me", on_stage=stage_names.append)
     assert made == [("matte.webm", 0.3)] and stage_names[-1] == "matte"
 
@@ -82,7 +86,7 @@ def test_failed_cut_out_still_saves_the_plan(tmp_path, stages, monkeypatch):
         raise RuntimeError("no mediapipe")
 
     monkeypatch.setattr(run, "matte", boom)
-    monkeypatch.setattr(run, "style_from_prompt", lambda prompt: Style(depth={"enabled": True}))
+    monkeypatch.setattr(run, "style_from_prompt", lambda prompt: Style(depth={"enabled": True, "cutout": True}))
     run.run_pipeline("in.mp4", tmp_path / "c", "green screen")
     assert (tmp_path / "c" / "plan.json").is_file()
 

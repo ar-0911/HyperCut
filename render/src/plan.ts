@@ -48,7 +48,9 @@ export type BackgroundKind = 'original' | 'blur' | 'dim' | 'color' | 'gradient' 
 /** What is behind the cut-out speaker for a stretch of source time (green-screen effects, ADR 0901). */
 export type BackgroundSpan = Span & {kind: BackgroundKind; color?: string | null; src?: string | null; parallax: number};
 /** Green-screen effects: off unless the user asked for them. */
-export type Depth = {enabled: boolean; background: BackgroundKind; behind_titles: boolean; around: boolean};
+/** `cutout`: the speaker is cut out of the frame (a different background or things behind them, ADR 0614);
+ * otherwise every effect is drawn over the real footage. */
+export type Depth = {enabled: boolean; cutout: boolean; background: BackgroundKind; behind_titles: boolean; around: boolean};
 export type LayoutMode = 'speaker' | 'split' | 'visual';
 /** How the frame is arranged for a stretch of source time. Outside every span: speaker. */
 export type LayoutSpan = Span & {mode: LayoutMode};
@@ -146,7 +148,7 @@ export const DEFAULT_STYLE: Style = {
 	pacing: {remove_fillers: true, max_silence: 0.35, keep_pause: 0.15, speed: 1},
 	camera: {zoom_frequency: 'medium', zoom_scale: 1.15},
 	transitions: {style: 'smooth', length: 0.2, fade_in: 0, fade_out: 0.8},
-	depth: {enabled: false, background: 'original', behind_titles: true, around: true},
+	depth: {enabled: false, cutout: false, background: 'original', behind_titles: true, around: true},
 };
 
 /**
@@ -164,6 +166,9 @@ export function normalizePlan(raw: unknown): EditPlan {
 		throw new Error('plan.source needs positive width, height, fps and duration');
 	}
 	const style = r.style ?? ({} as Partial<Style>);
+	const depth = {...DEFAULT_STYLE.depth, ...(style.depth ?? {})};
+	// Plans from before `cutout`: a background that was asked to change still changes (as plan.py does).
+	if (depth.background !== 'original' || (r.backgrounds ?? []).some((b: {kind?: string}) => (b.kind ?? 'blur') !== 'original')) depth.cutout = true;
 	return {
 		version: 1,
 		source: s,
@@ -185,7 +190,7 @@ export function normalizePlan(raw: unknown): EditPlan {
 			pacing: {...DEFAULT_STYLE.pacing, ...(style.pacing ?? {})},
 			camera: {...DEFAULT_STYLE.camera, ...(style.camera ?? {})},
 			transitions: {...DEFAULT_STYLE.transitions, ...(style.transitions ?? {})},
-			depth: {...DEFAULT_STYLE.depth, ...(style.depth ?? {})},
+			depth,
 		},
 	};
 }

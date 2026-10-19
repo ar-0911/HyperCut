@@ -217,11 +217,16 @@ def test_green_screen_titles_and_backgrounds_only_when_on(sample, fake_llm):
     }
     calls = fake_llm(answer)
     off = run(sample)
-    assert "behind" not in calls[0] and off.backgrounds == [] and all(g.layer == "front" for g in off.graphics)
+    assert "BEHIND the speaker" not in calls[0] and off.backgrounds == [] and all(g.layer == "front" for g in off.graphics)
 
-    style = Style(depth={"enabled": True})
+    # Effects on but no cut-out asked for: the real background stays and nothing goes behind (ADR 0614).
+    over = run(sample, style=Style(depth={"enabled": True}))
+    assert "BEHIND the speaker" not in calls[1] and "background stays as filmed" in calls[1]
+    assert over.backgrounds == [] and all(g.layer == "front" for g in over.graphics)
+
+    style = Style(depth={"enabled": True, "cutout": True})
     p = run(sample, style=style)
-    assert "BEHIND the speaker" in calls[1]
+    assert "BEHIND the speaker" in calls[2]
     behind = [g for g in p.graphics if g.layer == "behind"]
     assert [(g.id, g.props["text"]) for g in behind] == [("b1", "TEN HOURS A")]  # 3 words max
     assert not any(g.type == "stat_card" and g.start < 2.0 for g in p.graphics)  # the overlapped card made room
@@ -238,7 +243,7 @@ def test_behind_titles_skip_split_and_visual_stretches():
     assert [g.props["text"] for g in out] == ["A"]
 
 
-def test_stage_graphics_only_when_on(sample, fake_llm, monkeypatch):
+def test_stage_graphics_over_the_real_footage(sample, fake_llm, monkeypatch):
     from hypercut.analyze import visuals
 
     drawn = []
@@ -247,11 +252,10 @@ def test_stage_graphics_only_when_on(sample, fake_llm, monkeypatch):
     answer = {**GOOD, "stage": [{"type": "card_stack", "start": 1.0, "end": 9.0, "cards": [
         {"title": "Registered nurse today", "brief": "a nurse with a clipboard"}, {"title": ""}]}]}
     calls = fake_llm(answer)
-    assert not any(g.type == "card_stack" for g in run(sample).graphics)
-    assert '"stage"' not in calls[0]
-
-    p = run(sample, style=Style(depth={"enabled": True}))
-    assert '"stage"' in calls[1]
+    # Even with nothing asked for, cards play over the real background where there is room (ADR 0614).
+    p = run(sample)
+    assert '"stage"' in calls[0] and "OVER the real footage" in calls[0] and '"scene"' not in calls[0]
+    assert "BEHIND" not in calls[0]
     card = next(g for g in p.graphics if g.type == "card_stack")
     assert card.id == "s1" and card.end == 1.0 + 5.5
     assert [c["title"] for c in card.props["cards"]] == ["Registered nurse today"]
@@ -274,6 +278,7 @@ def test_stage_graphics_are_cleaned():
         {"type": "scene", "start": 10, "end": 20, "title": "Morning", "brief": "a kitchen"},
         {"type": "orbit", "start": 21, "end": 23, "items": ["a"]},
     ]
+    assert [g.type for g in parse_stage(items, duration=30, limit=5, cutout=False)] == ["chart"]  # no scenes over the real room
     out = parse_stage(items, duration=30, limit=5)
     assert [(g.type, g.start, g.end) for g in out] == [("chart", 1, 3), ("scene", 10, 15)]
     assert out[0].props == {"headline": "20 years of", "kind": "line", "values": [1.0, 2.0, 8.0],
@@ -352,5 +357,5 @@ def test_motion_moments_are_picked_and_designed(sample, fake_llm):
 
 def test_never_a_plain_background(sample, fake_llm):
     fake_llm({**GOOD, "backgrounds": [{"start": 1, "end": 3, "kind": "gradient"}, {"start": 4, "end": 6, "kind": "dim"}]})
-    style = Style(depth=plan.Depth(enabled=True))
+    style = Style(depth=plan.Depth(enabled=True, cutout=True))
     assert [b.kind for b in run(sample, style=style).backgrounds] == ["dim"]
