@@ -9,6 +9,7 @@ import {
 	askAssistant,
 	deleteAsset,
 	fileUrl,
+	generateAssets,
 	getJob,
 	recutPlan,
 	requestMatte,
@@ -16,6 +17,7 @@ import {
 	savePlan,
 	startRender,
 	uploadAsset,
+	type Generation,
 	type Job,
 } from '@/lib/api';
 import {useHistory} from '@/lib/history';
@@ -32,7 +34,9 @@ import {
 } from '@/lib/timeline';
 import Assistant from './Assistant';
 import Bin from './Bin';
+import Finish from './Finish';
 import Inspector from './Inspector';
+import OnScreen from './OnScreen';
 import Timeline from './Timeline';
 
 const PPS_STEPS = [6, 10, 16, 24, 36, 54, 80, 120];
@@ -45,6 +49,13 @@ function assistantKey(ref: ItemRef | null): string | null {
 	if (ref.kind === 'layout') return `l${ref.index}`;
 	return null;
 }
+
+/** Stock or generated pictures the plan still waits for (requested, not fetched, not given up on). */
+export const pendingAssets = (plan: EditPlan) =>
+	plan.graphics.filter((g) => {
+		const req = g.props.generate as {kind?: string; failed?: string} | undefined;
+		return (g.type === 'media' || g.type === 'motion') && Boolean(req?.kind) && !g.props.src && !req?.failed;
+	});
 
 const typing = (el: EventTarget | null) => el instanceof HTMLElement && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
 
@@ -61,10 +72,14 @@ export default function Editor({job}: {job: Job}) {
 	const [renderError, setRenderError] = useState<string | null>(job.render_error);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
+	const [generation, setGeneration] = useState<Generation | undefined>(job.generation);
+	const [fetching, setFetching] = useState(false);
 	// The speaker cut-out behind green-screen effects: made once, when the plan first asks for them.
 	const [matte, setMatte] = useState<Job['matte']>(job.files.includes('matte.webm') ? 'done' : job.matte === 'error' ? 'error' : null);
 	const wantsMatte = Boolean(plan.style.depth?.enabled && plan.style.depth?.cutout);
 	const playerRef = useRef<PlayerRef>(null);
+	const latest = useRef(plan);
+	latest.current = plan;
 	const dirty = plan !== saved;
 
 	const meta = useMemo(() => calculateMetadata({props: {plan, videoSrc: ''}}), [plan]);
@@ -241,11 +256,32 @@ export default function Editor({job}: {job: Job}) {
 		});
 	};
 
+	/** Fetch the pictures the plan waits for (or one again), applied as one undoable step. */
+	async function fetchPictures(from: EditPlan, graphicId?: string, prompt?: string) {
+		setFetching(true);
+		setError(null);
+		try {
+			const res = await generateAssets(job.id, from, graphicId, prompt);
+			setGeneration(res.generation);
+			// Edits made while fetching stay: only the graphics that were fetched are taken from the answer.
+			const before = new Map(from.graphics.map((g) => [g.id, JSON.stringify(g)]));
+			const fetched = new Map(res.plan.graphics.filter((g) => before.get(g.id) !== JSON.stringify(g)).map((g) => [g.id, g]));
+			const now = latest.current;
+			change({...now, graphics: now.graphics.map((g) => fetched.get(g.id) ?? g)});
+		} catch (e) {
+			setError((e as Error).message);
+		} finally {
+			setFetching(false);
+		}
+	}
+
 	async function ask(instruction: string) {
 		const res = await askAssistant(job.id, {instruction, plan, playhead: playhead(), selected: assistantKey(selected)});
 		if (JSON.stringify(res.plan) !== JSON.stringify(plan)) {
 			change(res.plan);
 			setSelected(null);
+			// Footage or pictures the assistant added are fetched right away, so the preview shows them.
+			if (pendingAssets(res.plan).some((g) => g.type === 'media')) void fetchPictures(res.plan);
 		}
 		return res;
 	}
@@ -326,9 +362,18 @@ export default function Editor({job}: {job: Job}) {
 						controls
 						clickToPlay={false}
 					/>
+					<OnScreen plan={plan} playerRef={playerRef} onSelect={setSelected} />
 				</div>
 				<div className="side">
-					<Inspector plan={plan} item={selectedItem} onChange={change} onDelete={remove} onDuplicate={duplicate} onSplit={split} />
+					<Inspector
+						plan={plan}
+						item={selectedItem}
+						onChange={change}
+						onDelete={remove}
+						onDuplicate={duplicate}
+						onSplit={split}
+						onRegenerate={generation?.available.length ? (id, prompt) => void fetchPictures(plan, id, prompt) : undefined}
+					/>
 					<Assistant onAsk={ask} disabled={busy} />
 				</div>
 			</div>
@@ -365,6 +410,16 @@ export default function Editor({job}: {job: Job}) {
 					<button onClick={restore} disabled={busy} title="Go back to the edit HyperCut made">
 						Restore original
 					</button>
+					{pendingAssets(plan).length > 0 && generation?.available.length ? (
+						<button disabled={busy || fetching} onClick={() => void fetchPictures(plan)} title="Fetch the stock footage and generated pictures still missing">
+							{fetching ? 'Fetching pictures…' : `Fetch ${pendingAssets(plan).length} picture${pendingAssets(plan).length === 1 ? '' : 's'}`}
+						</button>
+					) : null}
+					{generation && generation.spent > 0 ? (
+						<span className="hint" title="What generating pictures and clips has cost for this video, and its limit">
+							${generation.spent.toFixed(2)} of ${generation.budget.toFixed(2)}
+						</span>
+					) : null}
 					<button disabled={!dirty || busy} onClick={save}>
 						{dirty ? 'Save' : 'Saved'}
 					</button>
@@ -383,6 +438,7 @@ export default function Editor({job}: {job: Job}) {
 			{wantsMatte && matte === 'running' && (
 				<p className="hint">Cutting the speaker out for the green-screen effects. The preview shows them once that is done (a few minutes).</p>
 			)}
+			{fetching && <p className="hint">Fetching stock footage and generating pictures. Clips can take a minute or two each.</p>}
 			{error && <p className="error">{error}</p>}
 
 			<Timeline
@@ -400,6 +456,22 @@ export default function Editor({job}: {job: Job}) {
 					change(after);
 				}}
 				onDrop={(payload, at) => add(payload, at)}
+			/>
+
+			<Finish
+				job={job}
+				plan={plan}
+				dirty={dirty}
+				rendered={render === 'done' && !dirty}
+				onApply={(p) => {
+					change(p);
+					setSelected(null);
+				}}
+				onSeek={(t) => playerRef.current?.seekTo(Math.round(t * plan.output.fps))}
+				onSave={async () => {
+					await savePlan(job.id, plan);
+					setSaved(plan);
+				}}
 			/>
 		</div>
 	);

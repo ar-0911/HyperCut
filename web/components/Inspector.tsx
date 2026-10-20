@@ -1,5 +1,6 @@
 'use client';
 
+import {useEffect, useState} from 'react';
 import type {EditPlan, Graphic, LayoutMode} from '@render/plan';
 import {isAroundType, isStageType, isVisualType} from '@render/layout';
 import {
@@ -21,8 +22,50 @@ function Field({label, children}: {label: string; children: React.ReactNode}) {
 	);
 }
 
+type Regenerate = (id: string, prompt?: string) => void;
+
+const SOURCE_NAMES: Record<string, string> = {stock: 'Stock footage', image: 'Generated picture', video: 'Generated clip'};
+const MOVE_NAMES: Record<string, string> = {push_in: 'Slow push in', pull_out: 'Pull out', pan_left: 'Pan left', pan_right: 'Pan right', rise: 'Rise'};
+/** Graphic types whose colour follows props.accent (the reel's accent otherwise). */
+const COLOURED = new Set(['kinetic_text', 'stat_card', 'list_build', 'lower_third', 'progress_bar']);
+
+/** The request behind a stock or generated picture: what it searched or asked for, its state, and "again". */
+function GeneratedFields({g, onRegenerate}: {g: Graphic; onRegenerate?: Regenerate}) {
+	const req = g.props.generate as {kind?: string; prompt?: string; query?: string; failed?: string} | undefined;
+	const words = String((req?.kind === 'stock' ? req?.query : req?.prompt) ?? '');
+	const [draft, setDraft] = useState(words);
+	useEffect(() => setDraft(words), [words, g.id]);
+	if (!req?.kind) return null;
+	const fetched = Boolean(g.props.src) && (g.type === 'media' || g.type === 'motion');
+	return (
+		<>
+			<Field label={req.kind === 'stock' ? `${SOURCE_NAMES.stock}: search words` : `${SOURCE_NAMES[req.kind] ?? 'Picture'}: prompt`}>
+				<textarea value={draft} onChange={(e) => setDraft(e.target.value)} />
+			</Field>
+			{fetched && typeof g.props.credit === 'string' && (
+				<p className="hint">
+					Credit:{' '}
+					{typeof g.props.credit_url === 'string' && g.props.credit_url ? (
+						<a href={g.props.credit_url} target="_blank" rel="noreferrer">
+							{g.props.credit}
+						</a>
+					) : (
+						g.props.credit
+					)}
+					{g.props.credit_required ? ' (shown on screen, the licence asks for it)' : ''}
+				</p>
+			)}
+			{!fetched && req.failed && <p className="hint">Couldn’t fetch it ({req.failed}), so it is drawn instead.</p>}
+			{!fetched && !req.failed && g.type === 'media' && <p className="hint">Not fetched yet. It is fetched when you press Fetch pictures or render.</p>}
+			{onRegenerate && (
+				<button onClick={() => onRegenerate(g.id, draft !== words ? draft : undefined)}>{fetched ? 'Try another' : 'Fetch now'}</button>
+			)}
+		</>
+	);
+}
+
 /** Text fields for the graphic types people edit by hand. */
-function GraphicFields({plan, g, onChange}: {plan: EditPlan; g: Graphic; onChange: (p: EditPlan) => void}) {
+function GraphicFields({plan, g, onChange, onRegenerate}: {plan: EditPlan; g: Graphic; onChange: (p: EditPlan) => void; onRegenerate?: Regenerate}) {
 	const set = (props: Record<string, unknown>) => onChange(updateGraphic(plan, g.id, {props}));
 	const text = (key: string, label: string) => (
 		<Field label={label} key={key}>
@@ -105,11 +148,16 @@ function GraphicFields({plan, g, onChange}: {plan: EditPlan; g: Graphic; onChang
 					<Field label="What to show in 3D">
 						<textarea
 							value={String(g.props.idea ?? '')}
-							// A new idea is designed again when you render.
-							onChange={(e) => set({idea: e.target.value, scene: null})}
+							// A new idea is designed again (and a generated clip made again) when you render.
+							onChange={(e) => {
+								const gen = g.props.generate as Record<string, unknown> | undefined;
+								set({idea: e.target.value, scene: null, ...(gen ? {src: null, generate: {...gen, prompt: e.target.value, failed: undefined}} : {})});
+							}}
 						/>
 					</Field>
 					<p className="hint">Takes the whole frame for a few seconds while the speaker keeps talking.</p>
+					{Boolean(g.props.generate) && <p className="hint">{g.props.src ? 'Plays as a generated clip; the 3D scene is the fallback.' : 'A generated clip is made for it when fetched; until then the 3D scene shows.'}</p>}
+					{Boolean(g.props.generate) && onRegenerate && <button onClick={() => onRegenerate(g.id)}>{g.props.src ? 'Make another clip' : 'Make the clip now'}</button>}
 				</>
 			);
 		case 'scene':
@@ -166,12 +214,25 @@ function GraphicFields({plan, g, onChange}: {plan: EditPlan; g: Graphic; onChang
 				<>
 					{text('title', 'Title')}
 					{typeof g.props.brief === 'string' && <p className="hint">Drawn from: {g.props.brief}</p>}
+					<GeneratedFields g={g} onRegenerate={onRegenerate} />
 				</>
 			);
 		case 'media':
 			return (
 				<>
 					{text('label', 'Name')}
+					<GeneratedFields g={g} onRegenerate={onRegenerate} />
+					{g.props.kind !== 'video' && (
+						<Field label="Movement">
+							<select value={String(g.props.move ?? 'push_in')} onChange={(e) => set({move: e.target.value})}>
+								{Object.entries(MOVE_NAMES).map(([k, v]) => (
+									<option key={k} value={k}>
+										{v}
+									</option>
+								))}
+							</select>
+						</Field>
+					)}
 					<Field label="Fit">
 						<select value={g.props.fit === 'contain' ? 'contain' : 'cover'} onChange={(e) => set({fit: e.target.value})}>
 							<option value="cover">Fill the frame (crop edges)</option>
@@ -197,6 +258,23 @@ function GraphicFields({plan, g, onChange}: {plan: EditPlan; g: Graphic; onChang
 	}
 }
 
+/** The graphic's own colour, over the reel's accent (props.accent). */
+function ColourField({plan, g, onChange}: {plan: EditPlan; g: Graphic; onChange: (p: EditPlan) => void}) {
+	const own = typeof g.props.accent === 'string' ? g.props.accent : '';
+	const set = (accent: string | undefined) => {
+		const {accent: _old, ...rest} = g.props;
+		onChange(updateGraphic(plan, g.id, {props: accent ? {...rest, accent} : rest}));
+	};
+	return (
+		<Field label="Colour">
+			<div className="row">
+				<input type="color" value={(own || plan.style.graphics.accent_color).slice(0, 7)} onChange={(e) => set(e.target.value)} />
+				{own && <button onClick={() => set(undefined)}>Use the reel’s colour</button>}
+			</div>
+		</Field>
+	);
+}
+
 export default function Inspector({
 	plan,
 	item,
@@ -204,6 +282,7 @@ export default function Inspector({
 	onDelete,
 	onDuplicate,
 	onSplit,
+	onRegenerate,
 }: {
 	plan: EditPlan;
 	item: Item | null;
@@ -211,6 +290,7 @@ export default function Inspector({
 	onDelete: () => void;
 	onDuplicate: () => void;
 	onSplit: () => void;
+	onRegenerate?: Regenerate;
 }) {
 	if (!item) {
 		return (
@@ -243,7 +323,8 @@ export default function Inspector({
 				{item.pieces.length > 1 ? ' (it also plays in the hook at the start)' : ''}
 			</p>
 
-			{g && <GraphicFields plan={plan} g={g} onChange={onChange} />}
+			{g && <GraphicFields plan={plan} g={g} onChange={onChange} onRegenerate={onRegenerate} />}
+			{g && COLOURED.has(g.type) && <ColourField plan={plan} g={g} onChange={onChange} />}
 
 			{g && g.type !== 'progress_bar' && !isAroundType(g.type) && !isStageType(g.type) && (
 				<label className="check">

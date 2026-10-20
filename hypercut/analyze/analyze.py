@@ -6,6 +6,7 @@ from hypercut import llm
 from hypercut.analyze import cuts as cutting
 from hypercut.analyze import cutaways, motion, stage
 from hypercut.analyze.visuals import merge_graphics, plan_visuals
+from hypercut.generate import available as available_assets
 from hypercut.plan import (
     AROUND_GRAPHIC_TYPES, GENERATED_GRAPHIC_TYPES, BackgroundSpan, EditPlan, Graphic, Hook, HookCandidate, Source, Style, Transcript, Zoom,
 )
@@ -82,11 +83,13 @@ def analyze(
     audio_wav: str | None = None,
     strategy: str = "cold_open",
     visuals: bool = False,
+    pictures: bool = False,
 ) -> EditPlan:
     """Fill hook, segments, graphics and zooms of an EditPlan.
 
     With `visuals`, also mix layouts per beat and draw an original illustration for the beats that
-    get a visual (more Claude calls; see `hypercut.analyze.visuals`).
+    get a visual (more Claude calls; see `hypercut.analyze.visuals`). With `pictures` as well, some visuals
+    become stock footage or generated pictures / clips where keys are set (ADR 0016, 0020); off by default.
     """
     if strategy not in ("cold_open", "trim"):
         raise ValueError(f"unknown hook strategy: {strategy!r}")
@@ -142,8 +145,11 @@ def analyze(
     last = cutting.ending_word(transcript, int(preferred) if preferred is not None and preferred == int(preferred) else None)
     if last is not None:
         plan.segments = cutting.end_at(plan.segments, transcript, last)
+    # Stock footage and generated pictures / clips: only when asked for (`pictures`) and only what this machine is
+    # set up to fetch (ADR 0016, 0020). Otherwise every visual is drawn, which needs no keys.
+    sources = available_assets() if pictures else set()
     if visuals:
-        layout, art = plan_visuals(transcript, plan.segments, source.duration, style, hook_span)
+        layout, art = plan_visuals(transcript, plan.segments, source.duration, style, hook_span, sources=sources)
         plan.layout = layout
         plan.graphics = merge_graphics(plan.graphics, art, layout)
     if cutout:
@@ -157,6 +163,8 @@ def analyze(
     if moments:
         motion.add_motion(plan, moments)
         motion.design_scenes(plan.graphics, transcript, style)
+        if "video" in sources:  # a generated clip plays instead of the 3D scene, which stays as the fallback
+            motion.ask_for_clips(plan, moments)
     # Visuals next to a jump cut straddle it, like B-roll laid over the cut (ADR 0614).
     cutaways.cover_cuts(plan)
     return plan

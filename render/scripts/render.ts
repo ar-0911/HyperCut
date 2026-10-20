@@ -54,7 +54,8 @@ export function mediaFiles(plan: {
 		if (!name || name !== path.basename(name) || name.startsWith('.')) throw new Error(`bad media file name: ${JSON.stringify(name)}`);
 		names.add(name);
 	};
-	for (const g of plan.graphics) if (g.type === 'media') add(g.props.src);
+	// Pictures and clips: imported, stock or generated (a request not fetched yet has no file and draws nothing).
+	for (const g of plan.graphics) if ((g.type === 'media' || g.type === 'motion') && g.props.src) add(g.props.src);
 	// Background pictures and clips behind the cut-out speaker (only drawn with green-screen effects on).
 	if (plan.style?.depth?.enabled) for (const b of plan.backgrounds ?? []) if (b.kind === 'media' && b.src) add(b.src);
 	return [...names];
@@ -66,7 +67,7 @@ export const MATTE_FILE = 'matte.webm';
 async function main() {
 	const args = parseArgs(process.argv.slice(2));
 	if (!args.plan || !args.video || !args.out) {
-		console.error('usage: npm run render -- --plan <plan.json> --video <file> --out <mp4> [--assets <dir>] [--matte <webm>] [--composition HyperCut] [--concurrency N]');
+		console.error('usage: npm run render -- --plan <plan.json> --video <file> --out <mp4> [--assets <dir>] [--matte <webm>] [--composition HyperCut] [--concurrency N] [--overlays 1 (graphics only, ProRes 4444 .mov)]');
 		process.exit(2);
 	}
 	const planPath = path.resolve(args.plan);
@@ -112,7 +113,9 @@ async function main() {
 	try {
 		const browserExecutable = findBrowser() ?? null;
 		const serveUrl = await bundle({entryPoint: path.join(root, 'src/index.ts'), publicDir});
-		const inputProps = {plan, videoSrc: videoName, matteSrc};
+		// --overlays: the graphics and captions alone, on transparency, as ProRes 4444 (an editor export, ADR 0017).
+		const overlaysOnly = Boolean(args.overlays);
+		const inputProps = {plan, videoSrc: videoName, matteSrc: overlaysOnly ? undefined : matteSrc, overlaysOnly};
 		const composition = await selectComposition({
 			serveUrl,
 			id: args.composition ?? 'HyperCut',
@@ -125,7 +128,9 @@ async function main() {
 		await renderMedia({
 			composition,
 			serveUrl,
-			codec: 'h264',
+			...(overlaysOnly
+				? {codec: 'prores' as const, proResProfile: '4444' as const, pixelFormat: 'yuva444p10le' as const, imageFormat: 'png' as const, muted: true}
+				: {codec: 'h264' as const}),
 			outputLocation: outPath,
 			inputProps,
 			browserExecutable,

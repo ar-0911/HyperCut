@@ -48,6 +48,7 @@ finished plan.
 | 5 | reframe | `hypercut/reframe` | `normalized.mp4` | `Reframe` | MediaPipe face detection |
 | 6 | render | `render/` | `plan.json` + video | `output.mp4` | Remotion (React, TypeScript) |
 | 7 | matte (only when asked) | `hypercut/matte` | `normalized.mp4` + reframe | `matte.webm` (speaker cut-out) | MediaPipe selfie segmentation + MODNet + FFmpeg |
+| 8 | generate (only with keys) | `hypercut/generate` | plan with `generate` requests | `gen-*` stock and generated pictures / clips | Pexels, Pixabay, Wikimedia Commons; fal.ai or local diffusers |
 
 The API (`api/`, FastAPI) runs these stages as a job per upload and stores everything under
 `media/<job_id>/`. The web app (`web/`, Next.js) uploads, shows the hook candidates, takes the style
@@ -149,6 +150,8 @@ shots that land on the speaker alone, at most three a minute and 12 s apart. No 
 jump cut across it by 0.4 s, the way B-roll is laid over a jump cut, so the speaker never reappears for a few
 frames and then jumps.
 
+When the user asks for pictures (0020) and stock footage or generated pictures are set up (0016), the visual director may also pick `footage` (a stock search) or `picture` (a generation prompt) for a beat, plus one `look` line all pictures share; these become `media` graphics with a `generate` request and a brief to draw if nothing fits. Motion moments also ask for a generated clip, keeping their 3D scene as the fallback. See [ADR 0404](decisions/0404-sources-per-visual.md).
+
 **Reframe.** `reframe(video, source)` samples ~5 frames/s with OpenCV and takes the largest MediaPipe face per
 frame. The track is smoothed (exponential, with a dead zone so the crop ignores small movements), clamped so the
 full-height 9:16 window stays inside the frame, and stored as normalized crop-center keyframes. `cy` is the
@@ -235,6 +238,12 @@ Run it with `npm run render -- --plan plan.json --video normalized.mp4 --out out
 `--assets` says otherwise). See ADRs [0601](decisions/0601-render-architecture.md) to
 [0614](decisions/0614-real-background-and-editorial-cuts.md).
 
+
+Pictures and clips (imported, stock or generated) fill the split panel or the frame; stills move (`props.move`: push in, pull out, pans, rise), a CC BY credit shows small in the corner, and a `media` graphic without `src` draws nothing yet. A motion graphic with `src` plays that generated clip under its title instead of the 3D scene. Text graphics may carry their own colour (`props.accent`). `render --overlays 1` (prop `overlaysOnly`) renders graphics and captions alone on transparency as ProRes 4444 for the editor export. See [ADR 0615](decisions/0615-stills-clips-credits-overlays.md).
+
+**Generate.** `generate(plan, job_dir)` (`hypercut/generate/`, `python -m hypercut.generate JOB_DIR`) fills in every graphic whose `props.generate` asks for stock footage (`kind: stock`, `query`), a generated still (`image`, `prompt`) or a generated clip (`video`: a still, then image-to-video), saving `gen-<hash>.<ext>` in the job folder and setting `src` (plus `credit` for stock). Stock comes from Pexels, Pixabay and Wikimedia Commons (open licences only), with Claude looking at the thumbnails to pick the shot; generation from fal.ai (`FAL_KEY`) or open models on a local GPU (`HYPERCUT_GEN_LOCAL=1`). It runs after analyze, before each render and from the editor; results are cached by request and every paid call is checked against `HYPERCUT_GEN_BUDGET_USD` (default $2 a video, kept in `generate.json`). It is opt-in per video (the upload checkbox, `pictures` on `POST /jobs`, `--pictures`; [ADR 0020](decisions/0020-pictures-opt-in.md)); with it off, or no keys set, nothing is planned, offered or fetched and every visual is drawn. What can't be fetched becomes a drawing of its brief; a motion moment keeps its 3D scene. See [ADR 0016](decisions/0016-stock-and-generated-assets.md).
+
+**Finishing tools.** `hypercut/variants.py`: other hooks (`rehook`) and 30 s / 45 s cuts ending on a full sentence (`trim_to`), each saved as its own job; recipes are saved styles in `media/recipes.json` ([ADR 0018](decisions/0018-recipes-and-variants.md)). `hypercut/review.py`: Claude looks at up to 16 frames of the render and proposes fixes as editor operations ([ADR 0019](decisions/0019-vision-review.md)). `hypercut/export.py`: FCPXML and Premiere XML timelines, reel-time SRT, the footage and a transparent overlay track ([ADR 0017](decisions/0017-export-to-editors.md)).
 **API.** `uvicorn api.main:app` serves a job per upload. `POST /jobs` (multipart `video`, `style`,
 `hook_strategy`) saves to `media/<job_id>/` and returns an id; a background thread runs
 `hypercut.run.run_pipeline` (ingest, then transcribe and reframe together, then style, then analyze) and
@@ -256,6 +265,8 @@ field `matte`); the editor calls it when green-screen effects get turned on, and
 missing. See ADRs [0701](decisions/0701-job-server-design.md) to
 [0703](decisions/0703-recut-endpoint.md).
 
+
+Later additions ([ADR 0704](decisions/0704-generation-recipes-variants-review-export-endpoints.md)): `POST /jobs/{id}/generate` fetches the pictures a plan waits for (or one again) and returns the plan unsaved; `GET/POST /recipes`, `DELETE /recipes/{name}` and a `recipe` field on `POST /jobs`; a `pictures` field on `POST /jobs` and `GET /generation` (what the engine can fetch, ADR 0020); `POST /jobs/{id}/variants` makes new jobs from other hooks and shorter cuts; `POST /jobs/{id}/review` has Claude check the last render; `POST /jobs/{id}/export` builds `hypercut-export.zip`. `PUT /jobs/{id}/plan` accepts the job's `gen-*` files as well as imports, and a render fetches pending pictures first.
 **Web.** `web/` is a Next.js 14 App Router app (client components, no server code) that talks to the API at
 `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`). `/` uploads a video with a style prompt (preset
 chips fill the prompt) and a hook strategy; `/jobs/[id]` polls the job and shows the four stages, then the
@@ -279,6 +290,8 @@ it exists (decision 0805, 0901). Picking a hook or editing a word still goes thr
 logic, timeline edits) and a production build. See
 ADRs [0801](decisions/0801-nextjs-app-and-shared-composition.md) to [0805](decisions/0805-style-tab.md).
 
+
+The editor also shows the graphics at the playhead as buttons under the preview, a colour for each text graphic, the prompt or search words behind every stock or generated picture with "Try another", and a Finish panel: check the render (0019), make variants and save the style as a recipe (0018), export for Final Cut, Resolve or Premiere (0017). The upload page lists saved recipes and has an optional, off-by-default "Use stock footage and AI pictures" box, disabled when no keys are set (0020). See [ADR 0806](decisions/0806-finish-panel-and-picture-controls.md).
 ## Claude calls
 
 All of them go through `hypercut/llm.py`'s `ask_json`. By default it runs Claude Code headless
@@ -286,7 +299,8 @@ All of them go through `hypercut/llm.py`'s `ask_json`. By default it runs Claude
 Anthropic API for when other people use the app. Every answer is parsed and validated with the pydantic
 models before use. See [ADR 0003](decisions/0003-claude-via-subscription.md). The editor assistant
 (`hypercut/assistant.py`, decision 0013) is the one call made after the pipeline: one per request, plus one per
-batch of new illustrations.
+batch of new illustrations. `ask_json(images=[...])` lets Claude look at pictures (stock thumbnails, review frames):
+the CLI backend lets Claude Code read just those files, the API backend sends them as image blocks.
 
 ## Where things live
 
@@ -307,4 +321,6 @@ the steps and every setting). Options for hosting it for other people are in [ho
 ## Cost
 
 For personal use on a Claude subscription with local Whisper: nothing beyond the plan. With paid APIs,
-about $0.05 to $0.15 of Claude and about $0.013 of Deepgram per 3-minute video.
+about $0.05 to $0.15 of Claude and about $0.013 of Deepgram per 3-minute video. Stock footage is free; generated
+pictures cost about $0.05 each and clips about $0.30 each through fal.ai, capped per video by
+`HYPERCUT_GEN_BUDGET_USD` (default $2; ADR 0016).

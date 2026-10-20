@@ -14,12 +14,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from api import assets, jobs
+from api import assets, jobs, recipes
 from hypercut import plan as plan_mod
-from hypercut import assistant, llm, run
+from hypercut import assistant, edit, export, generate, llm, review, run, variants
 from hypercut.analyze import cuts as cutting
 from hypercut.matte import MATTE_FILE
-from hypercut.plan import EditPlan
+from hypercut.plan import EditPlan, Style
 
 app = FastAPI(title="HyperCut")
 # The web app calls the API straight from the browser (ADR 0802).
@@ -62,16 +62,23 @@ def _editable(job_id: str) -> dict:
 
 
 def _media_names(plan: EditPlan) -> set[str]:
-    names = {str(g.props.get("src", "")) for g in plan.graphics if g.type == "media"}
+    names = {str(g.props["src"]) for g in plan.graphics if g.type in ("media", "motion") and g.props.get("src")}
     return names | {b.src for b in plan.backgrounds if b.kind == "media" and b.src}
 
 
-def _process(job_id: str, video: Path, style: str, strategy: str) -> None:
+def _known_media(job_id: str, state: dict) -> set[str]:
+    """Files a plan may show: the user's imports and the stock / generated files fetched for this job."""
+    generated = {p.name for p in jobs.job_dir(job_id).glob("gen-*") if p.suffix in (".jpg", ".jpeg", ".png", ".webp", ".mp4")}
+    return {a["name"] for a in state.get("assets", [])} | generated
+
+
+def _process(job_id: str, video: Path, style: str, strategy: str, recipe: Style | None = None,
+             pictures: bool = False) -> None:
     try:
         jobs.write(job_id, status="running", stage="ingest")
         run.run_pipeline(
             video, jobs.job_dir(job_id), style, strategy,
-            on_stage=lambda s: jobs.write(job_id, stage=s),
+            on_stage=lambda s: jobs.write(job_id, stage=s), recipe=recipe, pictures=pictures,
         )
         jobs.write(job_id, status="done", stage="done", error=None)
     except Exception as e:
@@ -106,7 +113,12 @@ def create_job(
     video: UploadFile = File(...),
     style: str = Form(""),
     hook_strategy: Literal["cold_open", "trim"] = Form("cold_open"),
+    recipe: str = Form(""),
+    pictures: bool = Form(False),
 ):
+    saved_style = recipes.get(recipe) if recipe else None
+    if recipe and saved_style is None:
+        raise HTTPException(422, f"no recipe called {recipe!r}")
     job_id = jobs.new_id()
     directory = jobs.job_dir(job_id)
     directory.mkdir(parents=True)
@@ -114,8 +126,9 @@ def create_job(
     with upload.open("wb") as f:
         shutil.copyfileobj(video.file, f)
     jobs.write(job_id, status="queued", stage=None, error=None, render=None, render_error=None,
-               style=style, hook_strategy=hook_strategy, filename=video.filename)
-    background.add_task(_process, job_id, upload, style, hook_strategy)
+               style=style or (f"recipe: {recipe}" if recipe else ""), hook_strategy=hook_strategy, filename=video.filename,
+               pictures=pictures)
+    background.add_task(_process, job_id, upload, style, hook_strategy, saved_style, pictures)
     return {"id": job_id, "status": "queued"}
 
 
@@ -128,6 +141,8 @@ def get_job(job_id: str):
     state["base_plan"] = plan_mod.load(base).model_dump(mode="json") if base.is_file() else state["plan"]
     state.setdefault("assets", [])
     state["files"] = sorted(p.name for p in jobs.job_dir(job_id).iterdir() if p.is_file() and p.name != "job.json")
+    # What this machine can fetch for the editor's pictures, and what this video has spent on generating them.
+    state["generation"] = {**generate.spent(jobs.job_dir(job_id)), "available": sorted(generate.available())}
     return state
 
 
@@ -135,8 +150,7 @@ def get_job(job_id: str):
 def put_plan(job_id: str, plan: EditPlan):
     """Replace the plan; an invalid plan gets a 422 from validation."""
     state = _editable(job_id)
-    known = {a["name"] for a in state.get("assets", [])}
-    missing = sorted(_media_names(plan) - known)
+    missing = sorted(_media_names(plan) - _known_media(job_id, state))
     if missing:
         raise HTTPException(422, f"imported file not found in this job: {', '.join(missing)}")
     path, base = _plan_path(job_id), _base_path(job_id)
@@ -254,6 +268,141 @@ def make_matte(job_id: str, background: BackgroundTasks):
         jobs.write(job_id, matte="running", matte_error=None)
         background.add_task(_make_matte, job_id)
     return {"id": job_id, "matte": "running"}
+
+
+class GenerateRequest(BaseModel):
+    plan: EditPlan
+    graphic_id: str | None = None
+    prompt: str | None = Field(default=None, max_length=1000)
+
+
+@app.post("/jobs/{job_id}/generate")
+def generate_assets(job_id: str, req: GenerateRequest):
+    """Fetch the stock footage and generated pictures / clips the plan waits for (ADR 0016); with `graphic_id`, fetch
+    that one again (a new seed, or `prompt`). Files land in the job folder; the plan is returned, not saved."""
+    state = _job(job_id)
+    if state["status"] != "done":
+        raise HTTPException(409, f"job is {state['status']}; wait for the plan first")
+    plan = req.plan
+    if req.graphic_id:
+        if not any(g.id == req.graphic_id for g in plan.graphics):
+            raise HTTPException(404, "no such graphic")
+        plan = generate.regenerate(plan, req.graphic_id, req.prompt)
+    directory = jobs.job_dir(job_id)
+    plan = generate.generate(plan.model_copy(deep=True), directory)
+    return {"plan": plan.model_dump(mode="json"), "generation": {**generate.spent(directory), "available": sorted(generate.available())}}
+
+
+class RecipeRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+    style: Style
+    note: str = Field(default="", max_length=200)
+
+
+@app.get("/generation")
+def generation_sources():
+    """Which kinds of picture this machine can fetch (stock / image / video); empty without keys (ADR 0020)."""
+    return {"available": sorted(generate.available())}
+
+
+@app.get("/recipes")
+def list_recipes():
+    return {"recipes": recipes.all_recipes()}
+
+
+@app.post("/recipes", status_code=201)
+def save_recipe(req: RecipeRequest):
+    try:
+        return recipes.save(req.name, req.style, req.note)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+
+
+@app.delete("/recipes/{name}")
+def delete_recipe(name: str):
+    if not recipes.delete(name):
+        raise HTTPException(404, "no such recipe")
+    return {"deleted": name}
+
+
+def _clone(job_id: str, plan: EditPlan, label: str) -> str:
+    """A new, editable job with the same footage and files as `job_id` and its own plan."""
+    state = _job(job_id)
+    source = jobs.job_dir(job_id)
+    new_id = jobs.new_id()
+    target = jobs.job_dir(new_id)
+    target.mkdir(parents=True)
+    keep = {"normalized.mp4", "audio.wav", "transcript.json", "transcript.srt", MATTE_FILE}
+    for p in source.iterdir():
+        if p.is_file() and (p.name in keep or p.name.startswith(("asset-", "gen-"))):
+            try:
+                os.link(p, target / p.name)
+            except OSError:
+                shutil.copyfile(p, target / p.name)
+    plan_mod.save(plan, target / "plan.json")
+    jobs.write(new_id, status="done", stage="done", error=None, render=None, render_error=None,
+               style=state.get("style", ""), hook_strategy=plan.hook.strategy,
+               filename=f"{state.get('filename') or job_id} ({label})", assets=state.get("assets", []), variant_of=job_id)
+    return new_id
+
+
+@app.post("/jobs/{job_id}/variants", status_code=201)
+def make_variants(job_id: str, plan: EditPlan):
+    """New jobs from this edit (ADR 0018): one per other hook candidate, and 30 s / 45 s cuts. Each opens in the editor."""
+    _editable(job_id)
+    made = []
+    for label, p in variants.variants(plan):
+        made.append({"id": _clone(job_id, p, label), "label": label, "duration": round(edit.reel_duration(p), 1)})
+    return {"variants": made}
+
+
+@app.post("/jobs/{job_id}/review")
+def review_render(job_id: str):
+    """Claude looks at frames of the latest render and proposes fixes (ADR 0019). Nothing is saved."""
+    state = _job(job_id)
+    video = jobs.job_dir(job_id) / "output.mp4"
+    if state.get("render") != "done" or not video.is_file():
+        raise HTTPException(409, "render the current edit first; the review looks at the rendered video")
+    try:
+        result = review.review(plan_mod.load(_plan_path(job_id)), video)
+    except llm.LLMError as e:
+        raise HTTPException(502, f"the review could not run: {str(e)[:300]}") from None
+    return {
+        "summary": result.summary,
+        "issues": [{"at": i.at, "severity": i.severity, "problem": i.problem, "fixable": bool(i.ops)} for i in result.issues],
+        "plan": result.plan.model_dump(mode="json"),
+        "changes": result.changes,
+    }
+
+
+def _export(job_id: str, overlays: bool) -> None:
+    directory = jobs.job_dir(job_id)
+    try:
+        clip = None
+        if overlays:
+            with _render_slot:
+                clip = run.render_plan(directory, export.OVERLAYS, extra_args=["--overlays", "1"])
+        export.export(directory, overlays=clip)
+        jobs.write(job_id, export="done", export_error=None)
+    except Exception as e:
+        jobs.write(job_id, export="error", export_error=str(e)[:500])
+
+
+class ExportRequest(BaseModel):
+    overlays: bool = True
+
+
+@app.post("/jobs/{job_id}/export", status_code=202)
+def export_job(job_id: str, req: ExportRequest, background: BackgroundTasks):
+    """Build hypercut-export.zip for Final Cut, Resolve and Premiere (ADR 0017) from the saved plan."""
+    state = _job(job_id)
+    if state["status"] != "done":
+        raise HTTPException(409, f"job is {state['status']}; wait for the plan first")
+    if state.get("export") == "running":
+        raise HTTPException(409, "already exporting")
+    jobs.write(job_id, export="running", export_error=None)
+    background.add_task(_export, job_id, req.overlays)
+    return {"id": job_id, "export": "running"}
 
 
 @app.get("/jobs/{job_id}/files/{name}")

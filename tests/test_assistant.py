@@ -174,3 +174,19 @@ def test_motion_graphic_and_animated_transition_ops():
     assert any("motion graphic" in c for c in changes)
     plan, _ = assistant.apply_ops(plan, [{"op": "cut_transition", "at": 14.3, "kind": "none"}], playhead=0, assets=[])
     assert plan.cuts == []
+
+
+def test_anchor_and_add_picture_ops():
+    p = _plan()
+    key = p.graphics[0].id
+    ops = [
+        {"op": "anchor", "key": key, "anchor": "top"},
+        {"op": "add_picture", "source": "footage", "start": 1, "end": 3, "query": "city at night", "title": "City"},
+        {"op": "add_picture", "source": "clip", "start": 4, "end": 6, "prompt": "a rocket lifting off"},
+    ]
+    plan, changes = assistant.apply_ops(p, ops, playhead=0, assets=[], sources={"stock"})
+    assert next(g for g in plan.graphics if g.id == key).anchor == "top"
+    added = [g for g in plan.graphics if g.type == "media"]
+    assert len(added) == 1 and added[0].props["generate"] == {"kind": "stock", "query": "city at night", "media": "any"}
+    assert any("footage" in c for c in changes)  # the clip needs a video backend, which isn't set up here
+    assert "add_picture" not in assistant.pictures_prompt(set()) and '"clip"' in assistant.pictures_prompt({"video"})
