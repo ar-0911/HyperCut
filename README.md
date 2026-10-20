@@ -117,6 +117,11 @@ is available outside Docker.
 When illustrations are on, Claude may run a web search for reference, which sends search terms, not your
 media. Nothing is uploaded to a HyperCut server: there isn't one.
 
+Stock footage and generated pictures are off until you set a key (see [Settings](#settings)). With them on, the
+search words (to Pexels, Pixabay or Wikimedia Commons) and the picture prompts (to fal.ai) leave your computer;
+both are written from the transcript. Your footage never does. `HYPERCUT_GEN_LOCAL=1` makes the pictures with
+open models on your own GPU instead, so nothing leaves.
+
 ## Run it without Docker
 
 Use this for development, or to use a GPU for Whisper.
@@ -171,6 +176,13 @@ Set these in `.env` (Docker) or as environment variables (without Docker).
 | `HYPERCUT_WEB_ORIGINS` | `http://localhost:3000` | Web app origins the API accepts (comma-separated) |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Where the web app finds the API (build time) |
 | `REMOTION_BROWSER` | Remotion's own download | Path to a Chrome or Chromium for rendering |
+| `PEXELS_API_KEY`, `PIXABAY_API_KEY` | | Real stock B-roll (clips and photos), credited |
+| `HYPERCUT_STOCK` | | `commons` adds Wikimedia Commons photos (no key; open licences only) |
+| `FAL_KEY` | | Generated pictures and clips through fal.ai (pay per use) |
+| `HYPERCUT_GEN_IMAGE_MODEL`, `HYPERCUT_GEN_VIDEO_MODEL` | FLUX.2 Pro, Kling 2.1 | fal.ai models for stills and image-to-video |
+| `HYPERCUT_GEN_VIDEO` | `1` | `0` keeps the 3D motion graphics instead of generated clips |
+| `HYPERCUT_GEN_BUDGET_USD` | `2` | Most one video may spend on generation |
+| `HYPERCUT_GEN_LOCAL` | | `1` = open models on this computer's GPU (Z-Image-Turbo, Wan 2.2) |
 
 ## Troubleshooting
 

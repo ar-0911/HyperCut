@@ -22,6 +22,7 @@ and is what the TypeScript renderer and web app read. Change the schema only wit
 | analyze | `hypercut/analyze/` | transcript + style | `hook`, `segments` (cuts fillers/silence), `graphics`, `zooms` via `hypercut.llm` |
 | reframe | `hypercut/reframe/` | normalized mp4 | `Reframe` keys (MediaPipe face track, smoothed) |
 | matte | `hypercut/matte/` | normalized mp4 + reframe | `matte.webm` speaker cut-out, only when green-screen effects are asked for |
+| generate | `hypercut/generate/` | edit plan | stock footage and generated pictures / clips (`gen-*` files) for graphics that ask for them; off without keys |
 | render | `render/` (Remotion, TypeScript) | edit plan JSON + source video | final mp4 |
 | api | `api/` (FastAPI) | uploads to local `media/` | runs the stages as a job, serves results |
 | web | `web/` (Next.js) | api | upload, pick hook, style prompt, preview, download |

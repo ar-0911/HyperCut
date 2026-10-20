@@ -31,8 +31,14 @@ MAX_LAYERS = 12
 VIEWBOX = "0 0 1000 800"
 MODES = ("speaker", "split", "visual")
 PANEL_KINDS = ("illustration", "kinetic_text", "stat_card", "list_build")
+# Visuals fetched by `hypercut.generate` (ADR 0016), offered only when this machine can fetch them:
+# footage = real stock footage or photos, picture = a generated still.
+SOURCE_KINDS = {"footage": "stock", "picture": "image"}
 # Analyze graphics that would fight a visual for the panel; overlays like lower thirds stay.
 PANEL_TYPES = {"kinetic_text", "stat_card", "list_build", "illustration"}
+
+# How a still moves while it is on screen (render: MediaFill), alternated so consecutive pictures differ.
+MOVES = ("push_in", "pan_left", "pull_out", "pan_right", "rise")
 
 SVG_NS = "http://www.w3.org/2000/svg"
 ET.register_namespace("", SVG_NS)
@@ -127,10 +133,27 @@ packaging shape, logo colors, uniforms, setting) and put those details in the br
 original drawing; never ask to copy a logo or photo. Briefs are for a flat vector illustrator: name the \
 2-6 elements, their arrangement, and a palette of 3-5 hex colors that suits the speaker's setting and \
 the accent color {accent}. Keep a consistent visual language across beats.
-Use mode "speaker" for at least a quarter of the beats. Vary the rhythm: avoid three beats in a row with \
+{sources}Use mode "speaker" for at least a quarter of the beats. Vary the rhythm: avoid three beats in a row with \
 the same mode.
 
-Return {{"beats": [{{"i": <beat index>, "mode": "...", "visual": {{...}} or null}}, ...]}}"""
+Return {{{look}"beats": [{{"i": <beat index>, "mode": "...", "visual": {{...}} or null}}, ...]}}"""
+
+SOURCES_PROMPT = """Besides drawings, this editor can also show:
+{options}
+Choose per beat what serves it best: a drawing for diagrams, processes, lists and anything abstract; \
+{prefer}. Every one of these still needs a "title" (0-4 words) and a "brief" (what the ideal shot shows; it is \
+drawn instead if nothing fits).
+"""
+FOOTAGE_OPTION = """- {"kind": "footage", "query": "<2-5 plain words to search a stock library, e.g. 'aerial city night \
+traffic'>", "media": "video" | "image", "title": "...", "brief": "..."}: real stock footage (B-roll) of real \
+places, objects and actions mentioned (a factory line, a city, a lab, a kitchen, a crowd). Never a named \
+person, brand or logo."""
+PICTURE_OPTION = """- {"kind": "picture", "prompt": "<a generation prompt: the subject, what it is doing, setting, \
+camera angle, light; specific to the words>", "title": "...", "brief": "..."}: a generated photo-real or 3D \
+picture, for concepts and scenes no stock shot shows (the inside of a cell, a product idea, a historic scene). \
+No text, logos, real people or faces in it."""
+LOOK_FIELD = '"look": "<one line every generated picture shares so they match, e.g. editorial 3D render, soft \
+studio light, coral and blue accents>", '
 
 ILLUSTRATOR_SYSTEM = (
     "You are a flat-vector motion illustrator. You write clean, hand-crafted SVG by hand. "
@@ -158,13 +181,28 @@ Briefs:
 Return {{"svgs": [{{"i": <brief index>, "svg": "<svg ...>...</svg>"}}, ...]}}"""
 
 
+def sources_prompt(sources: set[str]) -> str:
+    """The extra visual kinds the director may pick, for the asset kinds this machine can fetch."""
+    options, prefer = [], []
+    if "stock" in sources:
+        options.append(FOOTAGE_OPTION)
+        prefer.append("footage when a real thing, place or action is named (about a third of the visuals)")
+    if "image" in sources:
+        options.append(PICTURE_OPTION)
+        prefer.append("a picture when a concrete scene or object can't be filmed")
+    return SOURCES_PROMPT.format(options="\n".join(options), prefer="; ".join(prefer)) if options else ""
+
+
 def direct(
     beats: list[Beat],
     style: Style,
     hook_span: tuple[float, float] | None = None,
     context: str = "",
+    sources: set[str] | None = None,
 ) -> list[dict]:
-    """One director call: mode + visual per beat, cleaned up and constrained in code."""
+    """One director call: mode + visual per beat, cleaned up and constrained in code. `sources`: the asset kinds
+    (`hypercut.generate.available()`) the director may also use. With "image", the first pick carries the reel's
+    shared "look" line."""
     lines = []
     for i, b in enumerate(beats):
         hook = " [HOOK, plays first]" if hook_span and b.start < hook_span[1] and hook_span[0] < b.end else ""
@@ -176,6 +214,8 @@ def direct(
             context=context or "a talking-head video",
             max_visual=max_visual,
             accent=style.graphics.accent_color,
+            sources=sources_prompt(sources or set()),
+            look=LOOK_FIELD if "image" in (sources or set()) else "",
         ),
         system=DIRECTOR_SYSTEM,
         timeout=600,
@@ -189,17 +229,33 @@ def direct(
     for i in range(len(beats)):
         item = picks.get(i, {})
         mode = item.get("mode") if item.get("mode") in MODES else "speaker"
-        visual = _visual(item.get("visual")) if mode != "speaker" else None
+        visual = _visual(item.get("visual"), sources or set()) if mode != "speaker" else None
         if visual is None:
             mode = "speaker"
         out.append({"mode": mode, "visual": visual})
+    look = " ".join(str(raw.get("look") or "").split())[:200]
+    if out and look:
+        out[0]["look"] = look
     return _constrain(out, beats)
 
 
-def _visual(v: Any) -> dict | None:
-    if not isinstance(v, dict) or v.get("kind") not in PANEL_KINDS:
+def _visual(v: Any, sources: set[str] = frozenset()) -> dict | None:
+    if not isinstance(v, dict):
         return None
-    kind = v["kind"]
+    kind = v.get("kind")
+    if kind in SOURCE_KINDS and SOURCE_KINDS[kind] in sources:
+        words = str(v.get("query" if kind == "footage" else "prompt") or "").strip()
+        brief = str(v.get("brief") or "").strip()[:1500]
+        if not words:
+            return None
+        out = {"kind": kind, "title": str(v.get("title") or "")[:40], "brief": brief or words}
+        if kind == "footage":
+            out.update(query=" ".join(words.split()[:8])[:80], media=v.get("media") if v.get("media") in ("video", "image") else "video")
+        else:
+            out["prompt"] = words[:1000]
+        return out
+    if kind not in PANEL_KINDS:
+        return None
     if kind == "illustration":
         brief = str(v.get("brief") or "").strip()
         return {"kind": kind, "brief": brief[:1500], "title": str(v.get("title") or "")[:40]} if brief else None
@@ -378,12 +434,17 @@ def plan_visuals(
     style: Style,
     hook_span: tuple[float, float] | None = None,
     context: str = "",
+    sources: set[str] | None = None,
 ) -> tuple[list[LayoutSpan], list[Graphic]]:
-    """Layout spans and visual graphics for the whole video. Empty lists when there is no speech."""
+    """Layout spans and visual graphics for the whole video. Empty lists when there is no speech.
+
+    Footage and pictures (only offered for `sources` this machine can fetch) come back as `media` graphics with a
+    `generate` request and no file yet; `hypercut.generate` fetches them."""
     beats = make_beats(transcript, segments, duration)
     if not beats:
         return [], []
-    picks = direct(beats, style, hook_span, context)
+    picks = direct(beats, style, hook_span, context, sources)
+    look = picks[0].get("look", "") if picks else ""
 
     need = [i for i, p in enumerate(picks) if p["visual"] and p["visual"]["kind"] == "illustration"]
     drawn = illustrate([picks[i]["visual"]["brief"] for i in need]) if need else []
@@ -400,6 +461,11 @@ def plan_visuals(
                 graphic = ("illustration", {**props, "title": v["title"], "brief": v["brief"]})
             elif v["title"]:  # drawing failed: keep the beat visual with its title as text
                 graphic = ("kinetic_text", {"text": v["title"]})
+        elif v and v["kind"] in SOURCE_KINDS:
+            req = {"kind": SOURCE_KINDS[v["kind"]]}
+            req.update({"query": v["query"], "media": v["media"]} if v["kind"] == "footage" else {"prompt": v["prompt"], "look": look})
+            graphic = ("media", {"generate": req, "title": v["title"], "brief": v["brief"], "label": v["title"],
+                                 "fit": "cover", "kind": v.get("media", "image"), "move": MOVES[len(graphics) % len(MOVES)]})
         elif v:
             graphic = (v["kind"], {k: val for k, val in v.items() if k != "kind"})
         mode = pick["mode"] if graphic else "speaker"

@@ -135,3 +135,19 @@ button.danger { border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
 .color { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; margin: 8px 0 0; }
 .color input { width: 32px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; }
 .style-panel .row { gap: 10px; }
+
+/* Recipes on the upload page: a name to pick and a delete cross in one pill. */
+span.chip { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); }
+span.chip button.link { font-size: 0.9rem; color: inherit; }
+span.chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Graphics at the playhead, under the preview. */
+.on-screen { margin-top: 8px; align-items: center; }
+
+/* Finish: check, variants, recipe, export. */
+.finish { margin-top: 16px; }
+.finish-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.finish h3 { font-size: 0.95rem; margin: 0 0 4px; }
+.finish ul { padding-left: 18px; margin: 8px 0; }
+.review li.high { color: var(--bad); }
+.review button.link { font-size: 0.85rem; color: var(--accent); }

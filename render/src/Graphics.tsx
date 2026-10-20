@@ -307,6 +307,14 @@ const TEMPLATES: Record<Exclude<Graphic['type'], 'media' | 'orbit' | 'fly_out' |
 /** How much a text graphic is enlarged when it is the full-frame visual. */
 const VISUAL_TEXT_SCALE = 1.15;
 
+const HEX = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/;
+
+/** A graphic's own colour (props.accent, set in the editor) over the reel's accent. */
+export function graphicStyle(graphic: Graphic, style: GraphicsStyle): GraphicsStyle {
+	const accent = graphic.props.accent;
+	return typeof accent === 'string' && HEX.test(accent) ? {...style, accent_color: accent} : style;
+}
+
 /**
  * A graphic's template at source time t, unpositioned, laid out for a box of boxWidth x boxHeight.
  * Used for the split top panel and full-frame visuals (centered there) and by GraphicView.
@@ -330,7 +338,7 @@ export const GraphicBody: React.FC<{
 		elapsed: t - graphic.start,
 		remaining: graphic.end - t,
 		progress: (t - graphic.start) / dur,
-		theme: themeTokens(style),
+		theme: themeTokens(graphicStyle(graphic, style)),
 		width: width / grow,
 		height,
 		boxWidth: boxWidth / grow,

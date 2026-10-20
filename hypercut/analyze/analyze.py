@@ -6,6 +6,7 @@ from hypercut import llm
 from hypercut.analyze import cuts as cutting
 from hypercut.analyze import cutaways, motion, stage
 from hypercut.analyze.visuals import merge_graphics, plan_visuals
+from hypercut.generate import available as available_assets
 from hypercut.plan import (
     AROUND_GRAPHIC_TYPES, GENERATED_GRAPHIC_TYPES, BackgroundSpan, EditPlan, Graphic, Hook, HookCandidate, Source, Style, Transcript, Zoom,
 )
@@ -142,8 +143,10 @@ def analyze(
     last = cutting.ending_word(transcript, int(preferred) if preferred is not None and preferred == int(preferred) else None)
     if last is not None:
         plan.segments = cutting.end_at(plan.segments, transcript, last)
+    # Stock footage and generated pictures / clips, only for what this machine is set up to fetch (ADR 0016).
+    sources = available_assets()
     if visuals:
-        layout, art = plan_visuals(transcript, plan.segments, source.duration, style, hook_span)
+        layout, art = plan_visuals(transcript, plan.segments, source.duration, style, hook_span, sources=sources)
         plan.layout = layout
         plan.graphics = merge_graphics(plan.graphics, art, layout)
     if cutout:
@@ -157,6 +160,8 @@ def analyze(
     if moments:
         motion.add_motion(plan, moments)
         motion.design_scenes(plan.graphics, transcript, style)
+        if "video" in sources:  # a generated clip plays instead of the 3D scene, which stays as the fallback
+            motion.ask_for_clips(plan, moments)
     # Visuals next to a jump cut straddle it, like B-roll laid over the cut (ADR 0614).
     cutaways.cover_cuts(plan)
     return plan
