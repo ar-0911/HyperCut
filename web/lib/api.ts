@@ -72,14 +72,18 @@ export function fileUrl(id: string, name: string): string {
 	return `${API_URL}/jobs/${id}/files/${encodeURIComponent(name)}`;
 }
 
-export function createJob(video: File, style: string, hookStrategy: 'cold_open' | 'trim', recipe = '') {
+export function createJob(video: File, style: string, hookStrategy: 'cold_open' | 'trim', recipe = '', pictures = false) {
 	const form = new FormData();
 	form.set('video', video);
 	form.set('style', style);
 	form.set('hook_strategy', hookStrategy);
 	if (recipe) form.set('recipe', recipe);
+	if (pictures) form.set('pictures', 'true');
 	return request<{id: string; status: string}>('/jobs', {method: 'POST', body: form});
 }
+
+/** Which kinds of picture the engine can fetch: empty when no stock or generation keys are set. */
+export const generationSources = () => request<{available: string[]}>('/generation');
 
 export const getJob = (id: string) => request<Job>(`/jobs/${id}`);
 

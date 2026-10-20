@@ -42,9 +42,12 @@ def run_pipeline(
     on_stage: Callable[[str], None] | None = None,
     visuals: bool = True,
     recipe: Style | None = None,
+    pictures: bool = False,
 ) -> EditPlan:
     """Run every stage and save `plan.json` in `job_dir`. `on_stage(name)` is called as each begins.
-    A `recipe` (a saved style, ADR 0018) is used as the style as it is, instead of reading the style prompt."""
+    A `recipe` (a saved style, ADR 0018) is used as the style as it is, instead of reading the style prompt.
+    `pictures` lets some visuals be stock footage or generated pictures / clips (ADR 0020): off by default, and
+    without keys it changes nothing."""
     job_dir = Path(job_dir)
     note = on_stage or (lambda _name: None)
 
@@ -68,7 +71,8 @@ def run_pipeline(
             cutout = pool.submit(matte, mp4, source, reframe_result, job_dir / MATTE_FILE)
 
         note("analyze")
-        plan = analyze(transcript, source, style, audio_wav=str(wav), strategy=strategy, visuals=visuals)
+        plan = analyze(transcript, source, style, audio_wav=str(wav), strategy=strategy, visuals=visuals,
+                       pictures=pictures)
         if cutout is not None:
             note("matte")
             try:
@@ -77,7 +81,7 @@ def run_pipeline(
                 log.warning("speaker cut-out failed, rendering without green-screen effects: %s", e)
                 cutout = None
     plan = plan.model_copy(update={"reframe": reframe_result})
-    # Stock footage and generated pictures / clips the plan asks for (ADR 0016); none unless keys are set.
+    # Stock footage and generated pictures / clips the plan asks for (ADR 0016); none unless asked for and keys are set.
     if pending(plan):
         note("generate")
         generate(plan, job_dir)
@@ -184,6 +188,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", help="output directory (default media/cli-<video name>)")
     ap.add_argument("--render", action="store_true", help="also render output.mp4 with Remotion")
     ap.add_argument("--no-visuals", action="store_true", help="skip per-beat layouts and illustrations")
+    ap.add_argument("--pictures", action="store_true",
+                    help="let some visuals be stock footage or generated pictures (needs keys, see .env.example)")
     args = ap.parse_args(argv)
 
     job_dir = Path(args.out) if args.out else ROOT / "media" / ("cli-" + Path(args.video).stem)
@@ -191,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
         plan = run_pipeline(
             args.video, job_dir, args.style, args.strategy,
             on_stage=lambda s: print("[" + s + "]", file=sys.stderr),
-            visuals=not args.no_visuals,
+            visuals=not args.no_visuals, pictures=args.pictures,
         )
         print(
             f"{len(plan.transcript.words)} words, {len(plan.hook.candidates)} hooks, "

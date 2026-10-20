@@ -29,8 +29,9 @@ def fake_stages(monkeypatch):
         (Path(job_dir) / "audio.wav").write_bytes(b"wav")
         return SOURCE, Path(job_dir) / "normalized.mp4", Path(job_dir) / "audio.wav"
 
-    def analyze(transcript, source, style, audio_wav=None, strategy="cold_open", visuals=False):
+    def analyze(transcript, source, style, audio_wav=None, strategy="cold_open", visuals=False, pictures=False):
         calls["strategy"] = strategy
+        calls["pictures"] = pictures
         calls["style"] = style.name
         hook = Hook(strategy=strategy, candidates=[
             HookCandidate(start=0, end=2, text="a", score=0.9), HookCandidate(start=3, end=5, text="b", score=0.5)])
@@ -349,3 +350,14 @@ def test_review_needs_a_render(client, fake_stages):
     job_id = _submit(client)
     _wait(client, job_id)
     assert client.post(f"/jobs/{job_id}/review").status_code == 409
+
+
+def test_pictures_are_off_unless_asked(client, fake_stages, monkeypatch):
+    from hypercut import generate
+
+    monkeypatch.setattr(generate, "available", lambda: set())
+    assert client.get("/generation").json() == {"available": []}
+    _wait(client, _submit(client))
+    assert fake_stages["pictures"] is False
+    _wait(client, _submit(client, pictures="true"))
+    assert fake_stages["pictures"] is True

@@ -359,3 +359,23 @@ def test_never_a_plain_background(sample, fake_llm):
     fake_llm({**GOOD, "backgrounds": [{"start": 1, "end": 3, "kind": "gradient"}, {"start": 4, "end": 6, "kind": "dim"}]})
     style = Style(depth=plan.Depth(enabled=True, cutout=True))
     assert [b.kind for b in run(sample, style=style).backgrounds] == ["dim"]
+
+
+@pytest.mark.parametrize("pictures, expected", [(False, set()), (True, {"stock", "image"})])
+def test_pictures_are_opt_in(sample, fake_llm, monkeypatch, pictures, expected):
+    """Stock footage and generated pictures only when asked for, even with keys set (ADR 0020)."""
+    import importlib
+
+    analyze_mod = importlib.import_module("hypercut.analyze.analyze")
+
+    fake_llm(GOOD)
+    seen = {}
+    monkeypatch.setattr(analyze_mod, "available_assets", lambda: {"stock", "image"})
+
+    def plan_visuals(*a, sources=None, **kw):
+        seen["sources"] = sources
+        return [], []
+
+    monkeypatch.setattr(analyze_mod, "plan_visuals", plan_visuals)
+    run(sample, visuals=True, pictures=pictures)
+    assert seen["sources"] == expected

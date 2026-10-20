@@ -72,12 +72,13 @@ def _known_media(job_id: str, state: dict) -> set[str]:
     return {a["name"] for a in state.get("assets", [])} | generated
 
 
-def _process(job_id: str, video: Path, style: str, strategy: str, recipe: Style | None = None) -> None:
+def _process(job_id: str, video: Path, style: str, strategy: str, recipe: Style | None = None,
+             pictures: bool = False) -> None:
     try:
         jobs.write(job_id, status="running", stage="ingest")
         run.run_pipeline(
             video, jobs.job_dir(job_id), style, strategy,
-            on_stage=lambda s: jobs.write(job_id, stage=s), recipe=recipe,
+            on_stage=lambda s: jobs.write(job_id, stage=s), recipe=recipe, pictures=pictures,
         )
         jobs.write(job_id, status="done", stage="done", error=None)
     except Exception as e:
@@ -113,6 +114,7 @@ def create_job(
     style: str = Form(""),
     hook_strategy: Literal["cold_open", "trim"] = Form("cold_open"),
     recipe: str = Form(""),
+    pictures: bool = Form(False),
 ):
     saved_style = recipes.get(recipe) if recipe else None
     if recipe and saved_style is None:
@@ -124,8 +126,9 @@ def create_job(
     with upload.open("wb") as f:
         shutil.copyfileobj(video.file, f)
     jobs.write(job_id, status="queued", stage=None, error=None, render=None, render_error=None,
-               style=style or (f"recipe: {recipe}" if recipe else ""), hook_strategy=hook_strategy, filename=video.filename)
-    background.add_task(_process, job_id, upload, style, hook_strategy, saved_style)
+               style=style or (f"recipe: {recipe}" if recipe else ""), hook_strategy=hook_strategy, filename=video.filename,
+               pictures=pictures)
+    background.add_task(_process, job_id, upload, style, hook_strategy, saved_style, pictures)
     return {"id": job_id, "status": "queued"}
 
 
@@ -294,6 +297,12 @@ class RecipeRequest(BaseModel):
     name: str = Field(min_length=1, max_length=60)
     style: Style
     note: str = Field(default="", max_length=200)
+
+
+@app.get("/generation")
+def generation_sources():
+    """Which kinds of picture this machine can fetch (stock / image / video); empty without keys (ADR 0020)."""
+    return {"available": sorted(generate.available())}
 
 
 @app.get("/recipes")

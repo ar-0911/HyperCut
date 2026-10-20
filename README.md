@@ -184,6 +184,8 @@ Set these in `.env` (Docker) or as environment variables (without Docker).
 | `HYPERCUT_GEN_BUDGET_USD` | `2` | Most one video may spend on generation |
 | `HYPERCUT_GEN_LOCAL` | | `1` = open models on this computer's GPU (Z-Image-Turbo, Wan 2.2) |
 
+All of the picture settings are optional. Without them every visual is drawn and everything else works the same; with them, tick "Use stock footage and AI pictures" on the upload page for the videos you want them in.
+
 ## Troubleshooting
 
 - **"the `claude` CLI is not installed"** (without Docker): install Claude Code, or switch to `HYPERCUT_LLM=api`.

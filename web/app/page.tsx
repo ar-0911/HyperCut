@@ -2,7 +2,7 @@
 
 import {useRouter} from 'next/navigation';
 import {useEffect, useState, type FormEvent} from 'react';
-import {createJob, deleteRecipe, listRecipes, type Recipe} from '@/lib/api';
+import {createJob, deleteRecipe, generationSources, listRecipes, type Recipe} from '@/lib/api';
 import {PRESETS} from '@/lib/presets';
 
 export default function UploadPage() {
@@ -14,11 +14,16 @@ export default function UploadPage() {
 	const [error, setError] = useState<string | null>(null);
 	const [recipes, setRecipes] = useState<Recipe[]>([]);
 	const [recipe, setRecipe] = useState('');
+	const [sources, setSources] = useState<string[]>([]);
+	const [pictures, setPictures] = useState(false);
 
 	useEffect(() => {
 		listRecipes()
 			.then((r) => setRecipes(r.recipes))
 			.catch(() => setRecipes([])); // the upload still works without them
+		generationSources()
+			.then((r) => setSources(r.available))
+			.catch(() => setSources([])); // no keys or an older engine: everything is drawn
 	}, []);
 
 	async function forget(name: string) {
@@ -38,7 +43,7 @@ export default function UploadPage() {
 		setBusy(true);
 		setError(null);
 		try {
-			const {id} = await createJob(file, recipe ? '' : style, strategy, recipe);
+			const {id} = await createJob(file, recipe ? '' : style, strategy, recipe, pictures && sources.length > 0);
 			router.push(`/jobs/${id}`);
 		} catch (err) {
 			setError((err as Error).message);
@@ -99,6 +104,18 @@ export default function UploadPage() {
 					<option value="cold_open">Cold open: play the hook first, then the whole video</option>
 					<option value="trim">Trim: start the video at the hook</option>
 				</select>
+			</div>
+
+			<div className="card">
+				<label className="check">
+					<input type="checkbox" checked={pictures} disabled={sources.length === 0} onChange={(e) => setPictures(e.target.checked)} />
+					Use stock footage and AI pictures (optional)
+				</label>
+				<p className="hint">
+					{sources.length === 0
+						? 'Off: no stock or picture keys are set, so every visual is drawn. Everything else works the same.'
+						: 'Some visuals become real footage or generated pictures instead of drawings. Generated ones cost a little; drawings are free.'}
+				</p>
 			</div>
 
 			<div className="row">

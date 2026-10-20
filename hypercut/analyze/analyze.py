@@ -83,11 +83,13 @@ def analyze(
     audio_wav: str | None = None,
     strategy: str = "cold_open",
     visuals: bool = False,
+    pictures: bool = False,
 ) -> EditPlan:
     """Fill hook, segments, graphics and zooms of an EditPlan.
 
     With `visuals`, also mix layouts per beat and draw an original illustration for the beats that
-    get a visual (more Claude calls; see `hypercut.analyze.visuals`).
+    get a visual (more Claude calls; see `hypercut.analyze.visuals`). With `pictures` as well, some visuals
+    become stock footage or generated pictures / clips where keys are set (ADR 0016, 0020); off by default.
     """
     if strategy not in ("cold_open", "trim"):
         raise ValueError(f"unknown hook strategy: {strategy!r}")
@@ -143,8 +145,9 @@ def analyze(
     last = cutting.ending_word(transcript, int(preferred) if preferred is not None and preferred == int(preferred) else None)
     if last is not None:
         plan.segments = cutting.end_at(plan.segments, transcript, last)
-    # Stock footage and generated pictures / clips, only for what this machine is set up to fetch (ADR 0016).
-    sources = available_assets()
+    # Stock footage and generated pictures / clips: only when asked for (`pictures`) and only what this machine is
+    # set up to fetch (ADR 0016, 0020). Otherwise every visual is drawn, which needs no keys.
+    sources = available_assets() if pictures else set()
     if visuals:
         layout, art = plan_visuals(transcript, plan.segments, source.duration, style, hook_span, sources=sources)
         plan.layout = layout
