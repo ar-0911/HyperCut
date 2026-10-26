@@ -80,3 +80,29 @@ def test_mapping_follows_the_speed():
     assert edit.to_reel(p, 1.0) == [6.0]
     assert edit.cut(p, 6.0, 10.0) == pytest.approx(4)  # reel 6-10 is source 1-3
     assert [(s.start, s.end) for s in p.segments][:3] == [(10, 12), (0, 1), (3, 8)]
+
+
+def _spoken():
+    # "a b" then a 1.5 s pause, then "c d", one piece.
+    words = [Word(text="a", start=0, end=0.5), Word(text="b", start=0.6, end=1.0),
+             Word(text="c", start=2.5, end=3.0), Word(text="d", start=3.1, end=3.5)]
+    return EditPlan(source=SOURCE, transcript=Transcript(words=words), segments=[Segment(start=0, end=20)])
+
+
+def test_pause_near_and_pause_cut():
+    p = _spoken()
+    assert edit.pauses(p) == [(1.0, 2.5)]
+    assert edit.pause_near(p, 2.5, "before") == (1.0, 2.5)
+    assert edit.pause_near(p, 1.0, "after") == (1.0, 2.5)
+    assert edit.pause_near(p, 10, "nearest") is None
+    a, b = edit.pause_cut(p, (1.0, 2.5))
+    assert (a, b) == pytest.approx((1.15, 2.35))  # the style's 0.15 s kept on each side
+    edit.cut(p, a, b)
+    assert edit.pauses(p) == []
+
+
+def test_word_cut_never_clips_a_word():
+    p = _spoken()
+    # Asked to cut 0.4-0.9: that covers the middle of "b" only (a's middle is 0.25).
+    assert edit.word_cut(p, 0.4, 0.9) == pytest.approx((0.6, 1.75))  # from b to just before c, less the pause
+    assert edit.word_cut(p, 5, 6) is None

@@ -208,3 +208,76 @@ def clear_visuals(plan: EditPlan, start: float, end: float, keep: str) -> list[s
         out.append(g)
     plan.graphics = out
     return removed
+
+
+# Word-accurate edits (ADR 0021): "remove the pause before the second answer" or "cut the sentence about
+# pricing" land on word boundaries instead of wherever a rounded reel second falls.
+
+PAUSE_MIN = 0.3  # a gap between words shorter than this is not a pause anyone asks to remove
+
+
+@dataclass
+class ReelWord:
+    start: float  # reel seconds
+    end: float
+    text: str
+    piece: int
+
+
+def reel_words(plan: EditPlan) -> list[ReelWord]:
+    """Caption words as they play in the reel (a word in the hook and the body shows twice), in reel order."""
+    out = []
+    for p in pieces(plan):
+        for w in plan.transcript.words:
+            mid = (w.start + w.end) / 2
+            if p.start - EPS <= mid < p.end - EPS:
+                out.append(ReelWord(p.reel(max(w.start, p.start)), p.reel(min(w.end, p.end)), w.text, p.index))
+    return sorted(out, key=lambda w: w.start)
+
+
+def pauses(plan: EditPlan, minimum: float = PAUSE_MIN) -> list[tuple[float, float]]:
+    """Reel spans between consecutive words of the same piece longer than `minimum` (cuts already removed
+    the gaps between pieces)."""
+    ws = reel_words(plan)
+    return [(a.end, b.start) for a, b in zip(ws, ws[1:]) if a.piece == b.piece and b.start - a.end > minimum]
+
+
+def pause_near(plan: EditPlan, t: float, side: str = "nearest", within: float = 3.0) -> tuple[float, float] | None:
+    """The pause the viewer sits through just before what starts at reel second t (side "before"), just
+    after what ends there ("after"), or the nearest one; None if none is within `within` seconds."""
+    gaps = pauses(plan)
+    if side == "before":
+        gaps = [g for g in gaps if g[1] <= t + 0.5 and t - g[1] <= within]
+        return max(gaps, key=lambda g: g[1]) if gaps else None
+    if side == "after":
+        gaps = [g for g in gaps if g[0] >= t - 0.5 and g[0] - t <= within]
+        return min(gaps, key=lambda g: g[0]) if gaps else None
+    dist = lambda g: 0.0 if g[0] <= t <= g[1] else min(abs(t - g[0]), abs(t - g[1]))  # noqa: E731
+    gaps = [g for g in gaps if dist(g) <= within]
+    return min(gaps, key=dist) if gaps else None
+
+
+def pause_cut(plan: EditPlan, gap: tuple[float, float], keep: float | None = None) -> tuple[float, float] | None:
+    """The reel span to remove so a pause shrinks to `keep` seconds on each side (default: the style's)."""
+    keep = plan.style.pacing.keep_pause if keep is None else keep
+    a, b = gap[0] + keep, gap[1] - keep
+    return (a, b) if b - a >= 0.05 else None
+
+
+def word_cut(plan: EditPlan, start: float, end: float) -> tuple[float, float] | None:
+    """Reel span covering exactly the words whose middle falls in reel [start, end), from just after the
+    word before them to just before the word after them (keeping the style's pause), so no word is clipped."""
+    ws = reel_words(plan)
+    inside = [i for i, w in enumerate(ws) if start - EPS <= (w.start + w.end) / 2 < end + EPS]
+    if not inside:
+        return None
+    first, last = ws[inside[0]], ws[inside[-1]]
+    keep = plan.style.pacing.keep_pause
+    lo, hi = first.start, last.end
+    if inside[0] > 0 and ws[inside[0] - 1].piece == first.piece:
+        lo = max(ws[inside[0] - 1].end + keep, (ws[inside[0] - 1].end + first.start) / 2)
+        lo = min(lo, first.start)
+    if inside[-1] + 1 < len(ws) and ws[inside[-1] + 1].piece == last.piece:
+        hi = min(ws[inside[-1] + 1].start - keep, (last.end + ws[inside[-1] + 1].start) / 2)
+        hi = max(hi, last.end)
+    return (round(lo, 3), round(hi, 3)) if hi - lo >= 0.05 else None

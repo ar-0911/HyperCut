@@ -64,6 +64,30 @@ That is what makes the hook work without special cases. A cold open is just the 
 once first (`reason: "hook"`) and again in its original place. Cutting a pause is just ending one segment
 and starting the next after it. Analyzers never need to know what else has been cut.
 
+## Projects: versions, explanations, recovery
+
+A job folder is a project. `plan.json` is the current edit; `history/` keeps every saved version (the first cut,
+the user's saves, accepted assistant edits, going back) with who made it, an optional name and what changed in words;
+`draft.json` is the editor's autosave of unsaved edits, offered back on reopening. Undo/redo between versions and
+"go back to version N" survive a reload or a crash, and going back never deletes anything. On start, the server
+marks work that was running when it stopped as interrupted, and a failed job can be retried. Every change is
+explained from the plans themselves (`hypercut/diff.py`), the first cut has a "why" for each decision
+(`hypercut/explain.py`), and assistant edits are proposals the user keeps or rejects after seeing before and after.
+The assistant has word-accurate operations (remove a pause, tighten a stretch, cut exact words). See
+[ADR 0021](decisions/0021-project-history-autosave-recovery.md) and
+[ADR 0022](decisions/0022-explained-edits-and-word-accurate-ops.md).
+
+## Quality: checks, export validation, benchmark
+
+Plan checks (`hypercut/checks.py`) find what a first watch would: clipped words, leftover pauses, a reel that ends
+mid-sentence or runs outside 15-60 s, hooks that start mid-sentence, visuals fighting for the same moment, missing
+picture files. The editor re-runs them on every change. After each render the API validates the file itself
+(`hypercut/qa.py`: size, frame rate, length against the plan, audio/video sync, black and frozen frames, sound
+dropouts, loudness and peaks) into `output.qa.json`. `python -m hypercut.bench` scores the whole pipeline on a
+folder of real videos (checks, caption WER, hook match, pacing, export validation), compares against an earlier
+run to catch regressions, and with `--jobs` measures how much people correct the first cut. See
+[ADR 0023](decisions/0023-quality-checks-export-validation-benchmark.md).
+
 ## Stage details
 
 **Ingest.** `ingest(input_path, job_dir) -> (Source, normalized_mp4, audio_wav)`. `ffprobe` reads size, rate

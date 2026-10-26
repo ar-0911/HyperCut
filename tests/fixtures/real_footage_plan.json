@@ -1,0 +1,3720 @@
+{
+ "version": 1,
+ "source": {
+  "path": "normalized.mp4",
+  "width": 3414,
+  "height": 1920,
+  "fps": 30.0,
+  "duration": 69.433333
+ },
+ "output": {
+  "width": 1080,
+  "height": 1920,
+  "fps": 30.0
+ },
+ "transcript": {
+  "language": "en",
+  "words": [
+   {
+    "start": 6.64,
+    "end": 7.06,
+    "text": "I'm",
+    "speaker": null,
+    "confidence": 0.5213246569037437
+   },
+   {
+    "start": 7.06,
+    "end": 7.26,
+    "text": "Michelle.",
+    "speaker": null,
+    "confidence": 0.9417528510093689
+   },
+   {
+    "start": 7.66,
+    "end": 7.82,
+    "text": "I'm",
+    "speaker": null,
+    "confidence": 0.9924935698509216
+   },
+   {
+    "start": 7.82,
+    "end": 7.98,
+    "text": "really",
+    "speaker": null,
+    "confidence": 0.990827739238739
+   },
+   {
+    "start": 7.98,
+    "end": 8.3,
+    "text": "conscious",
+    "speaker": null,
+    "confidence": 0.9886062741279602
+   },
+   {
+    "start": 8.3,
+    "end": 8.54,
+    "text": "about",
+    "speaker": null,
+    "confidence": 0.9920205473899841
+   },
+   {
+    "start": 8.54,
+    "end": 8.88,
+    "text": "nutrition",
+    "speaker": null,
+    "confidence": 0.996323823928833
+   },
+   {
+    "start": 8.88,
+    "end": 9.34,
+    "text": "and",
+    "speaker": null,
+    "confidence": 0.6689717173576355
+   },
+   {
+    "start": 9.34,
+    "end": 9.66,
+    "text": "Kachaba",
+    "speaker": null,
+    "confidence": 0.6021391352017721
+   },
+   {
+    "start": 9.66,
+    "end": 9.92,
+    "text": "makes",
+    "speaker": null,
+    "confidence": 0.975517749786377
+   },
+   {
+    "start": 9.92,
+    "end": 10.08,
+    "text": "my",
+    "speaker": null,
+    "confidence": 0.9966011047363281
+   },
+   {
+    "start": 10.08,
+    "end": 10.3,
+    "text": "life",
+    "speaker": null,
+    "confidence": 0.9970621466636658
+   },
+   {
+    "start": 10.3,
+    "end": 10.46,
+    "text": "so",
+    "speaker": null,
+    "confidence": 0.9972988963127136
+   },
+   {
+    "start": 10.46,
+    "end": 10.62,
+    "text": "much",
+    "speaker": null,
+    "confidence": 0.9997031092643738
+   },
+   {
+    "start": 10.62,
+    "end": 10.94,
+    "text": "easier.",
+    "speaker": null,
+    "confidence": 0.9986469149589539
+   },
+   {
+    "start": 11.42,
+    "end": 11.44,
+    "text": "Hi,",
+    "speaker": null,
+    "confidence": 0.8547064661979675
+   },
+   {
+    "start": 11.9,
+    "end": 12.08,
+    "text": "my",
+    "speaker": null,
+    "confidence": 0.981404721736908
+   },
+   {
+    "start": 12.08,
+    "end": 12.24,
+    "text": "name",
+    "speaker": null,
+    "confidence": 0.9992235898971558
+   },
+   {
+    "start": 12.24,
+    "end": 12.38,
+    "text": "is",
+    "speaker": null,
+    "confidence": 0.9988952875137329
+   },
+   {
+    "start": 12.38,
+    "end": 12.62,
+    "text": "Dawn.",
+    "speaker": null,
+    "confidence": 0.9553407430648804
+   },
+   {
+    "start": 13.12,
+    "end": 13.52,
+    "text": "I'm",
+    "speaker": null,
+    "confidence": 0.9940338134765625
+   },
+   {
+    "start": 13.52,
+    "end": 13.6,
+    "text": "a",
+    "speaker": null,
+    "confidence": 0.9979658126831055
+   },
+   {
+    "start": 13.6,
+    "end": 13.82,
+    "text": "health",
+    "speaker": null,
+    "confidence": 0.7283617258071899
+   },
+   {
+    "start": 13.82,
+    "end": 13.96,
+    "text": "and",
+    "speaker": null,
+    "confidence": 0.9925011992454529
+   },
+   {
+    "start": 13.96,
+    "end": 14.14,
+    "text": "wellness",
+    "speaker": null,
+    "confidence": 0.9994937181472778
+   },
+   {
+    "start": 14.14,
+    "end": 14.6,
+    "text": "coach,",
+    "speaker": null,
+    "confidence": 0.999042809009552
+   },
+   {
+    "start": 14.86,
+    "end": 14.96,
+    "text": "a",
+    "speaker": null,
+    "confidence": 0.9899539947509766
+   },
+   {
+    "start": 14.96,
+    "end": 15.26,
+    "text": "registered",
+    "speaker": null,
+    "confidence": 0.9966158270835876
+   },
+   {
+    "start": 15.26,
+    "end": 15.72,
+    "text": "nurse,",
+    "speaker": null,
+    "confidence": 0.9994321465492249
+   },
+   {
+    "start": 16.0,
+    "end": 16.14,
+    "text": "and",
+    "speaker": null,
+    "confidence": 0.9970256686210632
+   },
+   {
+    "start": 16.14,
+    "end": 16.24,
+    "text": "a",
+    "speaker": null,
+    "confidence": 0.9971514344215393
+   },
+   {
+    "start": 16.24,
+    "end": 16.44,
+    "text": "busy",
+    "speaker": null,
+    "confidence": 0.9971869587898254
+   },
+   {
+    "start": 16.44,
+    "end": 16.76,
+    "text": "mom.",
+    "speaker": null,
+    "confidence": 0.9897667765617371
+   },
+   {
+    "start": 17.16,
+    "end": 17.26,
+    "text": "What",
+    "speaker": null,
+    "confidence": 0.959897518157959
+   },
+   {
+    "start": 17.26,
+    "end": 17.42,
+    "text": "I'd",
+    "speaker": null,
+    "confidence": 0.879593700170517
+   },
+   {
+    "start": 17.42,
+    "end": 17.48,
+    "text": "love",
+    "speaker": null,
+    "confidence": 0.9959049820899963
+   },
+   {
+    "start": 17.48,
+    "end": 17.6,
+    "text": "to",
+    "speaker": null,
+    "confidence": 0.9994575381278992
+   },
+   {
+    "start": 17.6,
+    "end": 17.72,
+    "text": "see",
+    "speaker": null,
+    "confidence": 0.9977476000785828
+   },
+   {
+    "start": 17.72,
+    "end": 17.8,
+    "text": "in",
+    "speaker": null,
+    "confidence": 0.9768417477607727
+   },
+   {
+    "start": 17.8,
+    "end": 17.86,
+    "text": "the",
+    "speaker": null,
+    "confidence": 0.9992433786392212
+   },
+   {
+    "start": 17.86,
+    "end": 18.08,
+    "text": "future",
+    "speaker": null,
+    "confidence": 0.9990230798721313
+   },
+   {
+    "start": 18.08,
+    "end": 18.3,
+    "text": "at",
+    "speaker": null,
+    "confidence": 0.9036661386489868
+   },
+   {
+    "start": 18.3,
+    "end": 18.44,
+    "text": "Lyra",
+    "speaker": null,
+    "confidence": 0.384717732667923
+   },
+   {
+    "start": 18.44,
+    "end": 18.6,
+    "text": "Age",
+    "speaker": null,
+    "confidence": 0.2787954807281494
+   },
+   {
+    "start": 18.6,
+    "end": 18.88,
+    "text": "Women's",
+    "speaker": null,
+    "confidence": 0.5598389357328415
+   },
+   {
+    "start": 18.88,
+    "end": 19.16,
+    "text": "Surprise",
+    "speaker": null,
+    "confidence": 0.9507867693901062
+   },
+   {
+    "start": 19.16,
+    "end": 19.44,
+    "text": "is",
+    "speaker": null,
+    "confidence": 0.9266747236251831
+   },
+   {
+    "start": 19.44,
+    "end": 19.64,
+    "text": "always",
+    "speaker": null,
+    "confidence": 0.9890013933181763
+   },
+   {
+    "start": 19.64,
+    "end": 19.82,
+    "text": "going",
+    "speaker": null,
+    "confidence": 0.9929232597351074
+   },
+   {
+    "start": 19.82,
+    "end": 20.08,
+    "text": "above",
+    "speaker": null,
+    "confidence": 0.8199512362480164
+   },
+   {
+    "start": 20.08,
+    "end": 20.2,
+    "text": "and",
+    "speaker": null,
+    "confidence": 0.9915035963058472
+   },
+   {
+    "start": 20.2,
+    "end": 20.34,
+    "text": "beyond",
+    "speaker": null,
+    "confidence": 0.9982888102531433
+   },
+   {
+    "start": 20.34,
+    "end": 20.46,
+    "text": "for",
+    "speaker": null,
+    "confidence": 0.9920033812522888
+   },
+   {
+    "start": 20.46,
+    "end": 20.56,
+    "text": "their",
+    "speaker": null,
+    "confidence": 0.6918395161628723
+   },
+   {
+    "start": 20.56,
+    "end": 20.9,
+    "text": "customers,",
+    "speaker": null,
+    "confidence": 0.9986176490783691
+   },
+   {
+    "start": 21.32,
+    "end": 21.58,
+    "text": "never",
+    "speaker": null,
+    "confidence": 0.9958450198173523
+   },
+   {
+    "start": 21.58,
+    "end": 21.84,
+    "text": "losing",
+    "speaker": null,
+    "confidence": 0.9948741793632507
+   },
+   {
+    "start": 21.84,
+    "end": 22.08,
+    "text": "sight",
+    "speaker": null,
+    "confidence": 0.9745796918869019
+   },
+   {
+    "start": 22.08,
+    "end": 22.22,
+    "text": "of",
+    "speaker": null,
+    "confidence": 0.9991726279258728
+   },
+   {
+    "start": 22.22,
+    "end": 22.34,
+    "text": "that",
+    "speaker": null,
+    "confidence": 0.998690664768219
+   },
+   {
+    "start": 22.34,
+    "end": 22.44,
+    "text": "and",
+    "speaker": null,
+    "confidence": 0.8874330520629883
+   },
+   {
+    "start": 22.44,
+    "end": 22.64,
+    "text": "taking",
+    "speaker": null,
+    "confidence": 0.9912458062171936
+   },
+   {
+    "start": 22.64,
+    "end": 22.84,
+    "text": "care",
+    "speaker": null,
+    "confidence": 0.9981670379638672
+   },
+   {
+    "start": 22.84,
+    "end": 22.92,
+    "text": "of",
+    "speaker": null,
+    "confidence": 0.9984765648841858
+   },
+   {
+    "start": 22.92,
+    "end": 23.12,
+    "text": "every",
+    "speaker": null,
+    "confidence": 0.997930645942688
+   },
+   {
+    "start": 23.12,
+    "end": 23.34,
+    "text": "guest",
+    "speaker": null,
+    "confidence": 0.9929266571998596
+   },
+   {
+    "start": 23.34,
+    "end": 23.5,
+    "text": "the",
+    "speaker": null,
+    "confidence": 0.9934349060058594
+   },
+   {
+    "start": 23.5,
+    "end": 23.68,
+    "text": "same",
+    "speaker": null,
+    "confidence": 0.9996032118797302
+   },
+   {
+    "start": 23.68,
+    "end": 23.88,
+    "text": "way.",
+    "speaker": null,
+    "confidence": 0.9975638389587402
+   },
+   {
+    "start": 24.26,
+    "end": 24.66,
+    "text": "Kachaba",
+    "speaker": null,
+    "confidence": 0.944501002629598
+   },
+   {
+    "start": 24.66,
+    "end": 24.84,
+    "text": "is",
+    "speaker": null,
+    "confidence": 0.9045970439910889
+   },
+   {
+    "start": 24.84,
+    "end": 24.98,
+    "text": "my",
+    "speaker": null,
+    "confidence": 0.9982790946960449
+   },
+   {
+    "start": 24.98,
+    "end": 25.26,
+    "text": "secret",
+    "speaker": null,
+    "confidence": 0.9987688660621643
+   },
+   {
+    "start": 25.26,
+    "end": 25.52,
+    "text": "for",
+    "speaker": null,
+    "confidence": 0.9847187399864197
+   },
+   {
+    "start": 25.52,
+    "end": 25.72,
+    "text": "staying",
+    "speaker": null,
+    "confidence": 0.997038722038269
+   },
+   {
+    "start": 25.72,
+    "end": 26.08,
+    "text": "healthy.",
+    "speaker": null,
+    "confidence": 0.9995558857917786
+   },
+   {
+    "start": 26.42,
+    "end": 26.74,
+    "text": "That's",
+    "speaker": null,
+    "confidence": 0.9856363236904144
+   },
+   {
+    "start": 26.74,
+    "end": 26.94,
+    "text": "part",
+    "speaker": null,
+    "confidence": 0.9854757189750671
+   },
+   {
+    "start": 26.94,
+    "end": 27.08,
+    "text": "of",
+    "speaker": null,
+    "confidence": 0.9994358420372009
+   },
+   {
+    "start": 27.08,
+    "end": 27.18,
+    "text": "the",
+    "speaker": null,
+    "confidence": 0.9932720065116882
+   },
+   {
+    "start": 27.18,
+    "end": 27.46,
+    "text": "DNA",
+    "speaker": null,
+    "confidence": 0.9934237003326416
+   },
+   {
+    "start": 27.46,
+    "end": 27.8,
+    "text": "of",
+    "speaker": null,
+    "confidence": 0.6777920722961426
+   },
+   {
+    "start": 27.8,
+    "end": 28.04,
+    "text": "Sherwin",
+    "speaker": null,
+    "confidence": 0.8914505839347839
+   },
+   {
+    "start": 28.04,
+    "end": 28.38,
+    "text": "Williams.",
+    "speaker": null,
+    "confidence": 0.7862533926963806
+   },
+   {
+    "start": 28.38,
+    "end": 29.04,
+    "text": "Simply,",
+    "speaker": null,
+    "confidence": 0.3908449113368988
+   },
+   {
+    "start": 29.18,
+    "end": 29.44,
+    "text": "there's",
+    "speaker": null,
+    "confidence": 0.9748612940311432
+   },
+   {
+    "start": 29.44,
+    "end": 29.88,
+    "text": "never",
+    "speaker": null,
+    "confidence": 0.9842236638069153
+   },
+   {
+    "start": 29.88,
+    "end": 30.1,
+    "text": "going",
+    "speaker": null,
+    "confidence": 0.6206329464912415
+   },
+   {
+    "start": 30.1,
+    "end": 30.16,
+    "text": "to",
+    "speaker": null,
+    "confidence": 0.995830237865448
+   },
+   {
+    "start": 30.16,
+    "end": 30.3,
+    "text": "be",
+    "speaker": null,
+    "confidence": 0.9987069368362427
+   },
+   {
+    "start": 30.3,
+    "end": 30.54,
+    "text": "too",
+    "speaker": null,
+    "confidence": 0.988331139087677
+   },
+   {
+    "start": 30.54,
+    "end": 30.72,
+    "text": "much",
+    "speaker": null,
+    "confidence": 0.9992877840995789
+   },
+   {
+    "start": 30.72,
+    "end": 30.94,
+    "text": "good",
+    "speaker": null,
+    "confidence": 0.9896210432052612
+   },
+   {
+    "start": 30.94,
+    "end": 31.08,
+    "text": "in",
+    "speaker": null,
+    "confidence": 0.9974344372749329
+   },
+   {
+    "start": 31.08,
+    "end": 31.18,
+    "text": "the",
+    "speaker": null,
+    "confidence": 0.9989601373672485
+   },
+   {
+    "start": 31.18,
+    "end": 31.44,
+    "text": "world.",
+    "speaker": null,
+    "confidence": 0.998472273349762
+   },
+   {
+    "start": 31.74,
+    "end": 31.84,
+    "text": "But",
+    "speaker": null,
+    "confidence": 0.9667332172393799
+   },
+   {
+    "start": 31.84,
+    "end": 32.46,
+    "text": "if",
+    "speaker": null,
+    "confidence": 0.9197666049003601
+   },
+   {
+    "start": 32.46,
+    "end": 32.7,
+    "text": "that's",
+    "speaker": null,
+    "confidence": 0.9954090118408203
+   },
+   {
+    "start": 32.7,
+    "end": 32.82,
+    "text": "what",
+    "speaker": null,
+    "confidence": 0.9918982982635498
+   },
+   {
+    "start": 32.82,
+    "end": 32.9,
+    "text": "you",
+    "speaker": null,
+    "confidence": 0.9984645843505859
+   },
+   {
+    "start": 32.9,
+    "end": 33.06,
+    "text": "think",
+    "speaker": null,
+    "confidence": 0.9983166456222534
+   },
+   {
+    "start": 33.06,
+    "end": 33.24,
+    "text": "about",
+    "speaker": null,
+    "confidence": 0.988457977771759
+   },
+   {
+    "start": 33.24,
+    "end": 33.48,
+    "text": "every",
+    "speaker": null,
+    "confidence": 0.8947228193283081
+   },
+   {
+    "start": 33.48,
+    "end": 33.72,
+    "text": "day,",
+    "speaker": null,
+    "confidence": 0.9992272853851318
+   },
+   {
+    "start": 33.94,
+    "end": 34.02,
+    "text": "day",
+    "speaker": null,
+    "confidence": 0.9846414923667908
+   },
+   {
+    "start": 34.02,
+    "end": 34.2,
+    "text": "in",
+    "speaker": null,
+    "confidence": 0.9805764555931091
+   },
+   {
+    "start": 34.2,
+    "end": 34.3,
+    "text": "and",
+    "speaker": null,
+    "confidence": 0.9306455254554749
+   },
+   {
+    "start": 34.3,
+    "end": 34.46,
+    "text": "day",
+    "speaker": null,
+    "confidence": 0.9850016832351685
+   },
+   {
+    "start": 34.46,
+    "end": 34.7,
+    "text": "out,",
+    "speaker": null,
+    "confidence": 0.9987701773643494
+   },
+   {
+    "start": 34.96,
+    "end": 35.12,
+    "text": "you're",
+    "speaker": null,
+    "confidence": 0.9919835329055786
+   },
+   {
+    "start": 35.12,
+    "end": 35.28,
+    "text": "going",
+    "speaker": null,
+    "confidence": 0.9078766703605652
+   },
+   {
+    "start": 35.28,
+    "end": 35.38,
+    "text": "to",
+    "speaker": null,
+    "confidence": 0.9973738193511963
+   },
+   {
+    "start": 35.38,
+    "end": 35.64,
+    "text": "give",
+    "speaker": null,
+    "confidence": 0.9881044030189514
+   },
+   {
+    "start": 35.64,
+    "end": 35.84,
+    "text": "the",
+    "speaker": null,
+    "confidence": 0.9983378648757935
+   },
+   {
+    "start": 35.84,
+    "end": 36.08,
+    "text": "best",
+    "speaker": null,
+    "confidence": 0.9986698627471924
+   },
+   {
+    "start": 36.08,
+    "end": 36.46,
+    "text": "version",
+    "speaker": null,
+    "confidence": 0.9743976593017578
+   },
+   {
+    "start": 36.46,
+    "end": 36.64,
+    "text": "of",
+    "speaker": null,
+    "confidence": 0.997140645980835
+   },
+   {
+    "start": 36.64,
+    "end": 36.98,
+    "text": "yourself.",
+    "speaker": null,
+    "confidence": 0.9976980090141296
+   },
+   {
+    "start": 37.16,
+    "end": 37.28,
+    "text": "And",
+    "speaker": null,
+    "confidence": 0.8591091632843018
+   },
+   {
+    "start": 37.28,
+    "end": 37.42,
+    "text": "I",
+    "speaker": null,
+    "confidence": 0.9919794797897339
+   },
+   {
+    "start": 37.42,
+    "end": 37.62,
+    "text": "think",
+    "speaker": null,
+    "confidence": 0.9990053772926331
+   },
+   {
+    "start": 37.62,
+    "end": 37.84,
+    "text": "if",
+    "speaker": null,
+    "confidence": 0.9767915606498718
+   },
+   {
+    "start": 37.84,
+    "end": 37.98,
+    "text": "we",
+    "speaker": null,
+    "confidence": 0.9985561966896057
+   },
+   {
+    "start": 37.98,
+    "end": 38.18,
+    "text": "can",
+    "speaker": null,
+    "confidence": 0.9943377375602722
+   },
+   {
+    "start": 38.18,
+    "end": 38.62,
+    "text": "embody",
+    "speaker": null,
+    "confidence": 0.9993440508842468
+   },
+   {
+    "start": 38.62,
+    "end": 39.2,
+    "text": "that",
+    "speaker": null,
+    "confidence": 0.9987853169441223
+   },
+   {
+    "start": 39.2,
+    "end": 39.7,
+    "text": "and",
+    "speaker": null,
+    "confidence": 0.8101982474327087
+   },
+   {
+    "start": 39.7,
+    "end": 40.06,
+    "text": "remember",
+    "speaker": null,
+    "confidence": 0.9969758987426758
+   },
+   {
+    "start": 40.06,
+    "end": 40.44,
+    "text": "it,",
+    "speaker": null,
+    "confidence": 0.9850460886955261
+   },
+   {
+    "start": 40.56,
+    "end": 40.8,
+    "text": "that",
+    "speaker": null,
+    "confidence": 0.9800605773925781
+   },
+   {
+    "start": 40.8,
+    "end": 40.98,
+    "text": "we're",
+    "speaker": null,
+    "confidence": 0.995093584060669
+   },
+   {
+    "start": 40.98,
+    "end": 41.12,
+    "text": "going",
+    "speaker": null,
+    "confidence": 0.9832217693328857
+   },
+   {
+    "start": 41.12,
+    "end": 41.2,
+    "text": "to",
+    "speaker": null,
+    "confidence": 0.9973478317260742
+   },
+   {
+    "start": 41.2,
+    "end": 41.64,
+    "text": "continue",
+    "speaker": null,
+    "confidence": 0.9992625117301941
+   },
+   {
+    "start": 41.64,
+    "end": 41.82,
+    "text": "to",
+    "speaker": null,
+    "confidence": 0.9991293549537659
+   },
+   {
+    "start": 41.82,
+    "end": 41.98,
+    "text": "be",
+    "speaker": null,
+    "confidence": 0.9993298053741455
+   },
+   {
+    "start": 41.98,
+    "end": 42.14,
+    "text": "as",
+    "speaker": null,
+    "confidence": 0.9930295348167419
+   },
+   {
+    "start": 42.14,
+    "end": 42.7,
+    "text": "successful",
+    "speaker": null,
+    "confidence": 0.9994931221008301
+   },
+   {
+    "start": 42.7,
+    "end": 42.9,
+    "text": "as",
+    "speaker": null,
+    "confidence": 0.995161235332489
+   },
+   {
+    "start": 42.9,
+    "end": 43.14,
+    "text": "we've",
+    "speaker": null,
+    "confidence": 0.9747563004493713
+   },
+   {
+    "start": 43.14,
+    "end": 43.32,
+    "text": "been",
+    "speaker": null,
+    "confidence": 0.9989377856254578
+   },
+   {
+    "start": 43.32,
+    "end": 43.46,
+    "text": "in",
+    "speaker": null,
+    "confidence": 0.9939911961555481
+   },
+   {
+    "start": 43.46,
+    "end": 43.58,
+    "text": "the",
+    "speaker": null,
+    "confidence": 0.9975607395172119
+   },
+   {
+    "start": 43.58,
+    "end": 43.84,
+    "text": "past.",
+    "speaker": null,
+    "confidence": 0.9998526573181152
+   },
+   {
+    "start": 44.28,
+    "end": 44.4,
+    "text": "My",
+    "speaker": null,
+    "confidence": 0.9685770869255066
+   },
+   {
+    "start": 44.4,
+    "end": 44.56,
+    "text": "name",
+    "speaker": null,
+    "confidence": 0.9991770386695862
+   },
+   {
+    "start": 44.56,
+    "end": 44.74,
+    "text": "is",
+    "speaker": null,
+    "confidence": 0.9983919262886047
+   },
+   {
+    "start": 44.74,
+    "end": 45.36,
+    "text": "Marianne",
+    "speaker": null,
+    "confidence": 0.7130893468856812
+   },
+   {
+    "start": 45.36,
+    "end": 45.94,
+    "text": "Jackabowski",
+    "speaker": null,
+    "confidence": 0.48228317499160767
+   },
+   {
+    "start": 45.94,
+    "end": 46.24,
+    "text": "and",
+    "speaker": null,
+    "confidence": 0.42550238966941833
+   },
+   {
+    "start": 46.24,
+    "end": 46.4,
+    "text": "I'm",
+    "speaker": null,
+    "confidence": 0.9922976493835449
+   },
+   {
+    "start": 46.4,
+    "end": 46.6,
+    "text": "front",
+    "speaker": null,
+    "confidence": 0.5925888419151306
+   },
+   {
+    "start": 46.6,
+    "end": 46.8,
+    "text": "desk",
+    "speaker": null,
+    "confidence": 0.9399460554122925
+   },
+   {
+    "start": 46.8,
+    "end": 47.6,
+    "text": "receptionist.",
+    "speaker": null,
+    "confidence": 0.9968290627002716
+   },
+   {
+    "start": 48.54,
+    "end": 48.94,
+    "text": "If",
+    "speaker": null,
+    "confidence": 0.9545397758483887
+   },
+   {
+    "start": 48.94,
+    "end": 49.1,
+    "text": "you",
+    "speaker": null,
+    "confidence": 0.9992455244064331
+   },
+   {
+    "start": 49.1,
+    "end": 49.28,
+    "text": "want",
+    "speaker": null,
+    "confidence": 0.9895890951156616
+   },
+   {
+    "start": 49.28,
+    "end": 49.38,
+    "text": "to",
+    "speaker": null,
+    "confidence": 0.9991242289543152
+   },
+   {
+    "start": 49.38,
+    "end": 49.46,
+    "text": "be",
+    "speaker": null,
+    "confidence": 0.9994600415229797
+   },
+   {
+    "start": 49.46,
+    "end": 49.86,
+    "text": "healthier,",
+    "speaker": null,
+    "confidence": 0.9978117346763611
+   },
+   {
+    "start": 50.38,
+    "end": 50.66,
+    "text": "you",
+    "speaker": null,
+    "confidence": 0.9979497790336609
+   },
+   {
+    "start": 50.66,
+    "end": 50.84,
+    "text": "have",
+    "speaker": null,
+    "confidence": 0.6865289211273193
+   },
+   {
+    "start": 50.84,
+    "end": 51.08,
+    "text": "got",
+    "speaker": null,
+    "confidence": 0.9624854326248169
+   },
+   {
+    "start": 51.08,
+    "end": 51.42,
+    "text": "to",
+    "speaker": null,
+    "confidence": 0.9981487989425659
+   },
+   {
+    "start": 51.42,
+    "end": 51.7,
+    "text": "get",
+    "speaker": null,
+    "confidence": 0.9974921941757202
+   },
+   {
+    "start": 51.7,
+    "end": 52.32,
+    "text": "Kachaba.",
+    "speaker": null,
+    "confidence": 0.34637477435171604
+   },
+   {
+    "start": 52.32,
+    "end": 52.7,
+    "text": "I",
+    "speaker": null,
+    "confidence": 0.8520740866661072
+   },
+   {
+    "start": 52.7,
+    "end": 53.06,
+    "text": "recommend",
+    "speaker": null,
+    "confidence": 0.9737286567687988
+   },
+   {
+    "start": 53.06,
+    "end": 53.54,
+    "text": "Kachaba",
+    "speaker": null,
+    "confidence": 0.3569049007880191
+   },
+   {
+    "start": 53.54,
+    "end": 54.06,
+    "text": "to",
+    "speaker": null,
+    "confidence": 0.9227258563041687
+   },
+   {
+    "start": 54.06,
+    "end": 54.36,
+    "text": "busy",
+    "speaker": null,
+    "confidence": 0.9794298410415649
+   },
+   {
+    "start": 54.36,
+    "end": 54.84,
+    "text": "parents",
+    "speaker": null,
+    "confidence": 0.9981676340103149
+   },
+   {
+    "start": 54.84,
+    "end": 55.38,
+    "text": "or",
+    "speaker": null,
+    "confidence": 0.7340447902679443
+   },
+   {
+    "start": 55.38,
+    "end": 55.56,
+    "text": "to",
+    "speaker": null,
+    "confidence": 0.9917997121810913
+   },
+   {
+    "start": 55.56,
+    "end": 55.68,
+    "text": "my",
+    "speaker": null,
+    "confidence": 0.9962526559829712
+   },
+   {
+    "start": 55.68,
+    "end": 56.1,
+    "text": "family,",
+    "speaker": null,
+    "confidence": 0.9994344115257263
+   },
+   {
+    "start": 56.4,
+    "end": 56.92,
+    "text": "my",
+    "speaker": null,
+    "confidence": 0.9867379665374756
+   },
+   {
+    "start": 56.92,
+    "end": 57.34,
+    "text": "friends,",
+    "speaker": null,
+    "confidence": 0.999007523059845
+   },
+   {
+    "start": 57.66,
+    "end": 57.98,
+    "text": "or",
+    "speaker": null,
+    "confidence": 0.9815828204154968
+   },
+   {
+    "start": 57.98,
+    "end": 58.12,
+    "text": "my",
+    "speaker": null,
+    "confidence": 0.9956246018409729
+   },
+   {
+    "start": 58.12,
+    "end": 58.48,
+    "text": "colleagues.",
+    "speaker": null,
+    "confidence": 0.9953097701072693
+   },
+   {
+    "start": 58.84,
+    "end": 59.02,
+    "text": "It's",
+    "speaker": null,
+    "confidence": 0.9737841188907623
+   },
+   {
+    "start": 59.02,
+    "end": 59.14,
+    "text": "so",
+    "speaker": null,
+    "confidence": 0.998664140701294
+   },
+   {
+    "start": 59.14,
+    "end": 59.56,
+    "text": "convenient,",
+    "speaker": null,
+    "confidence": 0.9946975708007812
+   },
+   {
+    "start": 60.06,
+    "end": 60.22,
+    "text": "but",
+    "speaker": null,
+    "confidence": 0.995272696018219
+   },
+   {
+    "start": 60.22,
+    "end": 60.34,
+    "text": "it",
+    "speaker": null,
+    "confidence": 0.9937319159507751
+   },
+   {
+    "start": 60.34,
+    "end": 60.54,
+    "text": "tastes",
+    "speaker": null,
+    "confidence": 0.9783195853233337
+   },
+   {
+    "start": 60.54,
+    "end": 60.7,
+    "text": "good",
+    "speaker": null,
+    "confidence": 0.9994521737098694
+   },
+   {
+    "start": 60.7,
+    "end": 60.82,
+    "text": "at",
+    "speaker": null,
+    "confidence": 0.9959426522254944
+   },
+   {
+    "start": 60.82,
+    "end": 60.9,
+    "text": "the",
+    "speaker": null,
+    "confidence": 0.9995217323303223
+   },
+   {
+    "start": 60.9,
+    "end": 61.1,
+    "text": "same",
+    "speaker": null,
+    "confidence": 0.9994845390319824
+   },
+   {
+    "start": 61.1,
+    "end": 61.44,
+    "text": "time.",
+    "speaker": null,
+    "confidence": 0.9995518326759338
+   },
+   {
+    "start": 62.02,
+    "end": 62.18,
+    "text": "And",
+    "speaker": null,
+    "confidence": 0.09953328967094421
+   },
+   {
+    "start": 62.18,
+    "end": 62.36,
+    "text": "I'd",
+    "speaker": null,
+    "confidence": 0.5136929601430893
+   },
+   {
+    "start": 62.36,
+    "end": 62.38,
+    "text": "like",
+    "speaker": null,
+    "confidence": 0.557103157043457
+   },
+   {
+    "start": 62.38,
+    "end": 62.42,
+    "text": "to",
+    "speaker": null,
+    "confidence": 0.8372312188148499
+   },
+   {
+    "start": 62.42,
+    "end": 62.52,
+    "text": "go.",
+    "speaker": null,
+    "confidence": 0.4850187599658966
+   }
+  ]
+ },
+ "hook": {
+  "strategy": "cold_open",
+  "chosen": 0,
+  "candidates": [
+   {
+    "start": 9.34,
+    "end": 10.94,
+    "text": "Kachaba makes my life so much easier.",
+    "score": 0.82,
+    "why": "Payoff tease: a named product 'makes my life so much easier' from a nutrition-conscious speaker, which sparks curiosity about what Kachaba is"
+   },
+   {
+    "start": 48.54,
+    "end": 52.32,
+    "text": "If you want to be healthier, you have got to get Kachaba.",
+    "score": 0.74,
+    "why": "Direct bold claim: 'If you want to be healthier, you have got to get Kachaba.'"
+   },
+   {
+    "start": 24.26,
+    "end": 26.08,
+    "text": "Kachaba is my secret for staying healthy.",
+    "score": 0.7,
+    "why": "Secret reveal: 'Kachaba is my secret for staying healthy.'"
+   }
+  ]
+ },
+ "segments": [
+  {
+   "start": 9.34,
+   "end": 10.94,
+   "reason": "hook"
+  },
+  {
+   "start": 6.56,
+   "end": 7.34,
+   "reason": "body"
+  },
+  {
+   "start": 7.58,
+   "end": 11.02,
+   "reason": "body"
+  },
+  {
+   "start": 11.34,
+   "end": 11.52,
+   "reason": "body"
+  },
+  {
+   "start": 11.82,
+   "end": 12.7,
+   "reason": "body"
+  },
+  {
+   "start": 13.04,
+   "end": 14.68,
+   "reason": "body"
+  },
+  {
+   "start": 14.78,
+   "end": 15.8,
+   "reason": "body"
+  },
+  {
+   "start": 15.92,
+   "end": 16.84,
+   "reason": "body"
+  },
+  {
+   "start": 17.08,
+   "end": 20.98,
+   "reason": "body"
+  },
+  {
+   "start": 21.24,
+   "end": 23.96,
+   "reason": "body"
+  },
+  {
+   "start": 24.18,
+   "end": 26.16,
+   "reason": "body"
+  },
+  {
+   "start": 26.34,
+   "end": 31.52,
+   "reason": "body"
+  },
+  {
+   "start": 31.66,
+   "end": 34.78,
+   "reason": "body"
+  },
+  {
+   "start": 34.88,
+   "end": 43.92,
+   "reason": "body"
+  },
+  {
+   "start": 44.2,
+   "end": 47.68,
+   "reason": "body"
+  },
+  {
+   "start": 48.46,
+   "end": 49.94,
+   "reason": "body"
+  },
+  {
+   "start": 50.3,
+   "end": 56.18,
+   "reason": "body"
+  },
+  {
+   "start": 56.32,
+   "end": 57.42,
+   "reason": "body"
+  },
+  {
+   "start": 57.58,
+   "end": 58.56,
+   "reason": "body"
+  },
+  {
+   "start": 58.76,
+   "end": 59.64,
+   "reason": "body"
+  },
+  {
+   "start": 59.98,
+   "end": 61.52,
+   "reason": "body"
+  },
+  {
+   "start": 61.94,
+   "end": 62.6,
+   "reason": "body"
+  }
+ ],
+ "graphics": [
+  {
+   "start": 8.8,
+   "end": 10.8,
+   "id": "g1",
+   "type": "kinetic_text",
+   "props": {
+    "text": "MAKES LIFE EASIER"
+   },
+   "anchor": "center"
+  },
+  {
+   "start": 12.2,
+   "end": 15.2,
+   "id": "g2",
+   "type": "lower_third",
+   "props": {
+    "title": "Dawn",
+    "subtitle": "Health & Wellness Coach \u00b7 RN \u00b7 Busy Mom"
+   },
+   "anchor": "bottom"
+  },
+  {
+   "start": 14.86,
+   "end": 19.82,
+   "id": "v1",
+   "type": "illustration",
+   "props": {
+    "viewBox": "0 0 1000 800",
+    "defs": "<radialGradient id=\"a\" cx=\".5\" cy=\".4\" r=\".7\"><stop offset=\"0\" stop-color=\"#2E2E35\" /><stop offset=\"1\" stop-color=\"#232328\" /></radialGradient><path id=\"s\" d=\"M0 -22 Q3 -3 22 0 Q3 3 0 22 Q-3 3 -22 0 Q-3 -3 0 -22Z\" fill=\"#FFE600\" />",
+    "layers": [
+     "<g><rect width=\"1000\" height=\"800\" fill=\"#1B1B1F\" /><circle cx=\"180\" cy=\"470\" r=\"150\" fill=\"url(#a)\" /><circle cx=\"500\" cy=\"470\" r=\"150\" fill=\"url(#a)\" /><circle cx=\"820\" cy=\"470\" r=\"150\" fill=\"url(#a)\" /><ellipse cx=\"180\" cy=\"628\" rx=\"105\" ry=\"14\" fill=\"#111\" /><ellipse cx=\"500\" cy=\"628\" rx=\"105\" ry=\"14\" fill=\"#111\" /><ellipse cx=\"820\" cy=\"628\" rx=\"135\" ry=\"14\" fill=\"#111\" /></g>",
+     "<g stroke=\"#111\" stroke-width=\"8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M130 400 Q180 380 230 400 L250 620 L110 620Z\" fill=\"#E8683A\" /><path d=\"M140 420 Q100 470 122 505\" stroke-width=\"30\" fill=\"none\" /><path d=\"M140 420 Q100 470 122 505\" stroke=\"#F4EDE4\" stroke-width=\"16\" fill=\"none\" /><circle cx=\"122\" cy=\"522\" r=\"26\" fill=\"#2FA58A\" /><path d=\"M122 496 Q132 480 148 484 Q140 498 122 496Z\" fill=\"#E8683A\" stroke-width=\"5\" /><g transform=\"rotate(8 268 500)\"><rect x=\"232\" y=\"450\" width=\"72\" height=\"98\" rx=\"10\" fill=\"#F4EDE4\" /><rect x=\"254\" y=\"440\" width=\"28\" height=\"18\" rx=\"5\" fill=\"#FFE600\" stroke-width=\"6\" /><path d=\"M246 480 H290 M246 500 H290 M246 520 H274\" stroke=\"#2FA58A\" stroke-width=\"6\" fill=\"none\" /></g><path d=\"M222 420 Q262 455 252 505\" stroke-width=\"30\" fill=\"none\" /><path d=\"M222 420 Q262 455 252 505\" stroke=\"#F4EDE4\" stroke-width=\"16\" fill=\"none\" /><circle cx=\"252\" cy=\"508\" r=\"10\" fill=\"#F4EDE4\" stroke-width=\"5\" /><path d=\"M138 335 Q132 280 182 282 Q230 284 222 335 Q205 305 180 305 Q155 305 138 335Z\" fill=\"#8A5A3C\" /><circle cx=\"180\" cy=\"268\" r=\"16\" fill=\"#8A5A3C\" /><circle cx=\"180\" cy=\"335\" r=\"42\" fill=\"#F4EDE4\" /><path d=\"M138 335 Q132 282 182 284 Q230 286 222 335 Q205 310 180 310 Q155 310 138 335Z\" fill=\"#8A5A3C\" stroke=\"none\" /><path d=\"M168 350 Q180 361 192 350\" fill=\"none\" stroke-width=\"6\" /></g>",
+     "<g stroke=\"#111\" stroke-width=\"8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M440 400 Q500 380 560 400 L575 620 L425 620Z\" fill=\"#2FA58A\" /><path d=\"M446 415 L434 545\" stroke-width=\"34\" fill=\"none\" /><path d=\"M446 415 L434 545\" stroke=\"#2FA58A\" stroke-width=\"20\" fill=\"none\" /><path d=\"M554 415 L566 545\" stroke-width=\"34\" fill=\"none\" /><path d=\"M554 415 L566 545\" stroke=\"#2FA58A\" stroke-width=\"20\" fill=\"none\" /><circle cx=\"433\" cy=\"556\" r=\"11\" fill=\"#F4EDE4\" stroke-width=\"5\" /><circle cx=\"567\" cy=\"556\" r=\"11\" fill=\"#F4EDE4\" stroke-width=\"5\" /><path d=\"M474 392 L500 442 L526 392Z\" fill=\"#F4EDE4\" stroke-width=\"6\" /><path d=\"M470 392 Q458 485 500 492 Q542 485 530 392\" fill=\"none\" /><circle cx=\"500\" cy=\"500\" r=\"15\" fill=\"#FFE600\" /><rect x=\"520\" y=\"520\" width=\"38\" height=\"32\" rx=\"6\" fill=\"#2FA58A\" stroke-width=\"6\" /><path d=\"M532 520 V508\" stroke=\"#FFE600\" stroke-width=\"7\" /><circle cx=\"500\" cy=\"335\" r=\"42\" fill=\"#F4EDE4\" /><path d=\"M458 335 Q452 280 502 282 Q550 284 542 335 Q525 308 500 308 Q475 308 458 335Z\" fill=\"#8A5A3C\" /><path d=\"M488 350 Q500 361 512 350\" fill=\"none\" stroke-width=\"6\" /></g>",
+     "<g stroke=\"#111\" stroke-width=\"8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M724 340 Q718 275 772 275 Q824 275 816 340 L822 396 L720 396Z\" fill=\"#8A5A3C\" /><path d=\"M720 400 Q770 380 820 400 L835 620 L705 620Z\" fill=\"#F4EDE4\" /><circle cx=\"770\" cy=\"335\" r=\"42\" fill=\"#F4EDE4\" /><path d=\"M730 325 Q750 290 772 298 Q800 296 812 325 Q790 310 770 312 Q748 312 730 325Z\" fill=\"#8A5A3C\" stroke-width=\"5\" /><path d=\"M758 350 Q770 361 782 350\" fill=\"none\" stroke-width=\"6\" /><path d=\"M748 394 Q702 445 716 492\" fill=\"none\" stroke=\"#E8683A\" stroke-width=\"12\" /><rect x=\"686\" y=\"490\" width=\"76\" height=\"82\" rx=\"12\" fill=\"#E8683A\" /><path d=\"M704 520 H744\" stroke=\"#FFE600\" stroke-width=\"7\" /><path d=\"M815 420 Q852 478 880 500\" stroke-width=\"30\" fill=\"none\" /><path d=\"M815 420 Q852 478 880 500\" stroke=\"#F4EDE4\" stroke-width=\"16\" fill=\"none\" /><path d=\"M865 478 Q895 465 925 478 L930 620 L860 620Z\" fill=\"#FFE600\" /><circle cx=\"895\" cy=\"435\" r=\"30\" fill=\"#F4EDE4\" /><path d=\"M865 435 Q865 402 895 404 Q925 404 925 435 Q905 420 865 435Z\" fill=\"#8A5A3C\" stroke-width=\"5\" /><circle cx=\"882\" cy=\"502\" r=\"10\" fill=\"#F4EDE4\" stroke-width=\"5\" /></g>",
+     "<g fill=\"none\" stroke=\"#FFE600\" stroke-width=\"5\" stroke-linecap=\"round\"><path d=\"M228 295 Q340 160 452 295\" /><path d=\"M548 295 Q648 160 730 292\" /><circle cx=\"228\" cy=\"295\" r=\"7\" fill=\"#FFE600\" stroke=\"none\" /><circle cx=\"452\" cy=\"295\" r=\"7\" fill=\"#FFE600\" stroke=\"none\" /><circle cx=\"548\" cy=\"295\" r=\"7\" fill=\"#FFE600\" stroke=\"none\" /><circle cx=\"730\" cy=\"292\" r=\"7\" fill=\"#FFE600\" stroke=\"none\" /></g>",
+     "<g><use href=\"#s\" transform=\"translate(340 140)\" /><use href=\"#s\" transform=\"translate(645 150) scale(.7)\" /><use href=\"#s\" transform=\"translate(900 250) scale(.8)\" /><use href=\"#s\" transform=\"translate(90 240) scale(.6)\" /><circle cx=\"430\" cy=\"110\" r=\"6\" fill=\"#F4EDE4\" /><circle cx=\"580\" cy=\"95\" r=\"5\" fill=\"#2FA58A\" /></g>"
+    ],
+    "title": "Coach, nurse, mom"
+   },
+   "anchor": "auto"
+  },
+  {
+   "start": 16.2,
+   "end": 17.2,
+   "id": "g3",
+   "type": "emoji_burst",
+   "props": {
+    "emoji": "\ud83d\udc69\u200d\u2695\ufe0f"
+   },
+   "anchor": "top"
+  },
+  {
+   "start": 19.82,
+   "end": 24.26,
+   "id": "v2",
+   "type": "illustration",
+   "props": {
+    "viewBox": "0 0 1000 800",
+    "defs": "<linearGradient id=\"w\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#F4EDE4\" /><stop offset=\"1\" stop-color=\"#E6DACB\" /></linearGradient><path id=\"s\" d=\"M0 -22 Q3 -3 22 0 Q3 3 0 22 Q-3 3 -22 0 Q-3 -3 0 -22Z\" fill=\"#FFE600\" />",
+    "layers": [
+     "<g><rect width=\"1000\" height=\"800\" fill=\"#1B1B1F\" /><rect x=\"60\" y=\"240\" width=\"880\" height=\"500\" rx=\"40\" fill=\"url(#w)\" /><rect x=\"780\" y=\"290\" width=\"120\" height=\"96\" rx=\"12\" fill=\"#2FA58A\" stroke=\"#111\" stroke-width=\"8\" /><circle cx=\"840\" cy=\"338\" r=\"24\" fill=\"#FFE600\" stroke=\"#111\" stroke-width=\"6\" /><rect x=\"100\" y=\"290\" width=\"110\" height=\"14\" rx=\"7\" fill=\"#E8683A\" /><ellipse cx=\"500\" cy=\"715\" rx=\"400\" ry=\"16\" fill=\"#111\" opacity=\".25\" /></g>",
+     "<g stroke=\"#111\" stroke-width=\"8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M495 520 L500 440 Q560 405 620 440 L625 520Z\" fill=\"#1B1B1F\" /><path d=\"M530 424 L560 478 L590 424Z\" fill=\"#F4EDE4\" stroke-width=\"6\" /><path d=\"M552 445 L568 445 L573 492 L560 504 L547 492Z\" fill=\"#E8683A\" stroke-width=\"5\" /><rect x=\"592\" y=\"458\" width=\"30\" height=\"15\" rx=\"4\" fill=\"#FFE600\" stroke-width=\"4\" /><circle cx=\"560\" cy=\"352\" r=\"44\" fill=\"#F0C7A0\" /><path d=\"M514 352 Q510 296 562 298 Q612 298 606 352 Q590 324 560 324 Q530 324 514 352Z\" fill=\"#3A2A22\" /><circle cx=\"544\" cy=\"350\" r=\"4\" fill=\"#111\" stroke=\"none\" /><circle cx=\"576\" cy=\"350\" r=\"4\" fill=\"#111\" stroke=\"none\" /><path d=\"M545 366 Q560 382 575 366\" fill=\"none\" stroke-width=\"6\" /><rect x=\"330\" y=\"520\" width=\"470\" height=\"180\" rx=\"14\" fill=\"#B8693A\" /><path d=\"M430 545 V690 M520 545 V690 M610 545 V690 M700 545 V690\" stroke=\"#8E4E28\" stroke-width=\"5\" /><rect x=\"312\" y=\"495\" width=\"506\" height=\"40\" rx=\"14\" fill=\"#D88B52\" /></g>",
+     "<g stroke=\"#111\" stroke-width=\"8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M105 440 Q170 410 235 440 L250 690 L90 690Z\" fill=\"#2FA58A\" /><path d=\"M235 460 Q272 515 266 566\" stroke-width=\"34\" fill=\"none\" /><path d=\"M235 460 Q272 515 266 566\" stroke=\"#2FA58A\" stroke-width=\"20\" fill=\"none\" /><circle cx=\"170\" cy=\"355\" r=\"44\" fill=\"#F0C7A0\" /><path d=\"M124 360 Q118 302 172 304 Q224 304 216 360 L214 398 L204 398 Q206 342 170 334 Q140 342 134 398 L124 398Z\" fill=\"#3A2A22\" /><circle cx=\"154\" cy=\"358\" r=\"4\" fill=\"#111\" stroke=\"none\" /><circle cx=\"186\" cy=\"358\" r=\"4\" fill=\"#111\" stroke=\"none\" /><path d=\"M155 374 Q170 390 185 374\" fill=\"none\" stroke-width=\"6\" /><path d=\"M255 592 V562 H298 V592\" fill=\"none\" stroke-width=\"9\" /><rect x=\"225\" y=\"590\" width=\"100\" height=\"112\" rx=\"14\" fill=\"#E8683A\" /><rect x=\"225\" y=\"640\" width=\"100\" height=\"18\" fill=\"#FFE600\" /><circle cx=\"252\" cy=\"714\" r=\"10\" fill=\"#111\" /><circle cx=\"298\" cy=\"714\" r=\"10\" fill=\"#111\" /><circle cx=\"272\" cy=\"566\" r=\"11\" fill=\"#F0C7A0\" stroke-width=\"5\" /></g>",
+     "<g stroke=\"#111\" stroke-width=\"8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><ellipse cx=\"420\" cy=\"494\" rx=\"54\" ry=\"11\" fill=\"#E5C400\" /><path d=\"M372 490 Q372 430 420 430 Q468 430 468 490Z\" fill=\"#FFE600\" /><path d=\"M390 472 Q392 450 410 444\" fill=\"none\" stroke=\"#F4EDE4\" stroke-width=\"6\" /><rect x=\"412\" y=\"414\" width=\"16\" height=\"18\" rx=\"5\" fill=\"#E8683A\" stroke-width=\"6\" /><circle cx=\"420\" cy=\"410\" r=\"10\" fill=\"#E8683A\" stroke-width=\"6\" /><path d=\"M480 424 L502 408 M486 446 L512 442 M474 402 L484 380\" stroke=\"#E8683A\" stroke-width=\"6\" fill=\"none\" /></g>",
+     "<g stroke=\"#111\" stroke-width=\"10\" stroke-linejoin=\"round\"><circle cx=\"500\" cy=\"120\" r=\"85\" fill=\"#FFE600\" /><circle cx=\"500\" cy=\"120\" r=\"68\" fill=\"none\" stroke-width=\"4\" stroke-dasharray=\"4 10\" /><path transform=\"translate(500 122) scale(1.25)\" d=\"M0 -52 L12.9 -17.8 L49.5 -16.1 L20.9 6.8 L30.6 42.1 L0 22 L-30.6 42.1 L-20.9 6.8 L-49.5 -16.1 L-12.9 -17.8Z\" fill=\"#F4EDE4\" stroke-width=\"7\" /></g>",
+     "<g stroke=\"#111\" stroke-width=\"8\" stroke-linejoin=\"round\"><path d=\"M690 55 L738 112 L712 112 L712 190 L668 190 L668 112 L642 112Z\" fill=\"#2FA58A\" /></g>",
+     "<g><use href=\"#s\" transform=\"translate(350 90)\" /><use href=\"#s\" transform=\"translate(870 160) scale(.8)\" /><use href=\"#s\" transform=\"translate(630 200) scale(.5)\" /><circle cx=\"150\" cy=\"170\" r=\"7\" fill=\"#F4EDE4\" /><path d=\"M760 70 V30 M800 90 L830 62 M720 38 L700 18\" stroke=\"#FFE600\" stroke-width=\"6\" stroke-linecap=\"round\" fill=\"none\" /></g>"
+    ],
+    "title": "Every guest, same care"
+   },
+   "anchor": "auto"
+  },
+  {
+   "start": 24.26,
+   "end": 28.38,
+   "id": "v3",
+   "type": "illustration",
+   "props": {
+    "viewBox": "0 0 1000 800",
+    "defs": "<radialGradient id=\"sg\" cx=\".5\" cy=\".5\" r=\".5\"><stop offset=\"0\" stop-color=\"#FFF27A\" /><stop offset=\"1\" stop-color=\"#FFE600\" /></radialGradient><clipPath id=\"bt\"><rect x=\"585\" y=\"330\" width=\"140\" height=\"320\" rx=\"34\" /></clipPath><g id=\"lf\"><path d=\"M0 0 Q20 -44 64 -48 Q58 -6 0 0Z\" fill=\"#2FA58A\" stroke=\"#111\" stroke-width=\"6\" stroke-linejoin=\"round\" /><path d=\"M6 -4 Q30 -20 50 -38\" fill=\"none\" stroke=\"#111\" stroke-width=\"4\" stroke-linecap=\"round\" /></g><path id=\"s\" d=\"M0 -22 Q3 -3 22 0 Q3 3 0 22 Q-3 3 -22 0 Q-3 -3 0 -22Z\" />",
+    "layers": [
+     "<g><rect width=\"1000\" height=\"800\" fill=\"#1B1B1F\" /><circle cx=\"500\" cy=\"400\" r=\"342\" fill=\"none\" stroke=\"#FFE600\" stroke-width=\"64\" stroke-dasharray=\"14 26\" /><circle cx=\"500\" cy=\"400\" r=\"300\" fill=\"url(#sg)\" /></g>",
+     "<g><ellipse cx=\"500\" cy=\"660\" rx=\"320\" ry=\"24\" fill=\"#1B1B1F\" opacity=\".28\" /></g>",
+     "<g stroke=\"#111\" stroke-width=\"8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M298 215 L502 215 Q512 215 512 228 L520 620 Q520 650 490 650 L310 650 Q280 650 280 620 L288 228 Q288 215 298 215Z\" fill=\"#1B1B1F\" /><path d=\"M312 250 L308 620\" stroke=\"#3A3A42\" stroke-width=\"10\" fill=\"none\" /><rect x=\"290\" y=\"195\" width=\"220\" height=\"34\" rx=\"8\" fill=\"#2B2B31\" /><path d=\"M302 212 H498\" stroke=\"#F4EDE4\" stroke-width=\"4\" stroke-dasharray=\"6 8\" fill=\"none\" /><rect x=\"288\" y=\"250\" width=\"224\" height=\"46\" fill=\"#FFE600\" stroke=\"none\" /><rect x=\"312\" y=\"330\" width=\"176\" height=\"240\" rx=\"24\" fill=\"#F4EDE4\" /><g stroke=\"none\"><circle cx=\"400\" cy=\"392\" r=\"36\" fill=\"#2FA58A\" /><path d=\"M384 404 Q382 372 418 372 Q420 406 388 408Z\" fill=\"#F4EDE4\" /><rect x=\"340\" y=\"448\" width=\"120\" height=\"16\" rx=\"8\" fill=\"#1B1B1F\" /><rect x=\"355\" y=\"478\" width=\"90\" height=\"12\" rx=\"6\" fill=\"#E8683A\" /><rect x=\"345\" y=\"504\" width=\"110\" height=\"12\" rx=\"6\" fill=\"#2FA58A\" /></g></g>",
+     "<g stroke=\"#111\" stroke-width=\"8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><rect x=\"585\" y=\"330\" width=\"140\" height=\"320\" rx=\"34\" fill=\"#F4EDE4\" fill-opacity=\".45\" stroke=\"none\" /><g clip-path=\"url(#bt)\"><path d=\"M585 410 Q620 392 655 410 T725 410 V650 H585Z\" fill=\"#F0DDC2\" stroke=\"none\" /><circle cx=\"630\" cy=\"470\" r=\"9\" fill=\"#F4EDE4\" stroke=\"none\" /><circle cx=\"675\" cy=\"520\" r=\"6\" fill=\"#F4EDE4\" stroke=\"none\" /></g><rect x=\"585\" y=\"330\" width=\"140\" height=\"320\" rx=\"34\" fill=\"none\" /><path d=\"M585 480 h30 M585 530 h22 M585 580 h30\" stroke-width=\"5\" fill=\"none\" /><path d=\"M702 440 V540\" stroke=\"#F4EDE4\" stroke-width=\"8\" fill=\"none\" /><rect x=\"575\" y=\"292\" width=\"160\" height=\"48\" rx=\"14\" fill=\"#2FA58A\" /><rect x=\"625\" y=\"258\" width=\"60\" height=\"38\" rx=\"10\" fill=\"#E8683A\" /></g>",
+     "<g stroke=\"#111\" stroke-width=\"8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M150 620 L80 585\" stroke-width=\"24\" fill=\"none\" /><path d=\"M150 620 L80 585\" stroke=\"#2FA58A\" stroke-width=\"10\" fill=\"none\" /><path d=\"M138 590 Q150 558 185 556 Q220 558 232 590Z\" fill=\"#F0DDC2\" /><path d=\"M130 590 Q130 650 185 650 Q240 650 240 590Z\" fill=\"#2FA58A\" /></g>",
+     "<g stroke-linejoin=\"round\"><use href=\"#lf\" transform=\"translate(150 470) rotate(-30)\" /><use href=\"#lf\" transform=\"translate(850 520) rotate(200)\" /><use href=\"#lf\" transform=\"translate(410 700) rotate(-10)\" /><use href=\"#lf\" transform=\"translate(720 700) rotate(-170)\" /><g stroke=\"#111\" stroke-width=\"6\"><circle cx=\"215\" cy=\"692\" r=\"18\" fill=\"#E8683A\" /><circle cx=\"252\" cy=\"714\" r=\"15\" fill=\"#E8683A\" /><circle cx=\"790\" cy=\"690\" r=\"18\" fill=\"#E8683A\" /><circle cx=\"828\" cy=\"664\" r=\"15\" fill=\"#E8683A\" /><circle cx=\"560\" cy=\"712\" r=\"16\" fill=\"#E8683A\" /><ellipse cx=\"330\" cy=\"700\" rx=\"16\" ry=\"9\" fill=\"#F4EDE4\" transform=\"rotate(-25 330 700)\" /><ellipse cx=\"480\" cy=\"722\" rx=\"16\" ry=\"9\" fill=\"#F4EDE4\" transform=\"rotate(20 480 722)\" /><ellipse cx=\"660\" cy=\"716\" rx=\"16\" ry=\"9\" fill=\"#F4EDE4\" transform=\"rotate(-10 660 716)\" /><ellipse cx=\"880\" cy=\"600\" rx=\"16\" ry=\"9\" fill=\"#F4EDE4\" transform=\"rotate(35 880 600)\" /><ellipse cx=\"120\" cy=\"520\" rx=\"16\" ry=\"9\" fill=\"#F4EDE4\" transform=\"rotate(-40 120 520)\" /></g></g>",
+     "<g><use href=\"#s\" fill=\"#1B1B1F\" transform=\"translate(170 250)\" /><use href=\"#s\" fill=\"#F4EDE4\" transform=\"translate(850 200) scale(.8)\" /><use href=\"#s\" fill=\"#1B1B1F\" transform=\"translate(880 400) scale(.6)\" /><use href=\"#s\" fill=\"#F4EDE4\" transform=\"translate(215 360) scale(.5)\" /><circle cx=\"700\" cy=\"170\" r=\"6\" fill=\"#1B1B1F\" /></g>"
+    ],
+    "title": "Kachaba: my secret"
+   },
+   "anchor": "auto"
+  },
+  {
+   "start": 25.2,
+   "end": 26.2,
+   "id": "g5",
+   "type": "emoji_burst",
+   "props": {
+    "emoji": "\ud83d\udcaa"
+   },
+   "anchor": "top"
+  },
+  {
+   "start": 31.74,
+   "end": 34.96,
+   "id": "v4",
+   "type": "illustration",
+   "props": {
+    "viewBox": "0 0 1000 800",
+    "defs": "<g id=\"c\"><rect width=\"80\" height=\"66\" rx=\"14\" fill=\"#FFE600\" stroke=\"#111111\" stroke-width=\"5\" /><path d=\"M20 34l14 14 28-30\" fill=\"none\" stroke=\"#111111\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" /></g><path id=\"s\" d=\"M0-30Q4-4 30 0Q4 4 0 30Q-4 4-30 0Q-4-4 0-30z\" />",
+    "layers": [
+     "<g><rect width=\"1000\" height=\"800\" fill=\"#F4EDE4\" /><circle cx=\"790\" cy=\"500\" r=\"250\" fill=\"#FFE600\" opacity=\".35\" /><circle cx=\"120\" cy=\"740\" r=\"200\" fill=\"#2FA58A\" opacity=\".2\" /></g>",
+     "<g><rect x=\"98\" y=\"242\" width=\"540\" height=\"500\" rx=\"34\" fill=\"#111111\" opacity=\".18\" /><rect x=\"80\" y=\"220\" width=\"540\" height=\"500\" rx=\"34\" fill=\"#1B1B1F\" stroke=\"#111111\" stroke-width=\"8\" /><path d=\"M80 306V254Q80 220 114 220H586Q620 220 620 254V306z\" fill=\"#E8683A\" stroke=\"#111111\" stroke-width=\"8\" stroke-linejoin=\"round\" /><rect x=\"170\" y=\"192\" width=\"26\" height=\"54\" rx=\"13\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"6\" /><rect x=\"504\" y=\"192\" width=\"26\" height=\"54\" rx=\"13\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"6\" /></g>",
+     "<g><use href=\"#c\" x=\"110\" y=\"330\" /><use href=\"#c\" x=\"210\" y=\"330\" /><use href=\"#c\" x=\"310\" y=\"330\" /><use href=\"#c\" x=\"410\" y=\"330\" /><use href=\"#c\" x=\"510\" y=\"330\" /><use href=\"#c\" x=\"110\" y=\"430\" /><use href=\"#c\" x=\"210\" y=\"430\" /><use href=\"#c\" x=\"310\" y=\"430\" /><use href=\"#c\" x=\"410\" y=\"430\" /><use href=\"#c\" x=\"510\" y=\"430\" /><use href=\"#c\" x=\"110\" y=\"530\" /><use href=\"#c\" x=\"210\" y=\"530\" /><use href=\"#c\" x=\"310\" y=\"530\" /><use href=\"#c\" x=\"410\" y=\"530\" /><use href=\"#c\" x=\"510\" y=\"530\" /><use href=\"#c\" x=\"110\" y=\"630\" /><use href=\"#c\" x=\"210\" y=\"630\" /><use href=\"#c\" x=\"310\" y=\"630\" /><use href=\"#c\" x=\"410\" y=\"630\" /><use href=\"#c\" x=\"510\" y=\"630\" /></g>",
+     "<g><path d=\"M903 435A130 130 0 1 1 790 370\" fill=\"none\" stroke=\"#111111\" stroke-width=\"34\" stroke-linecap=\"round\" /><path d=\"M903 435A130 130 0 1 1 790 370\" fill=\"none\" stroke=\"#2FA58A\" stroke-width=\"18\" stroke-linecap=\"round\" /><path d=\"M780 336L840 370L780 404z\" fill=\"#2FA58A\" stroke=\"#111111\" stroke-width=\"7\" stroke-linejoin=\"round\" /><path d=\"M790 440V418M846 464L862 448M734 464L718 448\" stroke=\"#E8683A\" stroke-width=\"9\" stroke-linecap=\"round\" /><path d=\"M730 520a60 60 0 0 1 120 0z\" fill=\"#FFE600\" stroke=\"#111111\" stroke-width=\"8\" stroke-linejoin=\"round\" /><path d=\"M700 520H880\" stroke=\"#111111\" stroke-width=\"10\" stroke-linecap=\"round\" /></g>",
+     "<g><rect x=\"304\" y=\"206\" width=\"24\" height=\"64\" rx=\"11\" fill=\"#1B1B1F\" stroke=\"#111111\" stroke-width=\"6\" /><rect x=\"336\" y=\"206\" width=\"24\" height=\"64\" rx=\"11\" fill=\"#1B1B1F\" stroke=\"#111111\" stroke-width=\"6\" /><rect x=\"296\" y=\"262\" width=\"36\" height=\"18\" rx=\"8\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"6\" /><rect x=\"334\" y=\"262\" width=\"36\" height=\"18\" rx=\"8\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"6\" /><rect x=\"298\" y=\"146\" width=\"66\" height=\"84\" rx=\"28\" fill=\"#2FA58A\" stroke=\"#111111\" stroke-width=\"7\" /><path d=\"M350 178Q392 182 378 134\" fill=\"none\" stroke=\"#111111\" stroke-width=\"28\" stroke-linecap=\"round\" /><path d=\"M350 178Q392 182 378 134\" fill=\"none\" stroke=\"#2FA58A\" stroke-width=\"14\" stroke-linecap=\"round\" /><circle cx=\"378\" cy=\"128\" r=\"11\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"5\" /><circle cx=\"331\" cy=\"112\" r=\"30\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"7\" /><path d=\"M301 108Q304 80 331 80Q358 80 361 104Q340 96 301 108z\" fill=\"#1B1B1F\" /></g>",
+     "<g><circle cx=\"331\" cy=\"34\" r=\"24\" fill=\"#FFE600\" stroke=\"#111111\" stroke-width=\"7\" /><rect x=\"320\" y=\"56\" width=\"22\" height=\"14\" rx=\"5\" fill=\"#1B1B1F\" stroke=\"#111111\" stroke-width=\"5\" /><path d=\"M292 34H280M370 34H382M303 10L295 2M359 10L367 2\" stroke=\"#E8683A\" stroke-width=\"7\" stroke-linecap=\"round\" /></g>",
+     "<g><use href=\"#s\" transform=\"translate(690 250) scale(1.1)\" fill=\"#FFE600\" stroke=\"#111111\" stroke-width=\"4\" /><use href=\"#s\" transform=\"translate(920 690) scale(.9)\" fill=\"#E8683A\" stroke=\"#111111\" stroke-width=\"4\" /><use href=\"#s\" transform=\"translate(640 720) scale(.7)\" fill=\"#FFE600\" stroke=\"#111111\" stroke-width=\"4\" /><circle cx=\"900\" cy=\"250\" r=\"9\" fill=\"#2FA58A\" /><circle cx=\"60\" cy=\"140\" r=\"10\" fill=\"#E8683A\" /></g>"
+    ],
+    "title": "Day in, day out"
+   },
+   "anchor": "auto"
+  },
+  {
+   "start": 34.96,
+   "end": 39.7,
+   "id": "v5",
+   "type": "illustration",
+   "props": {
+    "viewBox": "0 0 1000 800",
+    "defs": "<radialGradient id=\"g\"><stop offset=\"0\" stop-color=\"#FFE600\" stop-opacity=\".85\" /><stop offset=\"1\" stop-color=\"#FFE600\" stop-opacity=\"0\" /></radialGradient><g id=\"p\"><rect x=\"-60\" y=\"-192\" width=\"22\" height=\"96\" rx=\"11\" /><rect x=\"38\" y=\"-192\" width=\"22\" height=\"96\" rx=\"11\" /><rect x=\"-34\" y=\"-100\" width=\"30\" height=\"100\" rx=\"13\" /><rect x=\"4\" y=\"-100\" width=\"30\" height=\"100\" rx=\"13\" /><rect x=\"-42\" y=\"-205\" width=\"84\" height=\"120\" rx=\"30\" /><circle cx=\"0\" cy=\"-240\" r=\"34\" /><path d=\"M28-250L54-270L44-234z\" /></g><path id=\"s\" d=\"M0-30Q4-4 30 0Q4 4 0 30Q-4 4-30 0Q-4-4 0-30z\" />",
+    "layers": [
+     "<g><rect width=\"1000\" height=\"800\" fill=\"#1B1B1F\" /><circle cx=\"710\" cy=\"330\" r=\"380\" fill=\"url(#g)\" /><rect x=\"60\" y=\"760\" width=\"880\" height=\"14\" rx=\"7\" fill=\"#F4EDE4\" opacity=\".2\" /></g>",
+     "<g><use href=\"#p\" transform=\"translate(710 475) scale(1.4)\" fill=\"#FFE600\" stroke=\"#FFE600\" stroke-width=\"12\" /><use href=\"#p\" transform=\"translate(710 475) scale(1.4)\" fill=\"#FFF6A0\" opacity=\".5\" /></g>",
+     "<g><rect x=\"130\" y=\"650\" width=\"220\" height=\"110\" rx=\"14\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"9\" /><rect x=\"350\" y=\"560\" width=\"190\" height=\"200\" rx=\"14\" fill=\"#2FA58A\" stroke=\"#111111\" stroke-width=\"9\" /><rect x=\"540\" y=\"470\" width=\"340\" height=\"290\" rx=\"14\" fill=\"#E8683A\" stroke=\"#111111\" stroke-width=\"9\" /><rect x=\"150\" y=\"668\" width=\"180\" height=\"12\" rx=\"6\" fill=\"#111111\" opacity=\".18\" /><rect x=\"370\" y=\"578\" width=\"150\" height=\"12\" rx=\"6\" fill=\"#111111\" opacity=\".18\" /><rect x=\"560\" y=\"488\" width=\"300\" height=\"12\" rx=\"6\" fill=\"#111111\" opacity=\".18\" /></g>",
+     "<g><use href=\"#p\" transform=\"translate(710 470)\" fill=\"#111111\" stroke=\"#111111\" stroke-width=\"16\" /><use href=\"#p\" transform=\"translate(710 470)\" fill=\"#F4EDE4\" /></g>",
+     "<g><path d=\"M140 612H330V525H500V440\" fill=\"none\" stroke=\"#FFE600\" stroke-width=\"14\" stroke-linecap=\"round\" stroke-linejoin=\"round\" /><path d=\"M468 448L500 392L532 448z\" fill=\"#FFE600\" stroke=\"#FFE600\" stroke-width=\"8\" stroke-linejoin=\"round\" /></g>",
+     "<g><use href=\"#s\" transform=\"translate(560 190) scale(1.3)\" fill=\"#FFE600\" /><use href=\"#s\" transform=\"translate(900 240)\" fill=\"#FFE600\" /><use href=\"#s\" transform=\"translate(880 400) scale(.7)\" fill=\"#F4EDE4\" /><use href=\"#s\" transform=\"translate(450 330) scale(.8)\" fill=\"#FFE600\" /><use href=\"#s\" transform=\"translate(820 100) scale(.8)\" fill=\"#E8683A\" /><circle cx=\"620\" cy=\"110\" r=\"9\" fill=\"#2FA58A\" /><circle cx=\"200\" cy=\"330\" r=\"11\" fill=\"#E8683A\" /><circle cx=\"300\" cy=\"200\" r=\"8\" fill=\"#FFE600\" /></g>"
+    ],
+    "title": "Best version of you"
+   },
+   "anchor": "auto"
+  },
+  {
+   "start": 44.7,
+   "end": 47.5,
+   "id": "g7",
+   "type": "lower_third",
+   "props": {
+    "title": "Marianne Jackabowski",
+    "subtitle": "Front Desk Receptionist"
+   },
+   "anchor": "bottom"
+  },
+  {
+   "start": 48.54,
+   "end": 52.32,
+   "id": "v6",
+   "type": "illustration",
+   "props": {
+    "viewBox": "0 0 1000 800",
+    "defs": "<path id=\"s\" d=\"M0-30Q4-4 30 0Q4 4 0 30Q-4 4-30 0Q-4-4 0-30z\" />",
+    "layers": [
+     "<g><rect width=\"1000\" height=\"800\" fill=\"#1B1B1F\" /><circle cx=\"500\" cy=\"400\" r=\"275\" fill=\"#FFE600\" /><circle cx=\"500\" cy=\"420\" r=\"275\" fill=\"#E8683A\" opacity=\".12\" /></g>",
+     "<g><path d=\"M410 200H590L610 540Q612 590 570 592H430Q388 590 390 540z\" fill=\"#1B1B1F\" stroke=\"#111111\" stroke-width=\"10\" stroke-linejoin=\"round\" /><rect x=\"404\" y=\"188\" width=\"192\" height=\"36\" rx=\"10\" fill=\"#1B1B1F\" stroke=\"#111111\" stroke-width=\"8\" /><path d=\"M424 206H576\" stroke=\"#F4EDE4\" stroke-width=\"5\" stroke-linecap=\"round\" /><rect x=\"430\" y=\"290\" width=\"140\" height=\"150\" rx=\"22\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"7\" /><circle cx=\"500\" cy=\"346\" r=\"26\" fill=\"#2FA58A\" stroke=\"#111111\" stroke-width=\"6\" /><rect x=\"455\" y=\"395\" width=\"90\" height=\"12\" rx=\"6\" fill=\"#1B1B1F\" /><rect x=\"470\" y=\"418\" width=\"60\" height=\"10\" rx=\"5\" fill=\"#1B1B1F\" /><path d=\"M394 470H606L609 526H391z\" fill=\"#FFE600\" stroke=\"#111111\" stroke-width=\"7\" stroke-linejoin=\"round\" /></g>",
+     "<g><rect x=\"418\" y=\"535\" width=\"36\" height=\"85\" rx=\"18\" fill=\"#E8683A\" stroke=\"#111111\" stroke-width=\"7\" /><rect x=\"458\" y=\"535\" width=\"36\" height=\"85\" rx=\"18\" fill=\"#E8683A\" stroke=\"#111111\" stroke-width=\"7\" /><rect x=\"498\" y=\"535\" width=\"36\" height=\"85\" rx=\"18\" fill=\"#E8683A\" stroke=\"#111111\" stroke-width=\"7\" /><rect x=\"538\" y=\"535\" width=\"36\" height=\"85\" rx=\"18\" fill=\"#E8683A\" stroke=\"#111111\" stroke-width=\"7\" /><rect x=\"372\" y=\"555\" width=\"36\" height=\"88\" rx=\"18\" transform=\"rotate(-20 389 600)\" fill=\"#E8683A\" stroke=\"#111111\" stroke-width=\"7\" /><rect x=\"405\" y=\"598\" width=\"190\" height=\"92\" rx=\"38\" fill=\"#E8683A\" stroke=\"#111111\" stroke-width=\"8\" /><rect x=\"440\" y=\"670\" width=\"120\" height=\"150\" rx=\"40\" fill=\"#E8683A\" stroke=\"#111111\" stroke-width=\"8\" /><rect x=\"425\" y=\"730\" width=\"150\" height=\"90\" rx=\"20\" fill=\"#2FA58A\" stroke=\"#111111\" stroke-width=\"8\" /></g>",
+     "<g><rect x=\"185\" y=\"640\" width=\"70\" height=\"180\" rx=\"30\" fill=\"#E8683A\" stroke=\"#111111\" stroke-width=\"8\" /><rect x=\"172\" y=\"720\" width=\"96\" height=\"100\" rx=\"20\" fill=\"#2FA58A\" stroke=\"#111111\" stroke-width=\"8\" /><path d=\"M178 452H262L272 600Q272 626 248 626H192Q168 626 168 600z\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"8\" stroke-linejoin=\"round\" /><rect x=\"174\" y=\"500\" width=\"92\" height=\"46\" fill=\"#2FA58A\" /><rect x=\"162\" y=\"426\" width=\"116\" height=\"32\" rx=\"10\" fill=\"#1B1B1F\" stroke=\"#111111\" stroke-width=\"8\" /><rect x=\"182\" y=\"402\" width=\"76\" height=\"28\" rx=\"10\" fill=\"#1B1B1F\" stroke=\"#111111\" stroke-width=\"7\" /><rect x=\"150\" y=\"565\" width=\"140\" height=\"88\" rx=\"36\" fill=\"#E8683A\" stroke=\"#111111\" stroke-width=\"8\" /><path d=\"M185 578V608M220 578V608M255 578V608\" stroke=\"#111111\" stroke-width=\"6\" stroke-linecap=\"round\" /></g>",
+     "<g><g transform=\"translate(160 220) scale(1.4)\"><path d=\"M0 40C-60 0-50-50-20-50C-8-50 0-42 0-34C0-42 8-50 20-50C50-50 60 0 0 40z\" fill=\"#2FA58A\" stroke=\"#111111\" stroke-width=\"6\" stroke-linejoin=\"round\" /></g><g transform=\"translate(850 190) scale(1.4)\"><path d=\"M0-30C20-45 50-35 50 0C50 40 25 60 0 52C-25 60-50 40-50 0C-50-35-20-45 0-30z\" fill=\"#E8683A\" stroke=\"#111111\" stroke-width=\"6\" /><path d=\"M0-30Q0-50 10-60\" fill=\"none\" stroke=\"#F4EDE4\" stroke-width=\"6\" stroke-linecap=\"round\" /><ellipse cx=\"24\" cy=\"-48\" rx=\"16\" ry=\"8\" transform=\"rotate(-25 24 -48)\" fill=\"#2FA58A\" stroke=\"#111111\" stroke-width=\"5\" /></g><g transform=\"translate(870 440) rotate(-25)\"><rect x=\"-70\" y=\"-8\" width=\"140\" height=\"16\" rx=\"6\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"5\" /><rect x=\"-92\" y=\"-38\" width=\"26\" height=\"76\" rx=\"9\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"6\" /><rect x=\"-66\" y=\"-26\" width=\"18\" height=\"52\" rx=\"7\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"6\" /><rect x=\"66\" y=\"-38\" width=\"26\" height=\"76\" rx=\"9\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"6\" /><rect x=\"48\" y=\"-26\" width=\"18\" height=\"52\" rx=\"7\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"6\" /></g><g transform=\"translate(830 640) scale(1.1)\"><path d=\"M-40-60H40L30 60Q28 70 18 70H-18Q-28 70-30 60z\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"7\" stroke-linejoin=\"round\" /><path d=\"M-36-20H36L30 58Q28 64 18 64H-18Q-28 64-30 58z\" fill=\"#2FA58A\" /><circle cx=\"-8\" cy=\"10\" r=\"6\" fill=\"#F4EDE4\" /><circle cx=\"10\" cy=\"-4\" r=\"4\" fill=\"#F4EDE4\" /></g></g>",
+     "<g><path d=\"M625 240l34-22M630 288h40M375 240l-34-22M370 288h-40\" stroke=\"#111111\" stroke-width=\"8\" stroke-linecap=\"round\" /><use href=\"#s\" transform=\"translate(330 140)\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"4\" /><use href=\"#s\" transform=\"translate(690 150) scale(.8)\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"4\" /><use href=\"#s\" transform=\"translate(940 330) scale(.7)\" fill=\"#FFE600\" /><use href=\"#s\" transform=\"translate(70 440) scale(.8)\" fill=\"#FFE600\" /><circle cx=\"95\" cy=\"90\" r=\"10\" fill=\"#E8683A\" /><circle cx=\"600\" cy=\"740\" r=\"9\" fill=\"#FFE600\" /></g>"
+    ],
+    "title": "Want healthier?"
+   },
+   "anchor": "auto"
+  },
+  {
+   "start": 52.32,
+   "end": 56.4,
+   "id": "v7",
+   "type": "illustration",
+   "props": {
+    "viewBox": "0 0 1000 800",
+    "defs": "<linearGradient id=\"wall\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#F4EDE4\" /><stop offset=\"1\" stop-color=\"#EADFD1\" /></linearGradient>",
+    "layers": [
+     "<g id=\"bg\"><rect width=\"1000\" height=\"800\" fill=\"url(#wall)\" /><circle cx=\"800\" cy=\"190\" r=\"150\" fill=\"#FFE600\" opacity=\"0.35\" /><rect x=\"60\" y=\"120\" width=\"150\" height=\"14\" rx=\"7\" fill=\"#1B1B1F\" opacity=\"0.15\" /></g>",
+     "<g id=\"clock\"><circle cx=\"806\" cy=\"198\" r=\"88\" fill=\"#1B1B1F\" opacity=\"0.15\" /><circle cx=\"745\" cy=\"112\" r=\"24\" fill=\"#E8683A\" stroke=\"#111111\" stroke-width=\"8\" /><circle cx=\"855\" cy=\"112\" r=\"24\" fill=\"#E8683A\" stroke=\"#111111\" stroke-width=\"8\" /><circle cx=\"800\" cy=\"190\" r=\"88\" fill=\"#FFFFFF\" stroke=\"#111111\" stroke-width=\"10\" /><circle cx=\"800\" cy=\"190\" r=\"68\" fill=\"none\" stroke=\"#E8683A\" stroke-width=\"8\" /><g stroke=\"#111111\" stroke-width=\"8\" stroke-linecap=\"round\"><path d=\"M800 135V147M800 233V245M745 190H757M843 190H855\" /><path d=\"M800 190L767 209\" stroke-width=\"11\" /><path d=\"M800 190L848 163\" stroke-width=\"9\" /></g><circle cx=\"800\" cy=\"190\" r=\"9\" fill=\"#E8683A\" stroke=\"#111111\" stroke-width=\"5\" /></g>",
+     "<g id=\"parent\"><circle cx=\"330\" cy=\"150\" r=\"28\" fill=\"#1B1B1F\" stroke=\"#111111\" stroke-width=\"8\" /><rect x=\"310\" y=\"280\" width=\"40\" height=\"50\" rx=\"14\" fill=\"#E0A982\" stroke=\"#111111\" stroke-width=\"8\" /><path d=\"M235 600Q235 335 330 318Q425 335 425 600Z\" fill=\"#E8683A\" stroke=\"#111111\" stroke-width=\"10\" stroke-linejoin=\"round\" /><path d=\"M296 322Q330 358 364 322\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"8\" stroke-linecap=\"round\" /><path d=\"M260 470H400\" stroke=\"#111111\" stroke-width=\"6\" opacity=\"0.25\" /><circle cx=\"330\" cy=\"235\" r=\"62\" fill=\"#F2C6A0\" stroke=\"#111111\" stroke-width=\"10\" /><path d=\"M266 238Q258 162 330 162Q402 162 394 238Q372 196 330 196Q290 196 266 238Z\" fill=\"#1B1B1F\" stroke=\"#111111\" stroke-width=\"6\" stroke-linejoin=\"round\" /><circle cx=\"308\" cy=\"246\" r=\"6\" fill=\"#111111\" /><circle cx=\"352\" cy=\"246\" r=\"6\" fill=\"#111111\" /><path d=\"M314 268Q330 280 346 268\" fill=\"none\" stroke=\"#111111\" stroke-width=\"6\" stroke-linecap=\"round\" /></g>",
+     "<g id=\"counter\"><rect x=\"0\" y=\"560\" width=\"1000\" height=\"240\" fill=\"#2FA58A\" stroke=\"#111111\" stroke-width=\"10\" /><rect x=\"0\" y=\"560\" width=\"1000\" height=\"36\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"10\" /><rect x=\"5\" y=\"600\" width=\"990\" height=\"195\" fill=\"#1B1B1F\" opacity=\"0.18\" /><path d=\"M120 690H300M520 690H700M820 690H940\" stroke=\"#111111\" stroke-width=\"8\" stroke-linecap=\"round\" opacity=\"0.3\" /></g>",
+     "<g id=\"items\"><ellipse cx=\"710\" cy=\"566\" rx=\"70\" ry=\"10\" fill=\"#1B1B1F\" opacity=\"0.25\" /><path d=\"M664 414H756V428H664Z\" fill=\"#1B1B1F\" stroke=\"#111111\" stroke-width=\"8\" stroke-linejoin=\"round\" /><path d=\"M660 428H760L772 556Q772 566 762 566H658Q648 566 648 556Z\" fill=\"#1B1B1F\" stroke=\"#111111\" stroke-width=\"10\" stroke-linejoin=\"round\" /><path d=\"M654 478H766L768 524H651Z\" fill=\"#FFE600\" stroke=\"#111111\" stroke-width=\"6\" /><circle cx=\"710\" cy=\"501\" r=\"14\" fill=\"#1B1B1F\" /><ellipse cx=\"612\" cy=\"555\" rx=\"26\" ry=\"10\" fill=\"#FFE600\" stroke=\"#111111\" stroke-width=\"7\" /><path d=\"M580 600L545 612\" stroke=\"#111111\" stroke-width=\"0\" /><path d=\"M636 550L664 538\" stroke=\"#111111\" stroke-width=\"12\" stroke-linecap=\"round\" /><path d=\"M636 550L664 538\" stroke=\"#FFE600\" stroke-width=\"5\" stroke-linecap=\"round\" /><ellipse cx=\"860\" cy=\"570\" rx=\"75\" ry=\"9\" fill=\"#1B1B1F\" opacity=\"0.25\" /><path d=\"M785 525Q850 595 925 510Q938 532 918 548Q850 612 780 555Z\" fill=\"#FFE600\" stroke=\"#111111\" stroke-width=\"8\" stroke-linejoin=\"round\" /><path d=\"M920 510L934 498\" stroke=\"#111111\" stroke-width=\"10\" stroke-linecap=\"round\" /></g>",
+     "<g id=\"shaker\"><path d=\"M405 352L468 420\" stroke=\"#111111\" stroke-width=\"56\" stroke-linecap=\"round\" /><path d=\"M405 352L468 420\" stroke=\"#E8683A\" stroke-width=\"40\" stroke-linecap=\"round\" /><path d=\"M515 500H585L575 562H525Z\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"8\" stroke-linejoin=\"round\" /><path d=\"M521 528H579L575 556H525Z\" fill=\"#E8683A\" /><g transform=\"translate(480 412) rotate(130)\"><rect x=\"-30\" y=\"-70\" width=\"60\" height=\"112\" rx=\"16\" fill=\"#F4EDE4\" stroke=\"#111111\" stroke-width=\"8\" /><rect x=\"-30\" y=\"-10\" width=\"60\" height=\"40\" fill=\"#2FA58A\" /><rect x=\"-24\" y=\"-100\" width=\"48\" height=\"32\" rx=\"8\" fill=\"#FFE600\" stroke=\"#111111\" stroke-width=\"8\" /></g><path d=\"M548 468Q556 490 548 520\" fill=\"none\" stroke=\"#E8683A\" stroke-width=\"12\" stroke-linecap=\"round\" /><circle cx=\"470\" cy=\"424\" r=\"22\" fill=\"#F2C6A0\" stroke=\"#111111\" stroke-width=\"8\" /></g>",
+     "<g id=\"bag\"><path d=\"M262 352L222 462\" stroke=\"#111111\" stroke-width=\"56\" stroke-linecap=\"round\" /><path d=\"M262 352L222 462\" stroke=\"#E8683A\" stroke-width=\"40\" stroke-linecap=\"round\" /><path d=\"M190 505Q190 470 222 470Q254 470 254 505\" fill=\"none\" stroke=\"#111111\" stroke-width=\"9\" /><rect x=\"160\" y=\"500\" width=\"110\" height=\"140\" rx=\"28\" fill=\"#FFE600\" stroke=\"#111111\" stroke-width=\"10\" /><rect x=\"178\" y=\"556\" width=\"74\" height=\"60\" rx=\"14\" fill=\"#2FA58A\" stroke=\"#111111\" stroke-width=\"7\" /><path d=\"M178 530H252\" stroke=\"#111111\" stroke-width=\"7\" stroke-linecap=\"round\" /><circle cx=\"222\" cy=\"468\" r=\"22\" fill=\"#F2C6A0\" stroke=\"#111111\" stroke-width=\"8\" /></g>",
+     "<g id=\"accents\"><path d=\"M608 408L618 432L642 442L618 452L608 476L598 452L574 442L598 432Z\" fill=\"#FFE600\" stroke=\"#111111\" stroke-width=\"5\" stroke-linejoin=\"round\" /><path d=\"M455 305L440 270M485 330L482 292M505 360L525 330\" stroke=\"#111111\" stroke-width=\"8\" stroke-linecap=\"round\" /><path d=\"M120 520Q100 570 120 620M95 500Q65 570 95 640\" fill=\"none\" stroke=\"#E8683A\" stroke-width=\"9\" stroke-linecap=\"round\" /><path d=\"M690 100L670 80M920 100L940 80M905 210L945 215\" stroke=\"#E8683A\" stroke-width=\"9\" stroke-linecap=\"round\" /><path d=\"M900 340L908 358L926 366L908 374L900 392L892 374L874 366L892 358Z\" fill=\"#2FA58A\" stroke=\"#111111\" stroke-width=\"5\" stroke-linejoin=\"round\" /></g>"
+    ],
+    "title": "For busy parents"
+   },
+   "anchor": "auto"
+  },
+  {
+   "start": 56.4,
+   "end": 60.06,
+   "id": "v8",
+   "type": "kinetic_text",
+   "props": {
+    "text": "SO CONVENIENT"
+   },
+   "anchor": "auto"
+  },
+  {
+   "start": 60.2,
+   "end": 61.6,
+   "id": "g10",
+   "type": "emoji_burst",
+   "props": {
+    "emoji": "\ud83d\ude0b"
+   },
+   "anchor": "top"
+  }
+ ],
+ "zooms": [
+  {
+   "start": 7.0,
+   "end": 8.6,
+   "scale": 1.2,
+   "ease": "snap"
+  },
+  {
+   "start": 9.9,
+   "end": 11.2,
+   "scale": 1.2,
+   "ease": "snap"
+  },
+  {
+   "start": 19.6,
+   "end": 21.0,
+   "scale": 1.2,
+   "ease": "ease_in_out"
+  },
+  {
+   "start": 24.3,
+   "end": 25.9,
+   "scale": 1.2,
+   "ease": "snap"
+  },
+  {
+   "start": 29.4,
+   "end": 31.0,
+   "scale": 1.2,
+   "ease": "ease_in_out"
+  },
+  {
+   "start": 35.6,
+   "end": 37.0,
+   "scale": 1.2,
+   "ease": "snap"
+  },
+  {
+   "start": 44.6,
+   "end": 46.0,
+   "scale": 1.2,
+   "ease": "ease_in_out"
+  },
+  {
+   "start": 50.6,
+   "end": 52.2,
+   "scale": 1.2,
+   "ease": "snap"
+  },
+  {
+   "start": 59.8,
+   "end": 61.4,
+   "scale": 1.2,
+   "ease": "snap"
+  }
+ ],
+ "layout": [
+  {
+   "start": 6.56,
+   "end": 14.86,
+   "mode": "speaker"
+  },
+  {
+   "start": 14.86,
+   "end": 24.26,
+   "mode": "split"
+  },
+  {
+   "start": 24.26,
+   "end": 28.38,
+   "mode": "visual"
+  },
+  {
+   "start": 28.38,
+   "end": 31.74,
+   "mode": "speaker"
+  },
+  {
+   "start": 31.74,
+   "end": 39.7,
+   "mode": "split"
+  },
+  {
+   "start": 39.7,
+   "end": 48.54,
+   "mode": "speaker"
+  },
+  {
+   "start": 48.54,
+   "end": 52.32,
+   "mode": "visual"
+  },
+  {
+   "start": 52.32,
+   "end": 60.06,
+   "mode": "split"
+  },
+  {
+   "start": 60.06,
+   "end": 62.6,
+   "mode": "speaker"
+  }
+ ],
+ "reframe": {
+  "keys": [
+   {
+    "t": 0.0,
+    "cx": 0.5138,
+    "cy": 0.2125
+   },
+   {
+    "t": 0.2,
+    "cx": 0.5138,
+    "cy": 0.2125
+   },
+   {
+    "t": 0.4,
+    "cx": 0.5138,
+    "cy": 0.2125
+   },
+   {
+    "t": 0.6,
+    "cx": 0.5138,
+    "cy": 0.2125
+   },
+   {
+    "t": 0.8,
+    "cx": 0.5138,
+    "cy": 0.2125
+   },
+   {
+    "t": 1.0,
+    "cx": 0.5138,
+    "cy": 0.2125
+   },
+   {
+    "t": 1.2,
+    "cx": 0.5138,
+    "cy": 0.2125
+   },
+   {
+    "t": 1.4,
+    "cx": 0.5138,
+    "cy": 0.2125
+   },
+   {
+    "t": 1.6,
+    "cx": 0.5138,
+    "cy": 0.2125
+   },
+   {
+    "t": 1.8,
+    "cx": 0.5138,
+    "cy": 0.2125
+   },
+   {
+    "t": 2.0,
+    "cx": 0.5138,
+    "cy": 0.2125
+   },
+   {
+    "t": 2.2,
+    "cx": 0.5138,
+    "cy": 0.2125
+   },
+   {
+    "t": 2.4,
+    "cx": 0.5138,
+    "cy": 0.2125
+   },
+   {
+    "t": 2.6,
+    "cx": 0.5138,
+    "cy": 0.2125
+   },
+   {
+    "t": 2.8,
+    "cx": 0.5138,
+    "cy": 0.2374
+   },
+   {
+    "t": 3.0,
+    "cx": 0.5138,
+    "cy": 0.269
+   },
+   {
+    "t": 3.2,
+    "cx": 0.5138,
+    "cy": 0.291
+   },
+   {
+    "t": 3.4,
+    "cx": 0.5138,
+    "cy": 0.3112
+   },
+   {
+    "t": 3.6,
+    "cx": 0.5138,
+    "cy": 0.326
+   },
+   {
+    "t": 3.8,
+    "cx": 0.5138,
+    "cy": 0.3367
+   },
+   {
+    "t": 4.0,
+    "cx": 0.5138,
+    "cy": 0.3367
+   },
+   {
+    "t": 4.2,
+    "cx": 0.5138,
+    "cy": 0.3367
+   },
+   {
+    "t": 4.4,
+    "cx": 0.5138,
+    "cy": 0.3367
+   },
+   {
+    "t": 4.6,
+    "cx": 0.5138,
+    "cy": 0.3367
+   },
+   {
+    "t": 4.7989999999999995,
+    "cx": 0.5138,
+    "cy": 0.3367
+   },
+   {
+    "t": 4.8,
+    "cx": 0.6806,
+    "cy": 0.2607
+   },
+   {
+    "t": 5.0,
+    "cx": 0.6806,
+    "cy": 0.2607
+   },
+   {
+    "t": 5.2,
+    "cx": 0.6806,
+    "cy": 0.2786
+   },
+   {
+    "t": 5.4,
+    "cx": 0.6806,
+    "cy": 0.2915
+   },
+   {
+    "t": 5.6,
+    "cx": 0.6806,
+    "cy": 0.3017
+   },
+   {
+    "t": 5.7989999999999995,
+    "cx": 0.6806,
+    "cy": 0.3017
+   },
+   {
+    "t": 5.8,
+    "cx": 0.6923,
+    "cy": 0.2185
+   },
+   {
+    "t": 6.0,
+    "cx": 0.6923,
+    "cy": 0.2185
+   },
+   {
+    "t": 6.2,
+    "cx": 0.6923,
+    "cy": 0.2185
+   },
+   {
+    "t": 6.4,
+    "cx": 0.6923,
+    "cy": 0.2185
+   },
+   {
+    "t": 6.598999999999999,
+    "cx": 0.6923,
+    "cy": 0.2185
+   },
+   {
+    "t": 6.6,
+    "cx": 0.2764,
+    "cy": 0.293
+   },
+   {
+    "t": 6.8,
+    "cx": 0.2764,
+    "cy": 0.293
+   },
+   {
+    "t": 7.0,
+    "cx": 0.2764,
+    "cy": 0.293
+   },
+   {
+    "t": 7.2,
+    "cx": 0.2764,
+    "cy": 0.293
+   },
+   {
+    "t": 7.4,
+    "cx": 0.2764,
+    "cy": 0.293
+   },
+   {
+    "t": 7.6,
+    "cx": 0.2764,
+    "cy": 0.293
+   },
+   {
+    "t": 7.8,
+    "cx": 0.2764,
+    "cy": 0.293
+   },
+   {
+    "t": 8.0,
+    "cx": 0.2764,
+    "cy": 0.293
+   },
+   {
+    "t": 8.2,
+    "cx": 0.2764,
+    "cy": 0.293
+   },
+   {
+    "t": 8.4,
+    "cx": 0.2764,
+    "cy": 0.293
+   },
+   {
+    "t": 8.6,
+    "cx": 0.2764,
+    "cy": 0.293
+   },
+   {
+    "t": 8.8,
+    "cx": 0.2764,
+    "cy": 0.293
+   },
+   {
+    "t": 9.0,
+    "cx": 0.2764,
+    "cy": 0.293
+   },
+   {
+    "t": 9.2,
+    "cx": 0.2764,
+    "cy": 0.293
+   },
+   {
+    "t": 9.399000000000001,
+    "cx": 0.2764,
+    "cy": 0.293
+   },
+   {
+    "t": 9.4,
+    "cx": 0.4095,
+    "cy": 0.4714
+   },
+   {
+    "t": 9.6,
+    "cx": 0.4095,
+    "cy": 0.4714
+   },
+   {
+    "t": 9.8,
+    "cx": 0.4095,
+    "cy": 0.4714
+   },
+   {
+    "t": 10.0,
+    "cx": 0.4095,
+    "cy": 0.4714
+   },
+   {
+    "t": 10.2,
+    "cx": 0.4095,
+    "cy": 0.4714
+   },
+   {
+    "t": 10.4,
+    "cx": 0.4095,
+    "cy": 0.4714
+   },
+   {
+    "t": 10.6,
+    "cx": 0.4095,
+    "cy": 0.4714
+   },
+   {
+    "t": 10.8,
+    "cx": 0.4095,
+    "cy": 0.4714
+   },
+   {
+    "t": 11.0,
+    "cx": 0.4095,
+    "cy": 0.4714
+   },
+   {
+    "t": 11.199,
+    "cx": 0.4095,
+    "cy": 0.4714
+   },
+   {
+    "t": 11.2,
+    "cx": 0.7226,
+    "cy": 0.3229
+   },
+   {
+    "t": 11.4,
+    "cx": 0.7226,
+    "cy": 0.3229
+   },
+   {
+    "t": 11.6,
+    "cx": 0.7226,
+    "cy": 0.3229
+   },
+   {
+    "t": 11.8,
+    "cx": 0.7226,
+    "cy": 0.3229
+   },
+   {
+    "t": 12.0,
+    "cx": 0.7226,
+    "cy": 0.3229
+   },
+   {
+    "t": 12.2,
+    "cx": 0.7496,
+    "cy": 0.3229
+   },
+   {
+    "t": 12.4,
+    "cx": 0.7496,
+    "cy": 0.3229
+   },
+   {
+    "t": 12.6,
+    "cx": 0.7496,
+    "cy": 0.3229
+   },
+   {
+    "t": 12.8,
+    "cx": 0.7713,
+    "cy": 0.3229
+   },
+   {
+    "t": 13.0,
+    "cx": 0.7846,
+    "cy": 0.3229
+   },
+   {
+    "t": 13.2,
+    "cx": 0.7745,
+    "cy": 0.3229
+   },
+   {
+    "t": 13.4,
+    "cx": 0.7745,
+    "cy": 0.3229
+   },
+   {
+    "t": 13.6,
+    "cx": 0.7623,
+    "cy": 0.3229
+   },
+   {
+    "t": 13.8,
+    "cx": 0.7493,
+    "cy": 0.3229
+   },
+   {
+    "t": 14.0,
+    "cx": 0.7493,
+    "cy": 0.3229
+   },
+   {
+    "t": 14.2,
+    "cx": 0.7387,
+    "cy": 0.3229
+   },
+   {
+    "t": 14.4,
+    "cx": 0.7387,
+    "cy": 0.3229
+   },
+   {
+    "t": 14.6,
+    "cx": 0.7387,
+    "cy": 0.3229
+   },
+   {
+    "t": 14.8,
+    "cx": 0.7387,
+    "cy": 0.3229
+   },
+   {
+    "t": 15.0,
+    "cx": 0.7387,
+    "cy": 0.3229
+   },
+   {
+    "t": 15.2,
+    "cx": 0.7387,
+    "cy": 0.3229
+   },
+   {
+    "t": 15.4,
+    "cx": 0.7387,
+    "cy": 0.3229
+   },
+   {
+    "t": 15.6,
+    "cx": 0.7255,
+    "cy": 0.3663
+   },
+   {
+    "t": 15.8,
+    "cx": 0.7255,
+    "cy": 0.4016
+   },
+   {
+    "t": 16.0,
+    "cx": 0.7255,
+    "cy": 0.4259
+   },
+   {
+    "t": 16.2,
+    "cx": 0.7255,
+    "cy": 0.4424
+   },
+   {
+    "t": 16.4,
+    "cx": 0.7152,
+    "cy": 0.4545
+   },
+   {
+    "t": 16.6,
+    "cx": 0.7152,
+    "cy": 0.4545
+   },
+   {
+    "t": 16.8,
+    "cx": 0.7051,
+    "cy": 0.4545
+   },
+   {
+    "t": 17.0,
+    "cx": 0.7051,
+    "cy": 0.4545
+   },
+   {
+    "t": 17.198999999999998,
+    "cx": 0.7051,
+    "cy": 0.4545
+   },
+   {
+    "t": 17.2,
+    "cx": 0.3591,
+    "cy": 0.2964
+   },
+   {
+    "t": 17.4,
+    "cx": 0.3591,
+    "cy": 0.2964
+   },
+   {
+    "t": 17.6,
+    "cx": 0.3591,
+    "cy": 0.2964
+   },
+   {
+    "t": 17.8,
+    "cx": 0.3591,
+    "cy": 0.2964
+   },
+   {
+    "t": 18.0,
+    "cx": 0.3591,
+    "cy": 0.2964
+   },
+   {
+    "t": 18.2,
+    "cx": 0.3591,
+    "cy": 0.2964
+   },
+   {
+    "t": 18.4,
+    "cx": 0.3591,
+    "cy": 0.2964
+   },
+   {
+    "t": 18.6,
+    "cx": 0.3591,
+    "cy": 0.2964
+   },
+   {
+    "t": 18.8,
+    "cx": 0.3591,
+    "cy": 0.2964
+   },
+   {
+    "t": 19.0,
+    "cx": 0.3591,
+    "cy": 0.2964
+   },
+   {
+    "t": 19.2,
+    "cx": 0.3591,
+    "cy": 0.2964
+   },
+   {
+    "t": 19.4,
+    "cx": 0.3591,
+    "cy": 0.2964
+   },
+   {
+    "t": 19.6,
+    "cx": 0.3591,
+    "cy": 0.2964
+   },
+   {
+    "t": 19.8,
+    "cx": 0.3591,
+    "cy": 0.2964
+   },
+   {
+    "t": 20.0,
+    "cx": 0.3591,
+    "cy": 0.2964
+   },
+   {
+    "t": 20.2,
+    "cx": 0.3591,
+    "cy": 0.2964
+   },
+   {
+    "t": 20.4,
+    "cx": 0.3591,
+    "cy": 0.3195
+   },
+   {
+    "t": 20.6,
+    "cx": 0.3591,
+    "cy": 0.3382
+   },
+   {
+    "t": 20.8,
+    "cx": 0.3591,
+    "cy": 0.3514
+   },
+   {
+    "t": 21.0,
+    "cx": 0.3591,
+    "cy": 0.3621
+   },
+   {
+    "t": 21.2,
+    "cx": 0.3591,
+    "cy": 0.3621
+   },
+   {
+    "t": 21.4,
+    "cx": 0.3591,
+    "cy": 0.3621
+   },
+   {
+    "t": 21.6,
+    "cx": 0.3591,
+    "cy": 0.3621
+   },
+   {
+    "t": 21.8,
+    "cx": 0.3591,
+    "cy": 0.3621
+   },
+   {
+    "t": 22.0,
+    "cx": 0.3591,
+    "cy": 0.3621
+   },
+   {
+    "t": 22.2,
+    "cx": 0.3591,
+    "cy": 0.3621
+   },
+   {
+    "t": 22.4,
+    "cx": 0.3591,
+    "cy": 0.3621
+   },
+   {
+    "t": 22.6,
+    "cx": 0.3591,
+    "cy": 0.3621
+   },
+   {
+    "t": 22.8,
+    "cx": 0.3591,
+    "cy": 0.3621
+   },
+   {
+    "t": 23.0,
+    "cx": 0.3591,
+    "cy": 0.3621
+   },
+   {
+    "t": 23.2,
+    "cx": 0.3591,
+    "cy": 0.3621
+   },
+   {
+    "t": 23.4,
+    "cx": 0.3591,
+    "cy": 0.3621
+   },
+   {
+    "t": 23.6,
+    "cx": 0.3695,
+    "cy": 0.3408
+   },
+   {
+    "t": 23.8,
+    "cx": 0.3695,
+    "cy": 0.3288
+   },
+   {
+    "t": 24.0,
+    "cx": 0.3695,
+    "cy": 0.3147
+   },
+   {
+    "t": 24.2,
+    "cx": 0.3695,
+    "cy": 0.3147
+   },
+   {
+    "t": 24.4,
+    "cx": 0.3695,
+    "cy": 0.3147
+   },
+   {
+    "t": 24.599,
+    "cx": 0.3695,
+    "cy": 0.3147
+   },
+   {
+    "t": 24.6,
+    "cx": 0.7478,
+    "cy": 0.2891
+   },
+   {
+    "t": 24.8,
+    "cx": 0.7478,
+    "cy": 0.2891
+   },
+   {
+    "t": 25.0,
+    "cx": 0.7478,
+    "cy": 0.2891
+   },
+   {
+    "t": 25.2,
+    "cx": 0.7478,
+    "cy": 0.2891
+   },
+   {
+    "t": 25.4,
+    "cx": 0.7478,
+    "cy": 0.2891
+   },
+   {
+    "t": 25.6,
+    "cx": 0.7276,
+    "cy": 0.315
+   },
+   {
+    "t": 25.8,
+    "cx": 0.7125,
+    "cy": 0.3328
+   },
+   {
+    "t": 26.0,
+    "cx": 0.6982,
+    "cy": 0.3441
+   },
+   {
+    "t": 26.2,
+    "cx": 0.6863,
+    "cy": 0.3542
+   },
+   {
+    "t": 26.4,
+    "cx": 0.6751,
+    "cy": 0.3542
+   },
+   {
+    "t": 26.6,
+    "cx": 0.6751,
+    "cy": 0.365
+   },
+   {
+    "t": 26.799,
+    "cx": 0.6751,
+    "cy": 0.365
+   },
+   {
+    "t": 26.8,
+    "cx": 0.3325,
+    "cy": 0.2714
+   },
+   {
+    "t": 27.0,
+    "cx": 0.3325,
+    "cy": 0.2714
+   },
+   {
+    "t": 27.2,
+    "cx": 0.3325,
+    "cy": 0.2714
+   },
+   {
+    "t": 27.4,
+    "cx": 0.3325,
+    "cy": 0.2714
+   },
+   {
+    "t": 27.6,
+    "cx": 0.3325,
+    "cy": 0.2714
+   },
+   {
+    "t": 27.8,
+    "cx": 0.3325,
+    "cy": 0.2714
+   },
+   {
+    "t": 28.0,
+    "cx": 0.3472,
+    "cy": 0.2978
+   },
+   {
+    "t": 28.2,
+    "cx": 0.3576,
+    "cy": 0.32
+   },
+   {
+    "t": 28.4,
+    "cx": 0.3576,
+    "cy": 0.3364
+   },
+   {
+    "t": 28.599,
+    "cx": 0.3576,
+    "cy": 0.3364
+   },
+   {
+    "t": 28.6,
+    "cx": 0.4038,
+    "cy": 0.3076
+   },
+   {
+    "t": 28.8,
+    "cx": 0.4038,
+    "cy": 0.3076
+   },
+   {
+    "t": 29.0,
+    "cx": 0.4038,
+    "cy": 0.3076
+   },
+   {
+    "t": 29.2,
+    "cx": 0.4038,
+    "cy": 0.3076
+   },
+   {
+    "t": 29.4,
+    "cx": 0.4038,
+    "cy": 0.3076
+   },
+   {
+    "t": 29.6,
+    "cx": 0.4038,
+    "cy": 0.3076
+   },
+   {
+    "t": 29.8,
+    "cx": 0.4038,
+    "cy": 0.3076
+   },
+   {
+    "t": 30.0,
+    "cx": 0.4598,
+    "cy": 0.3076
+   },
+   {
+    "t": 30.2,
+    "cx": 0.5046,
+    "cy": 0.3076
+   },
+   {
+    "t": 30.4,
+    "cx": 0.5375,
+    "cy": 0.318
+   },
+   {
+    "t": 30.6,
+    "cx": 0.5607,
+    "cy": 0.318
+   },
+   {
+    "t": 30.8,
+    "cx": 0.577,
+    "cy": 0.318
+   },
+   {
+    "t": 31.0,
+    "cx": 0.5912,
+    "cy": 0.318
+   },
+   {
+    "t": 31.2,
+    "cx": 0.6019,
+    "cy": 0.318
+   },
+   {
+    "t": 31.4,
+    "cx": 0.6019,
+    "cy": 0.318
+   },
+   {
+    "t": 31.6,
+    "cx": 0.6019,
+    "cy": 0.318
+   },
+   {
+    "t": 31.8,
+    "cx": 0.6019,
+    "cy": 0.318
+   },
+   {
+    "t": 32.0,
+    "cx": 0.6133,
+    "cy": 0.318
+   },
+   {
+    "t": 32.2,
+    "cx": 0.6133,
+    "cy": 0.318
+   },
+   {
+    "t": 32.4,
+    "cx": 0.6133,
+    "cy": 0.3327
+   },
+   {
+    "t": 32.6,
+    "cx": 0.6133,
+    "cy": 0.3434
+   },
+   {
+    "t": 32.8,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 33.0,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 33.2,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 33.4,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 33.6,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 33.8,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 34.0,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 34.2,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 34.4,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 34.6,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 34.8,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 35.0,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 35.2,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 35.4,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 35.6,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 35.8,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 36.0,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 36.2,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 36.4,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 36.6,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 36.8,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 37.0,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 37.199000000000005,
+    "cx": 0.6239,
+    "cy": 0.3434
+   },
+   {
+    "t": 37.2,
+    "cx": 0.6747,
+    "cy": 0.2544
+   },
+   {
+    "t": 37.4,
+    "cx": 0.6747,
+    "cy": 0.2544
+   },
+   {
+    "t": 37.6,
+    "cx": 0.6747,
+    "cy": 0.2544
+   },
+   {
+    "t": 37.8,
+    "cx": 0.6747,
+    "cy": 0.2544
+   },
+   {
+    "t": 38.0,
+    "cx": 0.6747,
+    "cy": 0.2544
+   },
+   {
+    "t": 38.2,
+    "cx": 0.6747,
+    "cy": 0.2544
+   },
+   {
+    "t": 38.4,
+    "cx": 0.6747,
+    "cy": 0.2544
+   },
+   {
+    "t": 38.6,
+    "cx": 0.6747,
+    "cy": 0.2544
+   },
+   {
+    "t": 38.8,
+    "cx": 0.6747,
+    "cy": 0.2544
+   },
+   {
+    "t": 39.0,
+    "cx": 0.6747,
+    "cy": 0.2544
+   },
+   {
+    "t": 39.2,
+    "cx": 0.6747,
+    "cy": 0.2544
+   },
+   {
+    "t": 39.4,
+    "cx": 0.6747,
+    "cy": 0.2544
+   },
+   {
+    "t": 39.6,
+    "cx": 0.6747,
+    "cy": 0.2544
+   },
+   {
+    "t": 39.8,
+    "cx": 0.6747,
+    "cy": 0.2544
+   },
+   {
+    "t": 40.0,
+    "cx": 0.6747,
+    "cy": 0.2544
+   },
+   {
+    "t": 40.2,
+    "cx": 0.6747,
+    "cy": 0.2544
+   },
+   {
+    "t": 40.4,
+    "cx": 0.6747,
+    "cy": 0.2697
+   },
+   {
+    "t": 40.6,
+    "cx": 0.6747,
+    "cy": 0.2834
+   },
+   {
+    "t": 40.8,
+    "cx": 0.6747,
+    "cy": 0.2834
+   },
+   {
+    "t": 41.0,
+    "cx": 0.6747,
+    "cy": 0.2834
+   },
+   {
+    "t": 41.2,
+    "cx": 0.6747,
+    "cy": 0.2834
+   },
+   {
+    "t": 41.4,
+    "cx": 0.6747,
+    "cy": 0.2834
+   },
+   {
+    "t": 41.6,
+    "cx": 0.6747,
+    "cy": 0.2834
+   },
+   {
+    "t": 41.8,
+    "cx": 0.6747,
+    "cy": 0.2834
+   },
+   {
+    "t": 42.0,
+    "cx": 0.6747,
+    "cy": 0.2834
+   },
+   {
+    "t": 42.2,
+    "cx": 0.6747,
+    "cy": 0.2834
+   },
+   {
+    "t": 42.4,
+    "cx": 0.6747,
+    "cy": 0.2834
+   },
+   {
+    "t": 42.6,
+    "cx": 0.6747,
+    "cy": 0.2834
+   },
+   {
+    "t": 42.8,
+    "cx": 0.6747,
+    "cy": 0.294
+   },
+   {
+    "t": 43.0,
+    "cx": 0.6747,
+    "cy": 0.294
+   },
+   {
+    "t": 43.2,
+    "cx": 0.6747,
+    "cy": 0.3042
+   },
+   {
+    "t": 43.4,
+    "cx": 0.6747,
+    "cy": 0.3042
+   },
+   {
+    "t": 43.6,
+    "cx": 0.6747,
+    "cy": 0.3042
+   },
+   {
+    "t": 43.8,
+    "cx": 0.6747,
+    "cy": 0.3164
+   },
+   {
+    "t": 44.0,
+    "cx": 0.6747,
+    "cy": 0.3164
+   },
+   {
+    "t": 44.2,
+    "cx": 0.6747,
+    "cy": 0.3164
+   },
+   {
+    "t": 44.399,
+    "cx": 0.6747,
+    "cy": 0.3164
+   },
+   {
+    "t": 44.4,
+    "cx": 0.3196,
+    "cy": 0.2573
+   },
+   {
+    "t": 44.6,
+    "cx": 0.3196,
+    "cy": 0.2573
+   },
+   {
+    "t": 44.8,
+    "cx": 0.3196,
+    "cy": 0.2573
+   },
+   {
+    "t": 45.0,
+    "cx": 0.3196,
+    "cy": 0.2573
+   },
+   {
+    "t": 45.2,
+    "cx": 0.3196,
+    "cy": 0.2573
+   },
+   {
+    "t": 45.4,
+    "cx": 0.3196,
+    "cy": 0.2573
+   },
+   {
+    "t": 45.6,
+    "cx": 0.3196,
+    "cy": 0.2573
+   },
+   {
+    "t": 45.8,
+    "cx": 0.3196,
+    "cy": 0.2573
+   },
+   {
+    "t": 46.0,
+    "cx": 0.3196,
+    "cy": 0.2573
+   },
+   {
+    "t": 46.2,
+    "cx": 0.3196,
+    "cy": 0.2573
+   },
+   {
+    "t": 46.4,
+    "cx": 0.3196,
+    "cy": 0.2573
+   },
+   {
+    "t": 46.6,
+    "cx": 0.3196,
+    "cy": 0.2573
+   },
+   {
+    "t": 46.8,
+    "cx": 0.3196,
+    "cy": 0.2919
+   },
+   {
+    "t": 47.0,
+    "cx": 0.3196,
+    "cy": 0.315
+   },
+   {
+    "t": 47.2,
+    "cx": 0.3196,
+    "cy": 0.3347
+   },
+   {
+    "t": 47.4,
+    "cx": 0.3196,
+    "cy": 0.3471
+   },
+   {
+    "t": 47.599000000000004,
+    "cx": 0.3196,
+    "cy": 0.3471
+   },
+   {
+    "t": 47.6,
+    "cx": 0.7323,
+    "cy": 0.2609
+   },
+   {
+    "t": 47.8,
+    "cx": 0.7323,
+    "cy": 0.2609
+   },
+   {
+    "t": 48.0,
+    "cx": 0.7323,
+    "cy": 0.2609
+   },
+   {
+    "t": 48.2,
+    "cx": 0.7477,
+    "cy": 0.2609
+   },
+   {
+    "t": 48.4,
+    "cx": 0.7477,
+    "cy": 0.2609
+   },
+   {
+    "t": 48.6,
+    "cx": 0.7477,
+    "cy": 0.2609
+   },
+   {
+    "t": 48.8,
+    "cx": 0.6999,
+    "cy": 0.3462
+   },
+   {
+    "t": 49.0,
+    "cx": 0.66,
+    "cy": 0.4118
+   },
+   {
+    "t": 49.2,
+    "cx": 0.6248,
+    "cy": 0.4655
+   },
+   {
+    "t": 49.4,
+    "cx": 0.5969,
+    "cy": 0.5036
+   },
+   {
+    "t": 49.6,
+    "cx": 0.573,
+    "cy": 0.5337
+   },
+   {
+    "t": 49.8,
+    "cx": 0.5602,
+    "cy": 0.5506
+   },
+   {
+    "t": 50.0,
+    "cx": 0.5602,
+    "cy": 0.5659
+   },
+   {
+    "t": 50.2,
+    "cx": 0.5602,
+    "cy": 0.5659
+   },
+   {
+    "t": 50.4,
+    "cx": 0.5602,
+    "cy": 0.5659
+   },
+   {
+    "t": 50.6,
+    "cx": 0.5602,
+    "cy": 0.5659
+   },
+   {
+    "t": 50.8,
+    "cx": 0.5602,
+    "cy": 0.5659
+   },
+   {
+    "t": 50.999,
+    "cx": 0.5602,
+    "cy": 0.5659
+   },
+   {
+    "t": 51.0,
+    "cx": 0.4096,
+    "cy": 0.3148
+   },
+   {
+    "t": 51.2,
+    "cx": 0.4096,
+    "cy": 0.3148
+   },
+   {
+    "t": 51.4,
+    "cx": 0.4096,
+    "cy": 0.3148
+   },
+   {
+    "t": 51.6,
+    "cx": 0.4096,
+    "cy": 0.3148
+   },
+   {
+    "t": 51.8,
+    "cx": 0.4096,
+    "cy": 0.3148
+   },
+   {
+    "t": 52.0,
+    "cx": 0.4096,
+    "cy": 0.3148
+   },
+   {
+    "t": 52.2,
+    "cx": 0.4096,
+    "cy": 0.3148
+   },
+   {
+    "t": 52.399,
+    "cx": 0.4096,
+    "cy": 0.3148
+   },
+   {
+    "t": 52.4,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 52.6,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 52.8,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 53.0,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 53.2,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 53.4,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 53.6,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 53.8,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 54.0,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 54.2,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 54.4,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 54.6,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 54.8,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 55.0,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 55.2,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 55.4,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 55.6,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 55.8,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 56.0,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 56.2,
+    "cx": 0.691,
+    "cy": 0.2453
+   },
+   {
+    "t": 56.4,
+    "cx": 0.691,
+    "cy": 0.257
+   },
+   {
+    "t": 56.6,
+    "cx": 0.691,
+    "cy": 0.257
+   },
+   {
+    "t": 56.8,
+    "cx": 0.691,
+    "cy": 0.257
+   },
+   {
+    "t": 57.0,
+    "cx": 0.691,
+    "cy": 0.257
+   },
+   {
+    "t": 57.2,
+    "cx": 0.691,
+    "cy": 0.257
+   },
+   {
+    "t": 57.4,
+    "cx": 0.691,
+    "cy": 0.257
+   },
+   {
+    "t": 57.6,
+    "cx": 0.617,
+    "cy": 0.2778
+   },
+   {
+    "t": 57.8,
+    "cx": 0.5647,
+    "cy": 0.2954
+   },
+   {
+    "t": 58.0,
+    "cx": 0.5889,
+    "cy": 0.2954
+   },
+   {
+    "t": 58.2,
+    "cx": 0.606,
+    "cy": 0.2954
+   },
+   {
+    "t": 58.4,
+    "cx": 0.621,
+    "cy": 0.2954
+   },
+   {
+    "t": 58.6,
+    "cx": 0.6324,
+    "cy": 0.2954
+   },
+   {
+    "t": 58.8,
+    "cx": 0.6324,
+    "cy": 0.2954
+   },
+   {
+    "t": 58.999,
+    "cx": 0.6324,
+    "cy": 0.2954
+   },
+   {
+    "t": 59.0,
+    "cx": 0.3316,
+    "cy": 0.2938
+   },
+   {
+    "t": 59.2,
+    "cx": 0.3316,
+    "cy": 0.2938
+   },
+   {
+    "t": 59.4,
+    "cx": 0.3316,
+    "cy": 0.2938
+   },
+   {
+    "t": 59.6,
+    "cx": 0.3316,
+    "cy": 0.2938
+   },
+   {
+    "t": 59.8,
+    "cx": 0.3316,
+    "cy": 0.2938
+   },
+   {
+    "t": 60.0,
+    "cx": 0.3316,
+    "cy": 0.2938
+   },
+   {
+    "t": 60.2,
+    "cx": 0.3316,
+    "cy": 0.2938
+   },
+   {
+    "t": 60.4,
+    "cx": 0.3316,
+    "cy": 0.2938
+   },
+   {
+    "t": 60.6,
+    "cx": 0.3316,
+    "cy": 0.3327
+   },
+   {
+    "t": 60.8,
+    "cx": 0.3316,
+    "cy": 0.3664
+   },
+   {
+    "t": 61.0,
+    "cx": 0.3316,
+    "cy": 0.3867
+   },
+   {
+    "t": 61.2,
+    "cx": 0.3316,
+    "cy": 0.408
+   },
+   {
+    "t": 61.4,
+    "cx": 0.3316,
+    "cy": 0.4198
+   },
+   {
+    "t": 61.6,
+    "cx": 0.3316,
+    "cy": 0.4326
+   },
+   {
+    "t": 61.799,
+    "cx": 0.3316,
+    "cy": 0.4326
+   },
+   {
+    "t": 61.8,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 62.0,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 62.2,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 62.4,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 62.6,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 62.8,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 63.0,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 63.2,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 63.4,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 63.6,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 63.8,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 64.0,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 64.2,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 64.4,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 64.6,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 64.8,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 65.0,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 65.2,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 65.4,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 65.6,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 65.8,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 66.0,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 66.2,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 66.4,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 66.6,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 66.8,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 67.0,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 67.2,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 67.4,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 67.6,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 67.8,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 68.0,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 68.2,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 68.4,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 68.6,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 68.8,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 69.0,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 69.2,
+    "cx": 0.676,
+    "cy": 0.276
+   },
+   {
+    "t": 69.4,
+    "cx": 0.676,
+    "cy": 0.276
+   }
+  ]
+ },
+ "style": {
+  "name": "bold_creator",
+  "caption": {
+   "font": "Montserrat",
+   "weight": 800,
+   "size": 80,
+   "color": "#FFFFFF",
+   "highlight_color": "#FFE600",
+   "stroke_color": "#000000",
+   "stroke_width": 6,
+   "uppercase": true,
+   "position": "bottom",
+   "words_per_line": 2,
+   "animation": "bounce"
+  },
+  "graphics": {
+   "density": "heavy",
+   "theme": "bold",
+   "accent_color": "#FFE600"
+  },
+  "pacing": {
+   "remove_fillers": true,
+   "max_silence": 0.25
+  },
+  "camera": {
+   "zoom_frequency": "high",
+   "zoom_scale": 1.2
+  }
+ }
+}

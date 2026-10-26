@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from contextlib import asynccontextmanager
 import shutil
 import threading
 import uuid
@@ -16,12 +17,19 @@ from pydantic import BaseModel, Field
 
 from api import assets, jobs, recipes
 from hypercut import plan as plan_mod
-from hypercut import assistant, edit, export, generate, llm, review, run, variants
+from hypercut import assistant, checks, diff, edit, explain, export, generate, history, llm, qa, review, run, variants
 from hypercut.analyze import cuts as cutting
 from hypercut.matte import MATTE_FILE
 from hypercut.plan import EditPlan, Style
 
-app = FastAPI(title="HyperCut")
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    recover_interrupted()
+    yield
+
+
+app = FastAPI(title="HyperCut", lifespan=_lifespan)
 # The web app calls the API straight from the browser (ADR 0802).
 app.add_middleware(
     CORSMiddleware,
@@ -29,6 +37,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+INTERRUPTED = "HyperCut stopped while this was running (the app was closed or crashed). Try again."
+
+
+def recover_interrupted() -> None:
+    """Work that was running when the server stopped can't still be running: say so, so the editor offers
+    a retry instead of waiting forever (ADR 0021)."""
+    for job_id in jobs.all_ids():
+        try:
+            state = jobs.read(job_id)
+        except (KeyError, ValueError):
+            continue
+        fields = {}
+        if state.get("status") in ("queued", "running"):
+            fields.update(status="error", error=INTERRUPTED, interrupted=True)
+        for task in ("render", "matte", "export"):
+            if state.get(task) == "running":
+                fields.update({task: "error", f"{task}_error": INTERRUPTED})
+        if state.get("qa") == "running":
+            fields["qa"] = None
+        if fields:
+            jobs.write(job_id, **fields)
+
 
 # Rendering is heavy; one at a time keeps a laptop usable.
 _render_slot = threading.Semaphore(1)
@@ -89,9 +120,16 @@ def _render(job_id: str) -> None:
     with _render_slot:
         try:
             run.render_plan(jobs.job_dir(job_id))
-            jobs.write(job_id, render="done")
+            jobs.write(job_id, render="done", qa="running")
         except Exception as e:
             jobs.write(job_id, render="error", render_error=str(e))
+            return
+    # A render that exited cleanly is not yet a good file: inspect it (ADR 0023).
+    try:
+        result = qa.validate_job(jobs.job_dir(job_id))
+        jobs.write(job_id, qa=result)
+    except Exception as e:
+        jobs.write(job_id, qa={"ok": None, "error": str(e)[:300]})
 
 
 _matte_jobs: set[str] = set()  # jobs whose cut-out is being made by this server process
@@ -132,6 +170,24 @@ def create_job(
     return {"id": job_id, "status": "queued"}
 
 
+@app.post("/jobs/{job_id}/retry", status_code=202)
+def retry_job(job_id: str, background: BackgroundTasks):
+    """Run the pipeline again on the uploaded video of a job that failed or was interrupted."""
+    state = _job(job_id)
+    if state["status"] != "error":
+        raise HTTPException(409, f"job is {state['status']}; only a failed job can be retried")
+    upload = next(iter(sorted(jobs.job_dir(job_id).glob("upload.*"))), None) or next(
+        iter(sorted(jobs.job_dir(job_id).glob("upload"))), None)
+    if upload is None:
+        raise HTTPException(409, "the uploaded video is gone; upload it again")
+    recipe = state.get("style", "")
+    saved = recipes.get(recipe.removeprefix("recipe: ")) if recipe.startswith("recipe: ") else None
+    jobs.write(job_id, status="queued", stage=None, error=None, interrupted=False)
+    background.add_task(_process, job_id, upload, "" if saved else state.get("style", ""),
+                        state.get("hook_strategy", "cold_open"), saved, bool(state.get("pictures")))
+    return {"id": job_id, "status": "queued"}
+
+
 @app.get("/jobs/{job_id}")
 def get_job(job_id: str):
     state = _job(job_id)
@@ -147,8 +203,10 @@ def get_job(job_id: str):
 
 
 @app.put("/jobs/{job_id}/plan")
-def put_plan(job_id: str, plan: EditPlan):
-    """Replace the plan; an invalid plan gets a 422 from validation."""
+def put_plan(job_id: str, plan: EditPlan, kind: history.Kind = "edit", note: str | None = None,
+             label: str | None = None):
+    """Save the plan as a new version (ADR 0021); an invalid plan gets a 422 from validation. `kind` says who
+    made it (the editor, an accepted assistant request, review fixes), `note` the request, `label` a name."""
     state = _editable(job_id)
     missing = sorted(_media_names(plan) - _known_media(job_id, state))
     if missing:
@@ -156,20 +214,125 @@ def put_plan(job_id: str, plan: EditPlan):
     path, base = _plan_path(job_id), _base_path(job_id)
     if path.is_file() and not base.exists():
         shutil.copyfile(path, base)
-    plan_mod.save(plan, path)
-    jobs.write(job_id, render=None, render_error=None)  # any earlier render is stale
+    history.commit(jobs.job_dir(job_id), plan, kind, note=(note or "")[:300] or None, label=label)
+    jobs.write(job_id, render=None, render_error=None, qa=None)  # any earlier render is stale
     return plan.model_dump(mode="json")
 
 
 @app.post("/jobs/{job_id}/plan/restore")
 def restore_plan(job_id: str):
-    """Put back the plan the pipeline made, dropping every edit."""
+    """Put back the plan the pipeline made, as a new version (the edits stay in the history)."""
     _editable(job_id)
-    base = _base_path(job_id)
-    if base.is_file():
-        shutil.copyfile(base, _plan_path(job_id))
-        jobs.write(job_id, render=None, render_error=None)
+    directory = jobs.job_dir(job_id)
+    index = history.ensure(directory)
+    first = next((v for v in index.versions if v.kind == "pipeline"), None)
+    if first is not None:
+        history.restore(directory, first.id)
+        jobs.write(job_id, render=None, render_error=None, qa=None)
     return plan_mod.load(_plan_path(job_id)).model_dump(mode="json")
+
+
+# Version history (ADR 0021): every saved version, undo/redo that survives a reload, named versions.
+
+def _history_dir(job_id: str) -> Path:
+    state = _job(job_id)
+    if state["status"] != "done" or not _plan_path(job_id).is_file():
+        raise HTTPException(409, f"job is {state['status']}; there is no plan yet")
+    return jobs.job_dir(job_id)
+
+
+@app.get("/jobs/{job_id}/history")
+def get_history(job_id: str):
+    return history.listing(_history_dir(job_id))
+
+
+@app.get("/jobs/{job_id}/history/{vid}")
+def get_version(job_id: str, vid: int):
+    directory = _history_dir(job_id)
+    try:
+        plan = history.load_version(directory, vid)
+    except KeyError:
+        raise HTTPException(404, "no such version") from None
+    return {"plan": plan.model_dump(mode="json"), "changes_from_current": diff.explain(plan_mod.load(_plan_path(job_id)), plan)}
+
+
+def _moved(job_id: str, step) -> dict:
+    _editable(job_id)
+    try:
+        plan, version = step(jobs.job_dir(job_id))
+    except LookupError as e:
+        raise HTTPException(409, str(e)) from None
+    jobs.write(job_id, render=None, render_error=None, qa=None)
+    return {"plan": plan.model_dump(mode="json"), "version": version.model_dump(mode="json"),
+            **{k: v for k, v in history.listing(jobs.job_dir(job_id)).items() if k != "versions"}}
+
+
+@app.post("/jobs/{job_id}/history/undo")
+def undo(job_id: str):
+    return _moved(job_id, history.undo)
+
+
+@app.post("/jobs/{job_id}/history/redo")
+def redo(job_id: str):
+    return _moved(job_id, history.redo)
+
+
+@app.post("/jobs/{job_id}/history/{vid}/restore")
+def restore_version(job_id: str, vid: int):
+    _editable(job_id)
+    directory = jobs.job_dir(job_id)
+    try:
+        version = history.restore(directory, vid)
+    except KeyError:
+        raise HTTPException(404, "no such version") from None
+    jobs.write(job_id, render=None, render_error=None, qa=None)
+    return {"plan": plan_mod.load(_plan_path(job_id)).model_dump(mode="json"), "version": version.model_dump(mode="json")}
+
+
+class NameRequest(BaseModel):
+    label: str | None = Field(default=None, max_length=80)
+
+
+@app.patch("/jobs/{job_id}/history/{vid}")
+def name_version(job_id: str, vid: int, req: NameRequest):
+    try:
+        return history.name(_history_dir(job_id), vid, req.label).model_dump(mode="json")
+    except KeyError:
+        raise HTTPException(404, "no such version") from None
+
+
+@app.put("/jobs/{job_id}/draft")
+def put_draft(job_id: str, plan: EditPlan):
+    """The editor's autosave of unsaved edits, every few seconds; offered back when the editor reopens."""
+    return history.save_draft(_history_dir(job_id), plan)
+
+
+@app.get("/jobs/{job_id}/draft")
+def get_draft(job_id: str):
+    return {"draft": history.draft(_history_dir(job_id))}
+
+
+@app.delete("/jobs/{job_id}/draft")
+def delete_draft(job_id: str):
+    history.discard_draft(_history_dir(job_id))
+    return {"deleted": True}
+
+
+@app.post("/jobs/{job_id}/checks")
+def check_plan(job_id: str, plan: EditPlan):
+    """Automatic checks of an (unsaved) plan: clipped words, leftover pauses, length, hook, visuals (ADR 0023)."""
+    _job(job_id)
+    return checks.report(plan, jobs.job_dir(job_id))
+
+
+@app.get("/jobs/{job_id}/explain")
+def explain_cut(job_id: str):
+    """Why HyperCut's first cut looks the way it does (and the current edit, if it was changed since)."""
+    directory = _history_dir(job_id)
+    index = history.ensure(directory)
+    first = next((v for v in index.versions if v.kind == "pipeline"), None)
+    plan = history.load_version(directory, first.id) if first else plan_mod.load(_plan_path(job_id))
+    return {"first_cut": explain.first_cut(plan), "current": explain.first_cut(plan_mod.load(_plan_path(job_id)))}
 
 
 @app.post("/jobs/{job_id}/assets", status_code=201)
@@ -227,7 +390,8 @@ def assistant_edit(job_id: str, req: AssistRequest):
                                   str(wav) if wav.is_file() else None)
     except llm.LLMError as e:
         raise HTTPException(502, f"the assistant could not answer: {str(e)[:300]}") from None
-    return {"plan": result.plan.model_dump(mode="json"), "message": result.message, "changes": result.changes}
+    return {"plan": result.plan.model_dump(mode="json"), "message": result.message, "changes": result.changes,
+            "explanation": result.explanation}
 
 
 @app.post("/jobs/{job_id}/recut")
@@ -339,7 +503,7 @@ def _clone(job_id: str, plan: EditPlan, label: str) -> str:
                 os.link(p, target / p.name)
             except OSError:
                 shutil.copyfile(p, target / p.name)
-    plan_mod.save(plan, target / "plan.json")
+    history.commit(target, plan, "pipeline", changes=[], note=f"A variant of {state.get('filename') or job_id}: {label}")
     jobs.write(new_id, status="done", stage="done", error=None, render=None, render_error=None,
                style=state.get("style", ""), hook_strategy=plan.hook.strategy,
                filename=f"{state.get('filename') or job_id} ({label})", assets=state.get("assets", []), variant_of=job_id)
