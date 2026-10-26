@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from hypercut import llm, vision
+from hypercut import llm, modes, vision
 from hypercut.analyze import cuts as cutting
 from hypercut.analyze import cutaways, motion, stage
 from hypercut.analyze.visuals import merge_graphics, plan_visuals
@@ -136,7 +136,7 @@ def analyze(
             max_zooms=max_zooms,
             types=list(GENERATED_GRAPHIC_TYPES),
             motion=motion.PROMPT.format(max_motion=max_motion),
-        ) + extra + (VISION_PROMPT.format(shots=vision.summary(visual_index)) if visual_index and visual_index.shots else ""),
+        ) + modes.guidance(style.mode) + extra + (VISION_PROMPT.format(shots=vision.summary(visual_index)) if visual_index and visual_index.shots else ""),
         system=SYSTEM,
     )
 

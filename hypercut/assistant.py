@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from hypercut import diff, edit, llm
+from hypercut import diff, edit, llm, modes
 from hypercut import plan as plan_mod
 from hypercut.analyze import cuts as cutting
 from hypercut.analyze import motion, stage, visuals
@@ -105,6 +105,7 @@ speed up the whole reel; keep_pause is how much pause stays around each cut (re-
 - {{"op": "motion", "start": s, "end": e, "title": "1-4 words", "idea": "the one 3D object or moment to show"}}  a 2-3 s full-screen 3D motion graphic of what is said there (the speaker keeps talking)
 - {{"op": "cut_transition", "at": s, "kind": "drop" | "whip" | "zoom" | "push" | "none"}}  an animated transition at a cut or shot change: drop = the old shot falls off screen, whip = a fast blurred pan, zoom = pushing through, push = slides up; "none" removes the one there. Use sparingly
 - {{"op": "depth", "enabled": false}}  turn all green-screen effects off
+- {{"op": "mode", "mode": "talking_head" | "podcast" | "product_demo" | "vlog"}}  edit the reel as another kind of video (pacing, zooms, captions, cuts; re-cuts the pauses): only when the user asks for that kind of edit
 {pictures}- {{"op": "transitions", "style": "editorial" | "hard" | "smooth" | "zoom", "fade_out": seconds}}  editorial (J-cuts, \
 punch-ins across jump cuts, a settle on new shots), hard cuts, short crossfades, or alternating punch-ins at cuts; fade to black at the end
 
@@ -348,6 +349,11 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
             if pause is not None and abs(pause - plan.style.pacing.keep_pause) > 1e-6:
                 plan.style.pacing.keep_pause = min(1.0, max(0.0, pause))
                 recut = True
+        elif kind == "mode" and op.get("mode") in modes.MODES and op["mode"] != plan.style.mode:
+            before = plan.style.pacing.model_copy()
+            plan.style = modes.apply(plan.style, op["mode"])
+            changes.append(f"Edited as {diff.article(modes.get(op['mode']).label.lower())}")
+            recut = recut or plan.style.pacing != before
         elif kind == "behind_text" and str(op.get("text") or "").strip():
             span = span_of(op, 2.5, MAX_ADD_SECONDS)
             if span:

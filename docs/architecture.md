@@ -88,6 +88,14 @@ per shot; shots that show a screen, a product or other footage are kept clear of
 the footage fix what speech recognition misheard. Without it, everything works from the transcript alone. See
 [ADR 0024](decisions/0024-visual-index.md).
 
+## Editing modes
+
+What the user is making (talking head, podcast clip, product demo, vlog) is `plan.style.mode`. A mode
+(`hypercut/modes.py`) is a policy over the same engine: a patch of pacing, camera, graphics, caption and cut
+settings applied over the style's preset (what the user asked for still wins), and a paragraph of planner guidance
+on hooks, what to keep and which graphics suit it. It is picked on the upload page or switched later with the
+assistant, which re-cuts the pauses and keeps the rest of the edit. See [ADR 0025](decisions/0025-editing-modes.md).
+
 ## Quality: checks, export validation, benchmark
 
 Plan checks (`hypercut/checks.py`) find what a first watch would: clipped words, leftover pauses, a reel that ends

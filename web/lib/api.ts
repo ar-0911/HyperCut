@@ -76,8 +76,9 @@ export function fileUrl(id: string, name: string): string {
 	return `${API_URL}/jobs/${id}/files/${encodeURIComponent(name)}`;
 }
 
-/** `vision`: who describes frames of the footage: '' (the server's default), 'none' (local only), 'ollama' or 'claude' (sends frames). */
-export function createJob(video: File, style: string, hookStrategy: 'cold_open' | 'trim', recipe = '', pictures = false, vision = '') {
+/** `vision`: who describes frames of the footage: '' (the server's default), 'none' (local only), 'ollama' or 'claude' (sends frames).
+ * `mode`: the editing mode (ADR 0025); empty for the server's default (talking head). */
+export function createJob(video: File, style: string, hookStrategy: 'cold_open' | 'trim', recipe = '', pictures = false, vision = '', mode = '') {
 	const form = new FormData();
 	form.set('video', video);
 	form.set('style', style);
@@ -85,6 +86,7 @@ export function createJob(video: File, style: string, hookStrategy: 'cold_open' 
 	if (recipe) form.set('recipe', recipe);
 	if (pictures) form.set('pictures', 'true');
 	if (vision) form.set('vision', vision);
+	if (mode) form.set('mode', mode);
 	return request<{id: string; status: string}>('/jobs', {method: 'POST', body: form});
 }
 

@@ -437,3 +437,11 @@ def test_render_is_validated_and_plans_can_be_checked(client, fake_stages, monke
     plan = body["plan"]
     report = client.post(f"/jobs/{job_id}/checks", json=plan).json()
     assert report["ok"] and [i["code"] for i in report["issues"]] == ["ends_mid_sentence"]
+
+
+def test_modes_listed_and_picked_at_upload(client, fake_stages):
+    listed = client.get("/modes").json()
+    assert listed["default"] == "talking_head" and {m["name"] for m in listed["modes"]} >= {"podcast", "vlog"}
+    body = _wait(client, _submit(client, mode="product_demo"))
+    assert body["mode"] == "product_demo" and body["plan"]["style"]["mode"] == "product_demo"
+    assert client.post("/jobs", files={"video": ("c.mp4", b"x")}, data={"mode": "nope"}).status_code == 422

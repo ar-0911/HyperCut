@@ -295,8 +295,14 @@ class Depth(_Model):
         return self
 
 
+EditingMode = Literal["talking_head", "podcast", "product_demo", "vlog"]
+
+
 class Style(_Model):
     name: str = "bold_creator"
+    # How the reel is edited, as opposed to how it looks (ADR 0025): `hypercut.modes` sets pacing, camera,
+    # graphics and cuts for the mode, and tells the planner what makes a hook and what to keep.
+    mode: EditingMode = "talking_head"
     caption: CaptionStyle = CaptionStyle()
     graphics: GraphicsStyle = GraphicsStyle()
     pacing: Pacing = Pacing()

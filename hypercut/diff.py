@@ -164,6 +164,10 @@ def _fields(a: Any, b: Any, path: str) -> list[str]:
         label = f"{path} {key.replace('_', ' ')}".strip()
         if isinstance(va, BaseModel) and isinstance(vb, BaseModel):
             out += _fields(va, vb, label)
+        elif label == "mode":
+            from hypercut.modes import get
+
+            out.append(f"Editing mode: {get(va).label} → {get(vb).label}")
         else:
             out.append(f"{label[0].upper()}{label[1:]}: {va} → {vb}")
     return out

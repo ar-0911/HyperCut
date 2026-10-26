@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
-from hypercut import audio, history
+from hypercut import audio, history, modes
 from hypercut import plan as plan_mod
 from hypercut.analyze import analyze
 from hypercut.analyze.transitions import plan_transitions
@@ -48,13 +48,15 @@ def run_pipeline(
     recipe: Style | None = None,
     pictures: bool = False,
     vision: str | None = None,
+    mode: str | None = None,
 ) -> EditPlan:
     """Run every stage and save `plan.json` in `job_dir`. `on_stage(name)` is called as each begins.
     A `recipe` (a saved style, ADR 0018) is used as the style as it is, instead of reading the style prompt.
     `pictures` lets some visuals be stock footage or generated pictures / clips (ADR 0020): off by default, and
     without keys it changes nothing. `vision` picks who describes the sampled frames of the visual index
     (ADR 0024): "none" (local signals only), "ollama" (a local model) or "claude" (sends frames to Claude);
-    default `HYPERCUT_VISION` or "none"; "off" skips the index."""
+    default `HYPERCUT_VISION` or "none"; "off" skips the index. `mode` is the editing mode (ADR 0025): podcast,
+    product_demo, vlog or talking_head; what the style prompt or recipe asked for still wins over it."""
     job_dir = Path(job_dir)
     note = on_stage or (lambda _name: None)
 
@@ -74,6 +76,8 @@ def run_pipeline(
 
         note("style")
         style = styled.result()
+        if mode:
+            style = modes.apply(style, mode)
         # The speaker is cut out only when the style prompt asked for a different background or things behind
         # them (ADR 0901, 0614): the cut-out is made while Claude plans the edit.
         cutout = None
@@ -223,6 +227,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-visuals", action="store_true", help="skip per-beat layouts and illustrations")
     ap.add_argument("--pictures", action="store_true",
                     help="let some visuals be stock footage or generated pictures (needs keys, see .env.example)")
+    ap.add_argument("--mode", choices=list(modes.MODES), help="editing mode (default talking_head)")
     args = ap.parse_args(argv)
 
     job_dir = Path(args.out) if args.out else ROOT / "media" / ("cli-" + Path(args.video).stem)
@@ -230,7 +235,7 @@ def main(argv: list[str] | None = None) -> int:
         plan = run_pipeline(
             args.video, job_dir, args.style, args.strategy,
             on_stage=lambda s: print("[" + s + "]", file=sys.stderr),
-            visuals=not args.no_visuals, pictures=args.pictures,
+            visuals=not args.no_visuals, pictures=args.pictures, mode=args.mode,
         )
         print(
             f"{len(plan.transcript.words)} words, {len(plan.hook.candidates)} hooks, "

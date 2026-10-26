@@ -92,6 +92,8 @@ export type TransitionStyle = 'hard' | 'smooth' | 'zoom' | 'editorial';
 export type Transitions = {style: TransitionStyle; length: number; fade_in: number; fade_out: number};
 export type Style = {
 	name: string;
+	/** How the reel is edited (ADR 0025); the renderer does not read it. */
+	mode?: "talking_head" | "podcast" | "product_demo" | "vlog";
 	caption: CaptionStyle;
 	graphics: GraphicsStyle;
 	pacing: Pacing;

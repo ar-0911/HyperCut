@@ -145,3 +145,9 @@ def test_visual_index_reaches_the_planner_and_fixes_names(tmp_path, stages, monk
     assert plan.transcript.words[1].text == "Kachava,"
     saved = json.loads((tmp_path / "job" / "visual_index.json").read_text())
     assert saved["corrections"] == [{"t": 0.5, "heard": "Kachaba", "written": "Kachava"}]
+
+
+def test_mode_sets_how_the_reel_is_edited(tmp_path, stages):
+    plan = run.run_pipeline("in.mp4", tmp_path / "job", "", mode="vlog")
+    assert plan.style.mode == "vlog" and plan.style.transitions.style == "smooth"
+    assert run.run_pipeline("in.mp4", tmp_path / "j2", "").style.mode == "talking_head"

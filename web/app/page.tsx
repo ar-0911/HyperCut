@@ -3,6 +3,7 @@
 import {useRouter} from 'next/navigation';
 import {useEffect, useState, type FormEvent} from 'react';
 import {createJob, deleteRecipe, generationSources, listRecipes, type Recipe} from '@/lib/api';
+import {MODES, type Mode} from '@/lib/modes';
 import {PRESETS} from '@/lib/presets';
 
 export default function UploadPage() {
@@ -17,6 +18,7 @@ export default function UploadPage() {
 	const [sources, setSources] = useState<string[]>([]);
 	const [pictures, setPictures] = useState(false);
 	const [vision, setVision] = useState('none');
+	const [mode, setMode] = useState<Mode>('talking_head');
 
 	useEffect(() => {
 		listRecipes()
@@ -44,7 +46,7 @@ export default function UploadPage() {
 		setBusy(true);
 		setError(null);
 		try {
-			const {id} = await createJob(file, recipe ? '' : style, strategy, recipe, pictures && sources.length > 0, vision);
+			const {id} = await createJob(file, recipe ? '' : style, strategy, recipe, pictures && sources.length > 0, vision, mode);
 			router.push(`/jobs/${id}`);
 		} catch (err) {
 			setError((err as Error).message);
@@ -60,6 +62,18 @@ export default function UploadPage() {
 			<div className="card">
 				<label htmlFor="video">Video</label>
 				<input id="video" type="file" accept="video/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+			</div>
+
+			<div className="card">
+				<label>What are you making?</label>
+				<div className="chips">
+					{MODES.map((m) => (
+						<button type="button" key={m.name} className={`chip${mode === m.name ? ' active' : ''}`} onClick={() => setMode(m.name)}>
+							{m.label}
+						</button>
+					))}
+				</div>
+				<p className="hint">{MODES.find((m) => m.name === mode)?.hint} It sets how the video is cut; the style below sets how it looks.</p>
 			</div>
 
 			{recipes.length > 0 && (
