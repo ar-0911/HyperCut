@@ -9,6 +9,7 @@ for green-screen effects], then writes plan.json (and output.mp4 with --render).
 from __future__ import annotations
 
 import argparse
+import functools
 import logging
 import os
 import subprocess
@@ -23,7 +24,7 @@ from hypercut import plan as plan_mod
 from hypercut.analyze import analyze
 from hypercut.analyze.transitions import plan_transitions
 from hypercut.generate import generate, pending
-from hypercut.ingest import ingest
+from hypercut.ingest import ingest, manifest
 from hypercut.matte import MATTE_FILE, matte, needs_matte, place_titles
 from hypercut.plan import EditPlan, Style
 from hypercut.reframe import reframe
@@ -38,6 +39,33 @@ RENDER_DIR = ROOT / "render"
 log = logging.getLogger(__name__)
 
 
+def _tracked(fn):
+    """Record each stage's status in the job's manifest.json (ADR 0104) as the pipeline reports it."""
+    @functools.wraps(fn)
+    def run(video, job_dir, *args, on_stage: Callable[[str], None] | None = None, **kwargs):
+        seen: list[str] = []
+
+        def note(name: str) -> None:
+            if seen:
+                manifest.mark(job_dir, seen[-1], "done")
+            seen.append(name)
+            manifest.mark(job_dir, name, "running")
+            if on_stage:
+                on_stage(name)
+
+        try:
+            plan = fn(video, job_dir, *args, on_stage=note, **kwargs)
+        except BaseException:
+            if seen:
+                manifest.mark(job_dir, seen[-1], "failed")
+            raise
+        if seen:
+            manifest.mark(job_dir, seen[-1], "done")
+        return plan
+    return run
+
+
+@_tracked
 def run_pipeline(
     video: str | Path,
     job_dir: str | Path,

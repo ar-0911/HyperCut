@@ -3,7 +3,7 @@ import wave
 
 import pytest
 
-from hypercut.ingest import IngestError, ingest
+from hypercut.ingest import IngestError, ingest, manifest
 from hypercut.ingest.__main__ import main
 
 
@@ -42,10 +42,45 @@ def test_rejects_too_long(tmp_path):
         ingest(clip, tmp_path / "job")
 
 
-def test_rejects_missing_audio(tmp_path):
+def test_no_sound_gets_a_silent_track(tmp_path):
     clip = make_clip(tmp_path / "silent.mp4", 11, audio=False)
-    with pytest.raises(IngestError, match="no audio"):
-        ingest(clip, tmp_path / "job")
+    source, mp4, wav = ingest(clip, tmp_path / "job")
+    assert source.duration == pytest.approx(11, abs=0.2)
+    with wave.open(str(wav)) as w:
+        assert w.getnframes() / 16000 == pytest.approx(11, abs=0.2)
+    facts = manifest.load(tmp_path / "job")
+    assert facts["audio"]["present"] is False and "no sound" in facts["warnings"][0]
+
+
+def test_manifest(tmp_path):
+    clip = make_clip(tmp_path / "in.mp4", 11, fps=25, size="480x854")
+    ingest(clip, tmp_path / "job")
+    facts = manifest.load(tmp_path / "job")
+    assert facts["original"]["name"] == "in.mp4" and len(facts["original"]["sha256"]) == 64
+    assert facts["video"]["orientation"] == "portrait" and facts["video"]["fps"] == 25
+    assert facts["video"]["variable_frame_rate"] is False and facts["audio"]["present"]
+    assert facts["normalized"]["fps"] == pytest.approx(30, abs=0.01)
+    assert facts["stages"]["ingest"]["status"] == "done"
+    assert any("soft" in w for w in facts["warnings"])  # 480 wide
+    manifest.mark(tmp_path / "job", "transcribe", "running")
+    assert manifest.load(tmp_path / "job")["stages"]["transcribe"]["status"] == "running"
+
+
+def test_manifest_reads_rotation_vfr_and_hdr(tmp_path):
+    clip = tmp_path / "c.mp4"
+    clip.write_bytes(b"x")
+    info = {"format": {"format_name": "mov", "duration": "12", "bit_rate": "800"}, "streams": [
+        {"codec_type": "video", "width": 1920, "height": 1080, "r_frame_rate": "30/1", "avg_frame_rate": "2400/100",
+         "color_transfer": "arib-std-b67", "side_data_list": [{"rotation": -90}]},
+        {"codec_type": "audio", "codec_name": "aac", "channels": 2, "sample_rate": "48000"},
+        {"codec_type": "audio"}]}
+    facts = manifest.describe(info, clip)
+    v = facts["video"]
+    assert v["rotation"] == 90 and (v["display_width"], v["display_height"]) == (1080, 1920)
+    assert v["orientation"] == "portrait" and v["variable_frame_rate"] and v["hdr"]
+    assert facts["audio"]["tracks"] == 2 and facts["original"]["bitrate"] == 800
+    text = " ".join(facts["warnings"])
+    assert "variable frame rate" in text and "rotated by 90" in text and "HDR" in text and "2 audio tracks" in text
 
 
 def test_rejects_non_video(tmp_path):

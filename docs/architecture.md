@@ -110,11 +110,14 @@ run to catch regressions, and with `--jobs` measures how much people correct the
 ## Stage details
 
 **Ingest.** `ingest(input_path, job_dir) -> (Source, normalized_mp4, audio_wav)`. `ffprobe` reads size, rate
-and duration; inputs without video or audio, under 10 seconds or over 3 minutes are rejected with an
-`IngestError` carrying a clear message (ADR 0102). FFmpeg re-encodes to 30 fps constant frame rate H.264/AAC
+and duration; inputs without video, under 10 seconds or over 3 minutes are rejected with an
+`IngestError` carrying a clear message (ADR 0102); a file without sound gets a silent track (ADR 0104). FFmpeg re-encodes to 30 fps constant frame rate H.264/AAC
 (variable frame rate phone footage breaks frame-accurate rendering) and extracts 16 kHz mono audio for
 transcription (ADR 0101). `Source` is probed from the normalized file. Manual run:
 `python -m hypercut.ingest <file> <out_dir>`. Sources taller than 1920 pixels are scaled down to 1920 tall (decision 0103), since the 1080x1920 output never uses more.
+Ingest also writes `manifest.json` (ADR 0104): the original's facts (SHA-256, codecs, rotation, orientation, frame
+rate and whether it varies, HDR, audio tracks), warnings in plain words for what it had to fix, and each stage's
+status, updated by the pipeline. The job page shows the warnings.
 
 **Transcribe.** Returns every word with start and end times. faster-whisper runs locally for free (the
 `small` model handles 3 minutes in about a minute on CPU); Deepgram is the fast paid option, chosen with

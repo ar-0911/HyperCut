@@ -151,3 +151,18 @@ def test_mode_sets_how_the_reel_is_edited(tmp_path, stages):
     plan = run.run_pipeline("in.mp4", tmp_path / "job", "", mode="vlog")
     assert plan.style.mode == "vlog" and plan.style.transitions.style == "smooth"
     assert run.run_pipeline("in.mp4", tmp_path / "j2", "").style.mode == "talking_head"
+
+
+def test_stages_recorded_in_the_manifest(tmp_path, stages, monkeypatch):
+    from hypercut.ingest import manifest
+
+    job = tmp_path / "job"
+    job.mkdir()
+    manifest.save(job, {"stages": {}})
+    run.run_pipeline("in.mp4", job, "")
+    assert {s["status"] for s in manifest.load(job)["stages"].values()} == {"done"}
+
+    monkeypatch.setattr(run, "analyze", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    with pytest.raises(RuntimeError):
+        run.run_pipeline("in.mp4", job, "")
+    assert manifest.load(job)["stages"]["analyze"]["status"] == "failed"

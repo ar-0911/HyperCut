@@ -1,4 +1,4 @@
-"""hypercut.ingest: probe, validate length, normalize to CFR H.264/AAC, extract 16 kHz mono wav."""
+"""hypercut.ingest: probe, validate length, normalize to CFR H.264/AAC, extract 16 kHz mono wav, write manifest.json."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import subprocess
 from fractions import Fraction
 from pathlib import Path
 
+from hypercut.ingest import manifest
 from hypercut.plan import Source
 
 MIN_SECONDS = 10.0
@@ -26,18 +27,21 @@ def _run(cmd: list[str]) -> subprocess.CompletedProcess:
         raise IngestError(f"{cmd[0]} is not installed; install FFmpeg to use HyperCut") from None
 
 
-def probe(path: Path) -> dict:
-    """Return width, height, fps, duration and has_audio for the first video stream."""
+def _probe_json(path: Path) -> dict:
     res = _run(["ffprobe", "-v", "error", "-print_format", "json", "-show_format", "-show_streams", str(path)])
     if res.returncode != 0:
         raise IngestError(f"Could not read {Path(path).name} as a video: {res.stderr.strip() or 'ffprobe failed'}")
     info = json.loads(res.stdout)
-    streams = info.get("streams", [])
-    video = next((s for s in streams if s.get("codec_type") == "video"), None)
-    if video is None:
+    if not any(s.get("codec_type") == "video" for s in info.get("streams", [])):
         raise IngestError(f"{Path(path).name} has no video stream")
-    if not any(s.get("codec_type") == "audio" for s in streams):
-        raise IngestError(f"{Path(path).name} has no audio track; HyperCut needs speech to transcribe")
+    return info
+
+
+def probe(path: Path, info: dict | None = None) -> dict:
+    """Return width, height, fps, duration and has_audio for the first video stream."""
+    info = info or _probe_json(path)
+    streams = info.get("streams", [])
+    video = next(s for s in streams if s.get("codec_type") == "video")
     duration = float(video.get("duration") or info.get("format", {}).get("duration") or 0)
     rate = video.get("avg_frame_rate") or video.get("r_frame_rate") or "0/1"
     try:
@@ -49,6 +53,7 @@ def probe(path: Path) -> dict:
         "height": int(video["height"]),
         "fps": fps,
         "duration": duration,
+        "has_audio": any(s.get("codec_type") == "audio" for s in streams),
     }
 
 
@@ -62,11 +67,15 @@ def validate_duration(duration: float) -> None:
 
 
 def ingest(input_path: str | Path, job_dir: str | Path) -> tuple[Source, Path, Path]:
-    """Probe and validate `input_path`, then write normalized.mp4 and audio.wav into `job_dir`."""
+    """Probe and validate `input_path`, then write normalized.mp4, audio.wav and manifest.json into `job_dir`.
+
+    A video without sound gets a silent track (ADR 0104): it still becomes a reel, without captions or speech cuts.
+    """
     input_path, job_dir = Path(input_path), Path(job_dir)
     if not input_path.is_file():
         raise IngestError(f"Input file not found: {input_path}")
-    meta = probe(input_path)
+    info = _probe_json(input_path)
+    meta = probe(input_path, info)
     validate_duration(meta["duration"])
 
     job_dir.mkdir(parents=True, exist_ok=True)
@@ -74,9 +83,10 @@ def ingest(input_path: str | Path, job_dir: str | Path) -> tuple[Source, Path, P
 
     # Rotation metadata is applied by ffmpeg's autorotate, so the probed size may be pre-rotation;
     # the final size is re-probed from the normalized file below.
+    silence = [] if meta["has_audio"] else ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"]
     res = _run([
-        "ffmpeg", "-y", "-v", "error", "-i", str(input_path),
-        "-map", "0:v:0", "-map", "0:a:0",
+        "ffmpeg", "-y", "-v", "error", "-i", str(input_path), *silence,
+        "-map", "0:v:0", "-map", "0:a:0" if meta["has_audio"] else "1:a:0", *([] if meta["has_audio"] else ["-shortest"]),
         "-vf", f"fps={TARGET_FPS},scale=-2:'min(ih,{MAX_HEIGHT})'", "-fps_mode", "cfr",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
@@ -95,4 +105,9 @@ def ingest(input_path: str | Path, job_dir: str | Path) -> tuple[Source, Path, P
     source = Source(
         path=str(mp4), width=out["width"], height=out["height"], fps=round(out["fps"], 3), duration=out["duration"]
     )
+    facts = manifest.describe(info, input_path)
+    facts["normalized"] = {"path": mp4.name, "width": source.width, "height": source.height, "fps": source.fps,
+                           "duration": round(source.duration, 3)}
+    facts["stages"] = {"ingest": {"status": "done"}}
+    manifest.save(job_dir, facts)
     return source, mp4, wav

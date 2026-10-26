@@ -51,6 +51,13 @@ export default function JobPage() {
 	return (
 		<>
 			<h1>{job.filename ?? 'Your short'}</h1>
+			{job.manifest?.warnings?.length ? (
+				<ul className="notes">
+					{job.manifest.warnings.map((w) => (
+						<li key={w}>{w}</li>
+					))}
+				</ul>
+			) : null}
 			{job.status === 'error' ? (
 				<div className="banner">
 					<p className="error">{job.interrupted ? job.error : `Processing failed: ${job.error}`}</p>

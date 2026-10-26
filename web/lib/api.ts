@@ -35,6 +35,15 @@ export type Job = {
 	interrupted?: boolean;
 	/** Validation of the last render (ADR 0023): 'running' just after it finishes. */
 	qa?: QAResult | 'running' | null;
+	/** What ingest found in the upload (ADR 0104); null for jobs from before the manifest. */
+	manifest?: Manifest | null;
+};
+
+export type Manifest = {
+	video: {width: number; height: number; display_width: number; display_height: number; orientation: 'portrait' | 'landscape' | 'square'; fps: number; variable_frame_rate: boolean; rotation: number; hdr: boolean} | null;
+	audio: {present: boolean; tracks: number} | null;
+	warnings: string[] | null;
+	stages: Record<string, {status: 'running' | 'done' | 'failed' | 'skipped'; at?: string}> | null;
 };
 
 export type Generation = {spent: number; budget: number; available: ('stock' | 'image' | 'video')[]; items?: unknown[]};

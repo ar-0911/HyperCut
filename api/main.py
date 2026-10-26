@@ -19,6 +19,7 @@ from api import assets, jobs, recipes
 from hypercut import plan as plan_mod
 from hypercut import assistant, checks, diff, edit, explain, export, generate, history, llm, modes, qa, review, run, variants, vision
 from hypercut.analyze import cuts as cutting
+from hypercut.ingest import manifest
 from hypercut.matte import MATTE_FILE
 from hypercut.plan import EditPlan, Style
 
@@ -204,6 +205,9 @@ def get_job(job_id: str):
     base = _base_path(job_id)
     state["base_plan"] = plan_mod.load(base).model_dump(mode="json") if base.is_file() else state["plan"]
     state.setdefault("assets", [])
+    # What ingest found in the upload (ADR 0104): the warnings are shown above the editor.
+    facts = manifest.load(jobs.job_dir(job_id)) or {}
+    state["manifest"] = {k: facts.get(k) for k in ("video", "audio", "warnings", "stages")} if facts else None
     state["files"] = sorted(p.name for p in jobs.job_dir(job_id).iterdir() if p.is_file() and p.name != "job.json")
     # What this machine can fetch for the editor's pictures, and what this video has spent on generating them.
     state["generation"] = {**generate.spent(jobs.job_dir(job_id)), "available": sorted(generate.available())}

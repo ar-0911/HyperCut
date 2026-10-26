@@ -445,3 +445,14 @@ def test_modes_listed_and_picked_at_upload(client, fake_stages):
     body = _wait(client, _submit(client, mode="product_demo"))
     assert body["mode"] == "product_demo" and body["plan"]["style"]["mode"] == "product_demo"
     assert client.post("/jobs", files={"video": ("c.mp4", b"x")}, data={"mode": "nope"}).status_code == 422
+
+
+def test_job_shows_what_ingest_found(client, fake_stages):
+    from api import jobs
+    from hypercut.ingest import manifest
+
+    job_id = _submit(client)
+    _wait(client, job_id)
+    assert client.get(f"/jobs/{job_id}").json()["manifest"] is None  # the fake ingest wrote none
+    manifest.save(jobs.job_dir(job_id), {"video": {"orientation": "portrait"}, "warnings": ["The video is HDR"]})
+    assert client.get(f"/jobs/{job_id}").json()["manifest"]["warnings"] == ["The video is HDR"]
