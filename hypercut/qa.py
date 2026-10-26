@@ -146,9 +146,11 @@ def validate(plan: EditPlan, video: str | Path) -> dict:
 
 
 def validate_job(job_dir: str | Path, video_name: str = "output.mp4") -> dict:
-    """Validate a job's render against its plan and save the result next to it."""
+    """Validate a job's render against the plan it was made from (the render's snapshot, ADR 0028, else the plan)
+    and save the result next to it."""
     job_dir = Path(job_dir)
-    result = validate(plan_mod.load(job_dir / "plan.json"), job_dir / video_name)
+    rendered = job_dir / "render.plan.json"
+    result = validate(plan_mod.load(rendered if rendered.is_file() else job_dir / "plan.json"), job_dir / video_name)
     (job_dir / QA_FILE).write_text(json.dumps(result, indent=2) + "\n")
     return result
 

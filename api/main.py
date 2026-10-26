@@ -20,7 +20,7 @@ from api import assets, jobs, kits, recipes
 from hypercut import plan as plan_mod
 from hypercut import assistant, checks, diff, edit, explain, export, generate, brand, history, llm, modes, project, qa, review, run, variants, vision
 from hypercut.analyze import cuts as cutting
-from hypercut.ingest import IngestError, manifest
+from hypercut.ingest import PROXY_FILE, IngestError, make_proxy, manifest
 from hypercut.matte import MATTE_FILE
 from hypercut.plan import EditPlan, Style
 
@@ -86,11 +86,10 @@ def _base_path(job_id: str) -> Path:
 
 
 def _editable(job_id: str) -> dict:
+    # Editing goes on during a render: the render works from a snapshot of the plan (ADR 0028).
     state = _job(job_id)
     if state["status"] != "done":
         raise HTTPException(409, f"job is {state['status']}; the plan can be edited once it is done")
-    if state.get("render") == "running":
-        raise HTTPException(409, "a render is running; wait for it to finish")
     return state
 
 
@@ -123,10 +122,18 @@ def _process(job_id: str, video: Path, style: str, strategy: str, recipe: Style 
 
 
 def _render(job_id: str) -> None:
+    # The version being rendered, so the editor can say when the download is older than the edit.
+    head = history.listing(jobs.job_dir(job_id))["head"]
+    jobs.write(job_id, render_version=None, rendering_version=head)
     with _render_slot:
         try:
-            run.render_plan(jobs.job_dir(job_id))
-            jobs.write(job_id, render="done", qa="running")
+            directory = jobs.job_dir(job_id)
+            run.render_plan(directory)
+            # Unedited meanwhile: the render is of the current version (with what the render drew in).
+            snapshot = directory / run.RENDER_PLAN
+            if not snapshot.is_file() or plan_mod.load(directory / "plan.json") == plan_mod.load(snapshot):
+                head = history.listing(directory)["head"]
+            jobs.write(job_id, render="done", qa="running", render_version=head)
         except Exception as e:
             jobs.write(job_id, render="error", render_error=str(e))
             return
@@ -136,6 +143,31 @@ def _render(job_id: str) -> None:
         jobs.write(job_id, qa=result)
     except Exception as e:
         jobs.write(job_id, qa={"ok": None, "error": str(e)[:300]})
+
+
+def _stale(job_id: str) -> None:
+    """The plan changed: an earlier render no longer matches it. A render going on carries on with its snapshot
+    (ADR 0028); the editor tells its version apart from the edit by `render_version`."""
+    if jobs.read(job_id).get("render") != "running":
+        jobs.write(job_id, render=None, render_error=None, qa=None)
+
+
+_proxy_jobs: set[str] = set()  # jobs whose preview copy was started by this server process
+
+
+def _start_proxy(job_id: str) -> None:
+    with _assets_lock:
+        if job_id in _proxy_jobs:
+            return
+        _proxy_jobs.add(job_id)
+
+    def make() -> None:
+        try:
+            make_proxy(jobs.job_dir(job_id) / "normalized.mp4")
+        except Exception:  # the editor keeps playing the full video
+            pass
+
+    threading.Thread(target=make, daemon=True).start()
 
 
 _matte_jobs: set[str] = set()  # jobs whose cut-out is being made by this server process
@@ -218,6 +250,8 @@ def get_job(job_id: str):
     facts = manifest.load(jobs.job_dir(job_id)) or {}
     state["manifest"] = {k: facts.get(k) for k in ("video", "audio", "warnings", "stages")} if facts else None
     state["files"] = sorted(p.name for p in jobs.job_dir(job_id).iterdir() if p.is_file() and p.name != "job.json")
+    if state["status"] == "done" and PROXY_FILE not in state["files"]:
+        _start_proxy(job_id)  # jobs from before the preview copy, and opened projects (ADR 0028)
     # What this machine can fetch for the editor's pictures, and what this video has spent on generating them.
     state["generation"] = {**generate.spent(jobs.job_dir(job_id)), "available": sorted(generate.available())}
     return state
@@ -236,7 +270,7 @@ def put_plan(job_id: str, plan: EditPlan, kind: history.Kind = "edit", note: str
     if path.is_file() and not base.exists():
         shutil.copyfile(path, base)
     history.commit(jobs.job_dir(job_id), plan, kind, note=(note or "")[:300] or None, label=label)
-    jobs.write(job_id, render=None, render_error=None, qa=None)  # any earlier render is stale
+    _stale(job_id)
     return plan.model_dump(mode="json")
 
 
@@ -249,7 +283,7 @@ def restore_plan(job_id: str):
     first = next((v for v in index.versions if v.kind == "pipeline"), None)
     if first is not None:
         history.restore(directory, first.id)
-        jobs.write(job_id, render=None, render_error=None, qa=None)
+        _stale(job_id)
     return plan_mod.load(_plan_path(job_id)).model_dump(mode="json")
 
 
@@ -283,7 +317,7 @@ def _moved(job_id: str, step) -> dict:
         plan, version = step(jobs.job_dir(job_id))
     except LookupError as e:
         raise HTTPException(409, str(e)) from None
-    jobs.write(job_id, render=None, render_error=None, qa=None)
+    _stale(job_id)
     return {"plan": plan.model_dump(mode="json"), "version": version.model_dump(mode="json"),
             **{k: v for k, v in history.listing(jobs.job_dir(job_id)).items() if k != "versions"}}
 
@@ -306,7 +340,7 @@ def restore_version(job_id: str, vid: int):
         version = history.restore(directory, vid)
     except KeyError:
         raise HTTPException(404, "no such version") from None
-    jobs.write(job_id, render=None, render_error=None, qa=None)
+    _stale(job_id)
     return {"plan": plan_mod.load(_plan_path(job_id)).model_dump(mode="json"), "version": version.model_dump(mode="json")}
 
 

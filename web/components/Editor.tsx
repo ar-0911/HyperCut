@@ -88,6 +88,8 @@ export default function Editor({job}: {job: Job}) {
 	const [pps, setPps] = useState(16);
 	const [snapping, setSnapping] = useState(true);
 	const [render, setRender] = useState<Job['render']>(job.render);
+	// The version the last render is of (ADR 0028); edits saved during a render are newer than the download.
+	const [renderedVersion, setRenderedVersion] = useState<number | null>(job.render_version ?? null);
 	const [renderError, setRenderError] = useState<string | null>(job.render_error);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
@@ -116,11 +118,12 @@ export default function Editor({job}: {job: Job}) {
 	const inputProps = useMemo(
 		() => ({
 			plan: shown,
-			videoSrc: fileUrl(job.id, 'normalized.mp4'),
+			// The light preview copy when there is one (ADR 0028); the render always uses the full video.
+			videoSrc: fileUrl(job.id, job.files?.includes('proxy.mp4') ? 'proxy.mp4' : 'normalized.mp4'),
 			assetBase: `${API_URL}/jobs/${job.id}/files/`,
 			matteSrc: matte === 'done' ? fileUrl(job.id, 'matte.webm') : undefined,
 		}),
-		[shown, job.id, matte],
+		[shown, job.id, job.files, matte],
 	);
 	const items = useMemo(() => buildItems(plan), [plan]);
 	const duration = useMemo(() => reelDuration(plan), [plan]);
@@ -149,6 +152,7 @@ export default function Editor({job}: {job: Job}) {
 				setRender(next.render);
 				setRenderError(next.render_error);
 				setQa(next.qa);
+				setRenderedVersion(next.render_version ?? null);
 			} catch (e) {
 				setError((e as Error).message);
 			}
@@ -587,7 +591,12 @@ export default function Editor({job}: {job: Job}) {
 					)}
 				</div>
 			</div>
-			{render === 'running' && <p className="hint">Rendering the final video takes a few minutes. Keep editing; the preview is always live.</p>}
+			{render === 'running' && (
+				<p className="hint">Rendering the final video takes a few minutes. Keep editing and saving: the render is of the version you started it on.</p>
+			)}
+			{render === 'done' && renderedVersion != null && (dirty || (versions?.head != null && versions.head !== renderedVersion)) && (
+				<p className="hint">The download is version {renderedVersion}; your edits since then need another render.</p>
+			)}
 			{render === 'error' && <p className="error">Render failed: {renderError}</p>}
 			{wantsMatte && matte === 'running' && (
 				<p className="hint">Cutting the speaker out for the green-screen effects. The preview shows them once that is done (a few minutes).</p>

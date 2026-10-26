@@ -35,6 +35,8 @@ export type Job = {
 	interrupted?: boolean;
 	/** Validation of the last render (ADR 0023): 'running' just after it finishes. */
 	qa?: QAResult | 'running' | null;
+	/** The history version the last render is of (ADR 0028). */
+	render_version?: number | null;
 	/** What ingest found in the upload (ADR 0104); null for jobs from before the manifest. */
 	manifest?: Manifest | null;
 };

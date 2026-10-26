@@ -83,6 +83,10 @@ visual index and manifest, the files the plan shows, and the footage unless it i
 new job; a project without footage asks for the original, recognised by its SHA-256 even if it was moved or
 renamed. See [ADR 0027](decisions/0027-portable-projects.md).
 
+Editing goes on during a render: the render works from a snapshot (`render.plan.json`) and puts what it drew back
+into the plan only if nobody edited meanwhile; the job says which version the download is. The editor previews a
+960 px `proxy.mp4` instead of the full video. See [ADR 0028](decisions/0028-background-render-and-proxy-preview.md).
+
 ## Understanding the footage
 
 Next to the transcript, the "look" stage (`hypercut/vision`) builds a visual index of the source: shots (the face

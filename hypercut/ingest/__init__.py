@@ -14,6 +14,8 @@ MIN_SECONDS = 10.0
 MAX_SECONDS = 180.0
 TARGET_FPS = 30
 MAX_HEIGHT = 1920  # the 1080x1920 output never needs more source pixels than this (ADR 0103)
+PROXY_FILE = "proxy.mp4"
+PROXY_HEIGHT = 960  # the editor's preview plays this, not the full-size video (ADR 0028)
 
 
 class IngestError(ValueError):
@@ -111,3 +113,23 @@ def ingest(input_path: str | Path, job_dir: str | Path) -> tuple[Source, Path, P
     facts["stages"] = {"ingest": {"status": "done"}}
     manifest.save(job_dir, facts)
     return source, mp4, wav
+
+
+def make_proxy(mp4: str | Path, out: str | Path | None = None) -> Path | None:
+    """A small copy of the normalized video for the editor's preview (ADR 0028): 960 px tall, a keyframe every half
+    second so scrubbing lands at once, the same frames and sound. None when the video is already that small."""
+    mp4 = Path(mp4)
+    out = Path(out) if out else mp4.with_name(PROXY_FILE)
+    if probe(mp4)["height"] <= PROXY_HEIGHT:
+        return None
+    tmp = out.with_name(out.stem + ".part.mp4")
+    res = _run([
+        "ffmpeg", "-y", "-v", "error", "-i", str(mp4),
+        "-vf", f"scale=-2:{PROXY_HEIGHT}", "-c:v", "libx264", "-preset", "veryfast", "-crf", "26", "-g", "15",
+        "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(tmp),
+    ])
+    if res.returncode != 0:
+        tmp.unlink(missing_ok=True)
+        raise IngestError(f"Could not make the preview copy: {res.stderr.strip()}")
+    tmp.replace(out)
+    return out

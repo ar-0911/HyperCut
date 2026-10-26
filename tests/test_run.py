@@ -166,3 +166,55 @@ def test_stages_recorded_in_the_manifest(tmp_path, stages, monkeypatch):
     with pytest.raises(RuntimeError):
         run.run_pipeline("in.mp4", job, "")
     assert manifest.load(job)["stages"]["analyze"]["status"] == "failed"
+
+
+def _fake_render(monkeypatch, job_dir, during=None):
+    """render_plan with the Remotion render and the before-render drawing faked: drawing adds a title to the
+    snapshot; `during` runs while the 'render' is going (an edit saved meanwhile)."""
+    import subprocess as sp
+
+    seen = {}
+
+    def draw(job_dir, plan_name="plan.json"):
+        path = Path(job_dir) / plan_name
+        plan = run.plan_mod.load(path)
+        plan.style.caption.font = "Drawn"
+        run.plan_mod.save(plan, path)
+
+    def fake_run(cmd, **kw):
+        seen["plan"] = cmd[cmd.index("--plan") + 1]
+        if during:
+            during()
+        Path(cmd[cmd.index("--out") + 1]).write_bytes(b"mp4")
+        return sp.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(run, "ensure_matte", lambda *a, **k: None)
+    monkeypatch.setattr(run, "place_new_titles", lambda *a, **k: None)
+    monkeypatch.setattr(run, "draw_new_around", draw)
+    monkeypatch.setattr(run, "fetch_new_assets", lambda *a, **k: None)
+    monkeypatch.setattr(run.subprocess, "run", fake_run)
+    monkeypatch.setattr(run.audio, "normalize", lambda out: None)
+    return seen
+
+
+def test_render_works_from_a_snapshot_and_keeps_what_it_drew(tmp_path, monkeypatch):
+    run.plan_mod.save(EditPlan(source=SOURCE), tmp_path / "plan.json")
+    seen = _fake_render(monkeypatch, tmp_path)
+    run.render_plan(tmp_path)
+    assert seen["plan"] == str(tmp_path / run.RENDER_PLAN)
+    # Unedited meanwhile: what the render drew comes back into the plan.
+    assert run.plan_mod.load(tmp_path / "plan.json").style.caption.font == "Drawn"
+
+
+def test_edits_saved_during_a_render_are_kept(tmp_path, monkeypatch):
+    run.plan_mod.save(EditPlan(source=SOURCE), tmp_path / "plan.json")
+
+    def edit():
+        plan = run.plan_mod.load(tmp_path / "plan.json")
+        plan.style.caption.font = "Edited"
+        run.plan_mod.save(plan, tmp_path / "plan.json")
+
+    _fake_render(monkeypatch, tmp_path, during=edit)
+    run.render_plan(tmp_path)
+    assert run.plan_mod.load(tmp_path / "plan.json").style.caption.font == "Edited"
+    assert run.plan_mod.load(tmp_path / run.RENDER_PLAN).style.caption.font == "Drawn"

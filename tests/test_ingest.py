@@ -106,3 +106,14 @@ def test_ingest_caps_4k_at_1920_tall(tmp_path):
     clip = make_clip(tmp_path / "in.mp4", 11, size="3840x2160")
     source, _, _ = ingest(clip, tmp_path / "job")
     assert (source.width, source.height) == (3414, 1920)
+
+
+def test_preview_copy(tmp_path):
+    from hypercut.ingest import PROXY_HEIGHT, make_proxy, probe
+
+    small = make_clip(tmp_path / "small.mp4", 1, size="320x240")
+    assert make_proxy(small) is None  # already light
+    big = make_clip(tmp_path / "big.mp4", 1, size="1080x1920")
+    out = make_proxy(big)
+    info = probe(out)
+    assert out.name == "proxy.mp4" and info["height"] == PROXY_HEIGHT and info["width"] == 540

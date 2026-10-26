@@ -504,3 +504,14 @@ def test_project_export_and_import(client, fake_stages):
     refused = client.post("/projects", files={"project_file": ("clip.hypercut", light.content)})
     assert refused.status_code == 422 and "footage" in refused.json()["detail"]
     assert client.post("/projects", files={"project_file": ("x.hypercut", b"junk")}).status_code == 422
+
+
+def test_editing_goes_on_during_a_render(client, fake_stages):
+    from api import jobs
+
+    job_id = _submit(client)
+    plan = _wait(client, job_id)["plan"]
+    jobs.write(job_id, render="running")  # a render started from the plan as it was
+    plan["hook"]["chosen"] = 1
+    assert client.put(f"/jobs/{job_id}/plan", json=plan).status_code == 200
+    assert client.get(f"/jobs/{job_id}").json()["render"] == "running"  # the render carries on
