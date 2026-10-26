@@ -181,6 +181,9 @@ span.chip.active { background: var(--accent); color: #fff; border-color: var(--a
 .kit.active { border-color: var(--accent); }
 .kit img, .kit-swatch { width: 40px; height: 24px; object-fit: contain; border-radius: 4px; flex: none; }
 .kit-name { font-weight: 600; }
-.kit .hint { flex: 1; margin: 0; }
+.kit .hint { margin: 0; }
 .kit-form { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; }
 .chip-logo { height: 16px; width: auto; margin-right: 6px; vertical-align: middle; }
+.brand-panel select, .brand-panel input[type='text'] { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: inherit; font: inherit; }
+.kit-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.kit-text .hint { font-size: 12px; }

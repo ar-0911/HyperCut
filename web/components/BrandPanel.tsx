@@ -80,8 +80,10 @@ export default function BrandPanel({jobId, plan, onChange, onUse}: {
 					<div key={k.id} className={`kit${brand.name === k.name ? ' active' : ''}`}>
 						{/* eslint-disable-next-line @next/next/no-img-element */}
 						{k.logo ? <img src={kitFileUrl(k.id, k.logo)} alt="" /> : <span className="kit-swatch" style={{background: k.colors[0] ?? '#888'}} />}
-						<span className="kit-name">{k.name}</span>
-						<span className="hint">{[k.caption_font, k.music ? 'music' : '', k.end_card ? 'end card' : ''].filter(Boolean).join(' · ')}</span>
+						<span className="kit-text">
+							<span className="kit-name">{k.name}</span>
+							<span className="hint">{[k.caption_font, k.music ? 'music' : '', k.end_card ? 'end card' : ''].filter(Boolean).join(' · ')}</span>
+						</span>
 						<button disabled={busy} onClick={() => apply(k)}>
 							Use
 						</button>
