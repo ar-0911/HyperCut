@@ -46,3 +46,8 @@ def write(job_id: str, **fields) -> dict:
         tmp.write_text(json.dumps(state, indent=2))
         tmp.replace(path)
         return state
+
+
+def all_ids() -> list[str]:
+    root = media_root()
+    return sorted(p.name for p in root.iterdir() if JOB_ID.match(p.name) and (p / "job.json").is_file()) if root.is_dir() else []

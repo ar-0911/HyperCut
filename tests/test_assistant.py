@@ -1,4 +1,4 @@
-from hypercut import assistant, llm
+from hypercut import assistant, edit, llm
 from hypercut.plan import EditPlan, Graphic, LayoutSpan, Segment, Source, Transcript, Word, Zoom
 
 SOURCE = Source(path="n.mp4", width=1920, height=1080, fps=30, duration=20)
@@ -22,7 +22,7 @@ def test_summary_is_in_reel_time():
     s = assistant.summarize(_plan(), [{"name": "asset-0123456789ab.mp4", "kind": "video", "label": "beach"}])
     assert "v1: illustration, 7.0-10.0" in s["items"]  # source 5-8 plays at reel 7-10 after the 2 s hook
     assert "l0: split, 7.0-10.0" in s["layout"] and "beach" in s["assets"]
-    assert s["captions"].startswith("0.2 w2 w3")
+    assert s["captions"].startswith("0.0 w2 [pause 0.5s] w3")  # word starts, with the pauses marked
 
 
 def test_apply_ops_delete_captions_and_illustration():
@@ -190,3 +190,32 @@ def test_anchor_and_add_picture_ops():
     assert len(added) == 1 and added[0].props["generate"] == {"kind": "stock", "query": "city at night", "media": "any"}
     assert any("footage" in c for c in changes)  # the clip needs a video backend, which isn't set up here
     assert "add_picture" not in assistant.pictures_prompt(set()) and '"clip"' in assistant.pictures_prompt({"video"})
+
+
+def test_word_accurate_ops_cut_between_words():
+    words = [Word(text="first", start=0, end=0.5), Word(text="answer.", start=0.6, end=1.0),
+             Word(text="Second", start=2.5, end=3.0), Word(text="answer", start=3.1, end=3.5),
+             Word(text="here.", start=5.0, end=5.4), Word(text="end", start=5.5, end=5.9)]
+    plan = EditPlan(source=SOURCE, transcript=Transcript(words=words), segments=[Segment(start=0, end=20)])
+    s = assistant.summarize(plan, [])
+    assert "answer. [pause 1.5s] Second" in s["captions"] and "answer [pause 1.5s] here." in s["captions"]
+
+    new, changes = assistant.apply_ops(plan, [{"op": "remove_pause", "at": 2.5, "side": "before"}], 0, [])
+    assert new.segments == [Segment(start=0, end=1.15), Segment(start=2.35, end=20)]
+    assert any(c.startswith("Cut 1.2s") for c in changes)
+
+    new, _ = assistant.apply_ops(plan, [{"op": "cut_words", "start": 2.6, "end": 3.4}], 0, [])
+    kept = [w.text for w in new.transcript.words if any(s.start <= w.start < s.end for s in new.segments)]
+    assert kept == ["first", "answer.", "here.", "end"]
+
+    new, _ = assistant.apply_ops(plan, [{"op": "tighten"}], 0, [])
+    assert edit.pauses(new) == []
+    _, changes = assistant.apply_ops(plan, [{"op": "remove_pause", "at": 15}], 0, [])
+    assert changes == ["Skipped: no pause long enough to remove there"]
+
+
+def test_assist_returns_an_explanation(monkeypatch):
+    monkeypatch.setattr(assistant.llm, "ask_json", lambda *a, **k: {"message": "Done", "ops": [{"op": "delete", "keys": ["g1"]}]})
+    monkeypatch.setattr(assistant, "available_assets", lambda: set())
+    result = assistant.assist(_plan(), "remove the wow text")
+    assert result.explanation == ["Removed the big text “WOW” at 0:12.0-0:13.0"]

@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
+from hypercut import history
 from hypercut import plan as plan_mod
 from hypercut.analyze import analyze
 from hypercut.analyze.transitions import plan_transitions
@@ -90,7 +91,8 @@ def run_pipeline(
     if cutout is not None:
         place_titles(plan, job_dir / MATTE_FILE)
     plan = EditPlan.model_validate(plan.model_dump())  # fail here, not in the renderer
-    plan_mod.save(plan, job_dir / "plan.json")
+    # The first cut is version 1 of the project's history (ADR 0021); it also writes plan.json.
+    history.commit(job_dir, plan, "pipeline", changes=[], note="HyperCut's first cut")
     return plan
 
 
@@ -166,6 +168,9 @@ def render_plan(job_dir: str | Path, out_name: str = "output.mp4", render_dir: P
         fetch_new_assets(job_dir)
     except Exception as e:
         log.warning("fetching generated pictures failed, rendering without them: %s", e)
+    # What was drawn or fetched above is kept as a version, so undo doesn't have to draw it again.
+    if (job_dir / history.HISTORY_DIR).is_dir():
+        history.commit(job_dir, plan_mod.load(job_dir / "plan.json"), "render", note="Drawn and fetched for the render")
     out = job_dir / out_name
     cmd = [
         "npm", "run", "render", "--",

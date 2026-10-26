@@ -31,6 +31,8 @@ export type Job = {
 	export_error?: string | null;
 	/** The job this one is a variant of (ADR 0018). */
 	variant_of?: string;
+	/** The server stopped while this job was being processed; it can be retried. */
+	interrupted?: boolean;
 };
 
 export type Generation = {spent: number; budget: number; available: ('stock' | 'image' | 'video')[]; items?: unknown[]};
@@ -87,12 +89,18 @@ export const generationSources = () => request<{available: string[]}>('/generati
 
 export const getJob = (id: string) => request<Job>(`/jobs/${id}`);
 
-export const savePlan = (id: string, plan: EditPlan) =>
-	request<EditPlan>(`/jobs/${id}/plan`, {
+/** Who made a saved version (ADR 0021). */
+export type VersionKind = 'pipeline' | 'edit' | 'assistant' | 'review' | 'restore' | 'render' | 'import';
+
+/** Save the plan as a new version of the project. */
+export function savePlan(id: string, plan: EditPlan, opts: {kind?: VersionKind; note?: string; label?: string} = {}) {
+	const query = new URLSearchParams(Object.entries(opts).filter(([, v]) => v) as [string, string][]).toString();
+	return request<EditPlan>(`/jobs/${id}/plan${query ? `?${query}` : ''}`, {
 		method: 'PUT',
 		headers: {'Content-Type': 'application/json'},
 		body: JSON.stringify(plan),
 	});
+}
 
 export const startRender = (id: string) => request<{id: string; render: string}>(`/jobs/${id}/render`, {method: 'POST'});
 
@@ -112,7 +120,8 @@ export function uploadAsset(id: string, file: File) {
 export const deleteAsset = (id: string, name: string) =>
 	request<{deleted: string}>(`/jobs/${id}/assets/${encodeURIComponent(name)}`, {method: 'DELETE'});
 
-export type AssistResult = {plan: EditPlan; message: string; changes: string[]};
+/** `explanation`: what the edit does, in words, worked out from the plans themselves. */
+export type AssistResult = {plan: EditPlan; message: string; changes: string[]; explanation: string[]};
 
 export const askAssistant = (id: string, body: {instruction: string; plan: EditPlan; playhead: number; selected?: string | null}) =>
 	request<AssistResult>(`/jobs/${id}/assistant`, {
@@ -144,3 +153,37 @@ export const reviewRender = (id: string) => request<ReviewResult>(`/jobs/${id}/r
 
 /** Build hypercut-export.zip (Final Cut, Resolve, Premiere) from the saved plan. */
 export const startExport = (id: string, overlays = true) => request<{id: string; export: string}>(`/jobs/${id}/export`, json({overlays}));
+
+export type Version = {
+	id: number;
+	parent: number | null;
+	kind: VersionKind;
+	created: number;
+	label: string | null;
+	note: string | null;
+	changes: string[];
+	duration: number;
+};
+export type HistoryListing = {head: number | null; can_undo: boolean; can_redo: boolean; versions: Version[]};
+
+export const getHistory = (id: string) => request<HistoryListing>(`/jobs/${id}/history`);
+export const getVersion = (id: string, vid: number) => request<{plan: EditPlan; changes_from_current: string[]}>(`/jobs/${id}/history/${vid}`);
+export const restoreVersion = (id: string, vid: number) =>
+	request<{plan: EditPlan; version: Version}>(`/jobs/${id}/history/${vid}/restore`, {method: 'POST'});
+export const nameVersion = (id: string, vid: number, label: string | null) =>
+	request<Version>(`/jobs/${id}/history/${vid}`, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({label})});
+
+export type Draft = {saved: number; base: number | null; plan: EditPlan; changes: string[]};
+/** Autosave unsaved edits; offered back when the editor reopens. */
+export const saveDraft = (id: string, plan: EditPlan) =>
+	request<{saved: number; base: number | null}>(`/jobs/${id}/draft`, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(plan)});
+export const getDraft = (id: string) => request<{draft: Draft | null}>(`/jobs/${id}/draft`);
+export const discardDraft = (id: string) => request<{deleted: boolean}>(`/jobs/${id}/draft`, {method: 'DELETE'});
+
+export type ExplainItem = {at: number; kind: 'hook' | 'silence' | 'filler' | 'trim' | 'ending' | 'graphic' | 'zoom'; text: string; id?: string};
+export type Explanation = {summary: string; items: ExplainItem[]};
+/** Why the first cut (and the current edit) look the way they do. */
+export const explainCut = (id: string) => request<{first_cut: Explanation; current: Explanation}>(`/jobs/${id}/explain`);
+
+/** Run the pipeline again on a job that failed or was interrupted. */
+export const retryJob = (id: string) => request<{id: string; status: string}>(`/jobs/${id}/retry`, {method: 'POST'});

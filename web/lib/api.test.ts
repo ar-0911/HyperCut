@@ -36,6 +36,13 @@ describe('api client', () => {
 		expect(JSON.parse(init.body)).toEqual({version: 1});
 	});
 
+	it('says who made a saved version', async () => {
+		const fetchMock = reply(200, {});
+		vi.stubGlobal('fetch', fetchMock);
+		await savePlan('abc', {version: 1} as never, {kind: 'assistant', note: 'cut the pause'});
+		expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:8000/jobs/abc/plan?kind=assistant&note=cut+the+pause');
+	});
+
 	it('surfaces string and validation errors', async () => {
 		vi.stubGlobal('fetch', reply(409, {detail: 'job is running'}));
 		await expect(getJob('abc')).rejects.toMatchObject({status: 409, message: 'job is running'});
