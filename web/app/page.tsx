@@ -2,7 +2,7 @@
 
 import {useRouter} from 'next/navigation';
 import {useEffect, useState, type FormEvent} from 'react';
-import {createJob, deleteRecipe, openProject, generationSources, kitFileUrl, listKits, listRecipes, type Kit, type Recipe} from '@/lib/api';
+import {clearTelemetry, createJob, deleteRecipe, getTelemetry, setTelemetry, telemetryFileUrl, type Telemetry, openProject, generationSources, kitFileUrl, listKits, listRecipes, type Kit, type Recipe} from '@/lib/api';
 import {MODES, type Mode} from '@/lib/modes';
 import {PRESETS} from '@/lib/presets';
 
@@ -24,6 +24,7 @@ export default function UploadPage() {
 	const [projectFile, setProjectFile] = useState<File | null>(null);
 	const [projectSource, setProjectSource] = useState<File | null>(null);
 	const [needsSource, setNeedsSource] = useState(false);
+	const [usage, setUsage] = useState<Telemetry | null>(null);
 
 	useEffect(() => {
 		listRecipes()
@@ -32,6 +33,9 @@ export default function UploadPage() {
 		listKits()
 			.then((r) => setKits(r.kits))
 			.catch(() => setKits([]));
+		getTelemetry()
+			.then(setUsage)
+			.catch(() => setUsage(null));
 		generationSources()
 			.then((r) => setSources(r.available))
 			.catch(() => setSources([])); // no keys or an older engine: everything is drawn
@@ -191,6 +195,34 @@ export default function UploadPage() {
 				</p>
 			</div>
 
+			<div className="card">
+				<label className="check">
+					<input
+						type="checkbox"
+						checked={usage?.enabled ?? false}
+						disabled={!usage}
+						onChange={(e) => void setTelemetry(e.target.checked).then(setUsage).catch((err) => setError((err as Error).message))}
+					/>
+					Count how I use HyperCut (optional, off by default)
+				</label>
+				<p className="hint">
+					Counts like “a render took 4 minutes” or “the suggested change was kept”, saved on this computer only. Never your video, frames,
+					words, prompts or file names. Nothing is sent: you can read the file and share it if you want to help improve HyperCut.
+					{usage && usage.events > 0 && (
+						<>
+							{' '}
+							{usage.events} counted.{' '}
+							<a href={telemetryFileUrl} download>
+								See the file
+							</a>{' '}
+							·{' '}
+							<button type="button" className="link" onClick={() => void clearTelemetry().then(setUsage)}>
+								Delete it
+							</button>
+						</>
+					)}
+				</p>
+			</div>
 			</details>
 
 			<div className="row">

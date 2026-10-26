@@ -92,6 +92,11 @@ New users get a short path (ADR 0029): the upload page asks only for the video a
 without a Claude call, export) until they ask for all the controls. See
 [ADR 0029](decisions/0029-first-steps-onboarding.md).
 
+Usage counts are opt-in and stay on the machine (`hypercut/telemetry.py`, `media/telemetry.jsonl`): a fixed list of
+events whose fields are numbers, yes/no or fixed words, never footage, text or names. "Share" hands the rendered mp4
+and a caption to the system share sheet, or downloads it with the caption copied. See
+[ADR 0030](decisions/0030-opt-in-local-usage-counts-and-sharing.md).
+
 ## Understanding the footage
 
 Next to the transcript, the "look" stage (`hypercut/vision`) builds a visual index of the source: shots (the face

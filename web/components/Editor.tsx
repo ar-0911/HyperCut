@@ -19,6 +19,7 @@ import {
 	nameVersion,
 	recutPlan,
 	applyKit,
+	count,
 	requestMatte,
 	restorePlan,
 	restoreVersion,
@@ -50,6 +51,7 @@ import Assistant from './Assistant';
 import Bin from './Bin';
 import Finish from './Finish';
 import FirstSteps from './FirstSteps';
+import Share from './Share';
 import Inspector from './Inspector';
 import OnScreen from './OnScreen';
 import Quality from './Quality';
@@ -132,6 +134,7 @@ export default function Editor({job}: {job: Job}) {
 	const setSimple = (on: boolean) => {
 		setSimpleState(on);
 		writeView(on);
+		count('view', {simple: on});
 	};
 	const wantsMatte = Boolean(plan.style.depth?.enabled && plan.style.depth?.cutout);
 	const playerRef = useRef<PlayerRef>(null);
@@ -634,9 +637,12 @@ export default function Editor({job}: {job: Job}) {
 						{render === 'running' ? 'Rendering…' : 'Render video'}
 					</button>
 					{render === 'done' && (
-						<a className="btn" href={fileUrl(job.id, 'output.mp4')} download>
-							Download mp4
-						</a>
+						<>
+							<a className="btn" href={fileUrl(job.id, 'output.mp4')} download onClick={() => count('download')}>
+								Download mp4
+							</a>
+							<Share jobId={job.id} plan={plan} name={(job.filename ?? 'hypercut-reel').replace(/\.[^.]+$/, '')} />
+						</>
 					)}
 				</div>
 			</div>

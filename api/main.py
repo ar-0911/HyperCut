@@ -6,6 +6,7 @@ import os
 from contextlib import asynccontextmanager
 import shutil
 import threading
+import time
 import uuid
 from pathlib import Path
 from typing import Literal
@@ -18,7 +19,7 @@ from pydantic import BaseModel, Field
 
 from api import assets, jobs, kits, recipes
 from hypercut import plan as plan_mod
-from hypercut import assistant, checks, diff, edit, explain, export, generate, brand, history, llm, modes, project, qa, review, run, suggest, variants, vision
+from hypercut import assistant, checks, diff, edit, explain, export, generate, brand, history, llm, modes, project, qa, review, run, suggest, telemetry, variants, vision
 from hypercut.analyze import cuts as cutting
 from hypercut.ingest import PROXY_FILE, IngestError, make_proxy, manifest
 from hypercut.matte import MATTE_FILE
@@ -116,15 +117,24 @@ def _process(job_id: str, video: Path, style: str, strategy: str, recipe: Style 
             on_stage=lambda s: jobs.write(job_id, stage=s), recipe=recipe, pictures=pictures,
             vision=vision_provider, mode=mode, kit=kits.kit_dir(kit) if kit else None,
         )
-        jobs.write(job_id, status="done", stage="done", error=None)
+        state = jobs.write(job_id, status="done", stage="done", error=None)
+        _count("job_done", seconds=time.time() - state.get("created", time.time()),
+               reel_seconds=edit.reel_duration(plan_mod.load(_plan_path(job_id))))
     except Exception as e:
-        jobs.write(job_id, status="error", error=str(e))
+        state = jobs.write(job_id, status="error", error=str(e))
+        _count("job_failed", stage=state.get("stage") or "unknown")
+
+
+def _count(event: str, **fields) -> None:
+    """Record a usage count when the person turned them on (ADR 0030); never footage, text or names."""
+    telemetry.record(jobs.media_root(), event, **fields)
 
 
 def _render(job_id: str) -> None:
     # The version being rendered, so the editor can say when the download is older than the edit.
     head = history.listing(jobs.job_dir(job_id))["head"]
     jobs.write(job_id, render_version=None, rendering_version=head)
+    started = time.time()
     with _render_slot:
         try:
             directory = jobs.job_dir(job_id)
@@ -134,13 +144,16 @@ def _render(job_id: str) -> None:
             if not snapshot.is_file() or plan_mod.load(directory / "plan.json") == plan_mod.load(snapshot):
                 head = history.listing(directory)["head"]
             jobs.write(job_id, render="done", qa="running", render_version=head)
+            _count("render_done", seconds=time.time() - started)
         except Exception as e:
             jobs.write(job_id, render="error", render_error=str(e))
+            _count("render_failed")
             return
     # A render that exited cleanly is not yet a good file: inspect it (ADR 0023).
     try:
         result = qa.validate_job(jobs.job_dir(job_id))
         jobs.write(job_id, qa=result)
+        _count("qa", ok=bool(result.get("ok")), failures=len([c for c in result.get("checks", []) if c.get("status") == "fail"]))
     except Exception as e:
         jobs.write(job_id, qa={"ok": None, "error": str(e)[:300]})
 
@@ -215,6 +228,8 @@ def create_job(
                pictures=pictures, vision=vision or None, mode=mode or None, kit=kit or None)
     background.add_task(_process, job_id, upload, style, hook_strategy, saved_style, pictures, vision or None,
                         mode or None, kit or None)
+    _count("job_created", mode=mode or "talking_head", kit=bool(kit), pictures=pictures, recipe=bool(recipe),
+           style_prompt=bool(style))
     return {"id": job_id, "status": "queued"}
 
 
@@ -270,6 +285,7 @@ def put_plan(job_id: str, plan: EditPlan, kind: history.Kind = "edit", note: str
     if path.is_file() and not base.exists():
         shutil.copyfile(path, base)
     history.commit(jobs.job_dir(job_id), plan, kind, note=(note or "")[:300] or None, label=label)
+    _count("edit_saved", kind=kind)
     _stale(job_id)
     return plan.model_dump(mode="json")
 
@@ -582,6 +598,7 @@ def export_project(job_id: str, footage: bool = True):
     except project.ProjectError as e:
         raise HTTPException(409, str(e)) from None
     name = Path(state.get("filename") or "project").stem + ".hypercut"
+    _count("project_saved", footage=footage)
     return FileResponse(out, filename=name, media_type="application/zip", background=BackgroundTask(out.unlink, missing_ok=True))
 
 
@@ -609,6 +626,7 @@ def import_project(project_file: UploadFile = File(...), source: UploadFile | No
         incoming.unlink(missing_ok=True)
     kept = {k: v for k, v in (meta.get("job") or {}).items() if k in PROJECT_STATE}
     jobs.write(job_id, status="done", stage="done", error=None, render=None, render_error=None, **kept)
+    _count("project_opened")
     return {"id": job_id, "footage": meta.get("footage"), "versions": len(history.listing(directory)["versions"])}
 
 
@@ -690,6 +708,7 @@ def apply_kit(job_id: str, req: KitRequest):
     plan = plan_mod.load(path)
     changes = brand.apply(plan, folder, jobs.job_dir(job_id))
     history.commit(jobs.job_dir(job_id), plan, "edit", changes=changes, note=changes[0])
+    _count("kit_applied")
     return {"plan": plan.model_dump(mode="json"), "changes": changes}
 
 
@@ -781,3 +800,47 @@ def get_file(job_id: str, name: str):
     if path.parent != root or name == "job.json" or not path.is_file():
         raise HTTPException(404, "no such file")
     return FileResponse(path)
+
+
+# Usage counts (ADR 0030): off until turned on, kept in the media folder, never sent anywhere.
+
+class TelemetrySetting(BaseModel):
+    enabled: bool
+
+
+class TelemetryEvent(BaseModel):
+    event: str = Field(max_length=40)
+    fields: dict = Field(default_factory=dict)
+
+
+@app.get("/telemetry")
+def telemetry_summary():
+    """Whether counting is on, what has been counted, and every event with the only fields it can hold."""
+    return {**telemetry.summary(jobs.media_root()), "fields": {e: sorted(f) for e, f in telemetry.EVENTS.items()}}
+
+
+@app.put("/telemetry")
+def telemetry_setting(req: TelemetrySetting):
+    telemetry.set_enabled(jobs.media_root(), req.enabled)
+    return telemetry.summary(jobs.media_root())
+
+
+@app.post("/telemetry/events", status_code=204)
+def telemetry_event(req: TelemetryEvent):
+    """What the web app counts itself (a suggestion kept, a share). Unknown events and fields are dropped."""
+    if req.event in telemetry.CLIENT_EVENTS:
+        _count(req.event, **req.fields)
+
+
+@app.get("/telemetry/file")
+def telemetry_file():
+    path = jobs.media_root() / telemetry.FILE
+    if not path.is_file():
+        raise HTTPException(404, "nothing recorded")
+    return FileResponse(path, media_type="application/x-ndjson", filename="hypercut-usage.jsonl")
+
+
+@app.delete("/telemetry")
+def telemetry_clear():
+    telemetry.clear(jobs.media_root())
+    return telemetry.summary(jobs.media_root())

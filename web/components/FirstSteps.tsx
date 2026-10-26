@@ -2,8 +2,9 @@
 
 import {useEffect, useState} from 'react';
 import type {EditPlan} from '@render/plan';
-import {getSuggestion, type Suggestion} from '@/lib/api';
+import {count, getSuggestion, type Suggestion} from '@/lib/api';
 import {MODES} from '@/lib/modes';
+import Share from './Share';
 
 type Props = {
 	jobId: string;
@@ -33,6 +34,7 @@ export default function FirstSteps({jobId, plan, duration, render, downloadUrl, 
 			.then((r) => {
 				setSuggestion(r.suggestion);
 				setStep(r.suggestion ? 'offer' : 'done');
+				count('suggestion', r.suggestion ? {kind: r.suggestion.kind, outcome: 'shown'} : {outcome: 'none'});
 				if (!r.suggestion) setOutcome('Nothing stands out: the first cut is ready as it is.');
 			})
 			.catch(() => {
@@ -46,9 +48,11 @@ export default function FirstSteps({jobId, plan, duration, render, downloadUrl, 
 		if (!suggestion) return;
 		setBefore(plan);
 		onTry(suggestion.plan);
+		count('suggestion', {kind: suggestion.kind, outcome: 'tried'});
 		setStep('trying');
 	};
-	const finish = (text: string) => {
+	const finish = (text: string, outcome?: string) => {
+		if (outcome && suggestion) count('suggestion', {kind: suggestion.kind, outcome});
 		setStep('done');
 		setOutcome(text);
 	};
@@ -76,7 +80,7 @@ export default function FirstSteps({jobId, plan, duration, render, downloadUrl, 
 								<button className="primary" onClick={tryIt}>
 									Try it
 								</button>
-								<button onClick={() => finish('Skipped; the first cut stays as it was.')}>Skip</button>
+								<button onClick={() => finish('Skipped; the first cut stays as it was.', 'skipped')}>Skip</button>
 							</span>
 						</>
 					)}
@@ -89,14 +93,14 @@ export default function FirstSteps({jobId, plan, duration, render, downloadUrl, 
 							<span className="row">
 								<button className="primary" onClick={() => {
 											onKeep();
-											finish(`Kept and saved: ${suggestion.label.toLowerCase()}.`);
+											finish(`Kept and saved: ${suggestion.label.toLowerCase()}.`, 'kept');
 										}}>
 									Keep it
 								</button>
 								<button
 									onClick={() => {
 										if (before) onTry(before);
-										finish('Put back; the first cut stays as it was.');
+										finish('Put back; the first cut stays as it was.', 'put_back');
 									}}
 								>
 									Put it back
@@ -110,9 +114,10 @@ export default function FirstSteps({jobId, plan, duration, render, downloadUrl, 
 					<strong>Export</strong>
 					{render === 'done' ? (
 						<span className="row">
-							<a className="btn primary" href={downloadUrl} download>
+							<a className="btn primary" href={downloadUrl} download onClick={() => count('download')}>
 								Download mp4
 							</a>
+							<Share jobId={jobId} plan={plan} name="hypercut-reel" />
 						</span>
 					) : (
 						<span className="row">

@@ -524,3 +524,21 @@ def test_suggestion(client, fake_stages):
     assert "suggestion" in body
     if body["suggestion"]:
         assert body["suggestion"]["label"] and body["suggestion"]["plan"]["source"]
+
+
+def test_usage_counts_are_opt_in(client, fake_stages):
+    from api import jobs
+    from hypercut import telemetry
+
+    assert client.get("/telemetry").json()["enabled"] is False
+    _wait(client, _submit(client))
+    assert not (jobs.media_root() / telemetry.FILE).exists()  # off: nothing written
+
+    assert client.put("/telemetry", json={"enabled": True}).json()["enabled"] is True
+    _wait(client, _submit(client))
+    assert client.post("/telemetry/events", json={"event": "share", "fields": {"how": "download", "path": "/x"}}).status_code == 204
+    client.post("/telemetry/events", json={"event": "job_done", "fields": {"seconds": 1}})  # server-only: dropped
+    counts = client.get("/telemetry").json()["counts"]
+    assert counts["job_created"] == 1 and counts["job_done"] == 1 and counts["share"] == 1
+    assert "/x" not in client.get("/telemetry/file").text
+    assert client.delete("/telemetry").json()["events"] == 0

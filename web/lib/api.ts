@@ -263,3 +263,33 @@ export type Suggestion = {kind: 'shorter' | 'hook' | 'tighter'; label: string; w
 export function getSuggestion(id: string) {
 	return request<{suggestion: Suggestion | null}>(`/jobs/${id}/suggestion`);
 }
+
+/** Usage counts (ADR 0030): off until turned on, kept on this computer. */
+export type Telemetry = {
+	enabled: boolean;
+	events: number;
+	counts: Record<string, number>;
+	render_success: number | null;
+	suggestion_kept: number | null;
+};
+
+export function getTelemetry() {
+	return request<Telemetry>('/telemetry');
+}
+
+export function setTelemetry(enabled: boolean) {
+	return request<Telemetry>('/telemetry', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({enabled})});
+}
+
+export function clearTelemetry() {
+	return request<Telemetry>('/telemetry', {method: 'DELETE'});
+}
+
+export const telemetryFileUrl = `${API_URL}/telemetry/file`;
+
+/** Count something the web app sees (a suggestion kept, a share). Dropped by the server when counting is off; never fails. */
+export function count(event: string, fields: Record<string, string | number | boolean> = {}) {
+	void fetch(`${API_URL}/telemetry/events`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({event, fields})}).catch(
+		() => undefined,
+	);
+}
