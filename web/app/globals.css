@@ -187,3 +187,16 @@ span.chip.active { background: var(--accent); color: #fff; border-color: var(--a
 .brand-panel select, .brand-panel input[type='text'] { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: inherit; font: inherit; }
 .kit-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .kit-text .hint { font-size: 12px; }
+/* First steps (ADR 0029): goal, first cut, one change, export. */
+.editor-top.simple { grid-template-columns: minmax(260px, 360px) minmax(280px, 1fr); }
+@media (max-width: 640px) { .editor-top.simple { grid-template-columns: 1fr; } }
+.first-steps ol { list-style: none; margin: 0 0 8px; padding: 0; counter-reset: step; }
+.first-steps li { counter-increment: step; position: relative; padding: 0 0 14px 38px; display: flex; flex-direction: column; gap: 6px; color: var(--muted); }
+.first-steps li::before { content: counter(step); position: absolute; left: 0; top: -2px; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+.first-steps li.done::before { content: '✓'; background: var(--accent); border-color: var(--accent); color: #fff; }
+.first-steps li.now { color: inherit; }
+.first-steps li.now::before { border-color: var(--accent); color: var(--accent); }
+.first-steps li strong { color: inherit; }
+.first-steps li.done strong { color: var(--fg, inherit); }
+details.more { margin-bottom: 16px; }
+details.more > summary { cursor: pointer; font-weight: 600; margin-bottom: 12px; }

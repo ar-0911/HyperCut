@@ -256,3 +256,10 @@ export type QACheck = {name: string; status: 'pass' | 'warn' | 'fail'; detail: s
 export type QAResult = {ok: boolean | null; checks?: QACheck[]; error?: string};
 
 export const checkPlan = (id: string, plan: EditPlan) => request<CheckReport>(`/jobs/${id}/checks`, json(plan));
+
+/** One change worth trying on a first cut (ADR 0029); made without Claude. */
+export type Suggestion = {kind: 'shorter' | 'hook' | 'tighter'; label: string; why: string; changes: string[]; plan: EditPlan};
+
+export function getSuggestion(id: string) {
+	return request<{suggestion: Suggestion | null}>(`/jobs/${id}/suggestion`);
+}

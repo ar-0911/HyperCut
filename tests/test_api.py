@@ -515,3 +515,12 @@ def test_editing_goes_on_during_a_render(client, fake_stages):
     plan["hook"]["chosen"] = 1
     assert client.put(f"/jobs/{job_id}/plan", json=plan).status_code == 200
     assert client.get(f"/jobs/{job_id}").json()["render"] == "running"  # the render carries on
+
+
+def test_suggestion(client, fake_stages):
+    job_id = _submit(client)
+    _wait(client, job_id)
+    body = client.get(f"/jobs/{job_id}/suggestion").json()
+    assert "suggestion" in body
+    if body["suggestion"]:
+        assert body["suggestion"]["label"] and body["suggestion"]["plan"]["source"]

@@ -49,6 +49,7 @@ import {
 import Assistant from './Assistant';
 import Bin from './Bin';
 import Finish from './Finish';
+import FirstSteps from './FirstSteps';
 import Inspector from './Inspector';
 import OnScreen from './OnScreen';
 import Quality from './Quality';
@@ -77,6 +78,24 @@ export const pendingAssets = (plan: EditPlan) =>
 	});
 
 const typing = (el: EventTarget | null) => el instanceof HTMLElement && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
+
+const VIEW_KEY = 'hypercut.view'; // 'simple' (first steps only) or 'full'; per browser (ADR 0029)
+
+function readView(): boolean {
+	try {
+		return window.localStorage.getItem(VIEW_KEY) !== 'full'; // someone new starts simple
+	} catch {
+		return true;
+	}
+}
+
+function writeView(simple: boolean) {
+	try {
+		window.localStorage.setItem(VIEW_KEY, simple ? 'simple' : 'full');
+	} catch {
+		// private window: the choice lasts for this page only
+	}
+}
 
 export default function Editor({job}: {job: Job}) {
 	const history = useHistory<EditPlan>(job.plan as EditPlan);
@@ -108,6 +127,12 @@ export default function Editor({job}: {job: Job}) {
 	// Automatic checks of the edit as it is now, and the validation of the last render (ADR 0023).
 	const [report, setReport] = useState<CheckReport | null>(null);
 	const [qa, setQa] = useState<Job['qa']>(job.qa);
+	const [simple, setSimpleState] = useState(false);
+	useEffect(() => setSimpleState(readView()), []);
+	const setSimple = (on: boolean) => {
+		setSimpleState(on);
+		writeView(on);
+	};
 	const wantsMatte = Boolean(plan.style.depth?.enabled && plan.style.depth?.cutout);
 	const playerRef = useRef<PlayerRef>(null);
 	const latest = useRef(plan);
@@ -466,7 +491,8 @@ export default function Editor({job}: {job: Job}) {
 				</div>
 			)}
 			{proposal && <p className="hint">The preview shows the AI’s proposed edit ({proposal.showing}). Keep or reject it in the AI box.</p>}
-			<div className="editor-top">
+			<div className={`editor-top${simple ? ' simple' : ''}`}>
+				{!simple && (
 				<Bin
 					jobId={job.id}
 					plan={plan}
@@ -495,6 +521,7 @@ export default function Editor({job}: {job: Job}) {
 						refreshVersions();
 					}}
 				/>
+				)}
 				<div className="player">
 					<Player
 						ref={playerRef}
@@ -511,6 +538,23 @@ export default function Editor({job}: {job: Job}) {
 					<OnScreen plan={plan} playerRef={playerRef} onSelect={setSelected} />
 				</div>
 				<div className="side">
+					{simple && (
+						<FirstSteps
+							jobId={job.id}
+							plan={plan}
+							duration={duration}
+							render={render}
+							downloadUrl={fileUrl(job.id, 'output.mp4')}
+							onTry={(p) => {
+								change(p);
+								setSelected(null);
+							}}
+							onKeep={save}
+							onExport={renderNow}
+							onShowAll={() => setSimple(false)}
+						/>
+					)}
+					{!simple && (
 					<Inspector
 						plan={plan}
 						item={selectedItem}
@@ -520,6 +564,7 @@ export default function Editor({job}: {job: Job}) {
 						onSplit={split}
 						onRegenerate={generation?.available.length ? (id, prompt) => void fetchPictures(plan, id, prompt) : undefined}
 					/>
+					)}
 					<Assistant
 						onAsk={ask}
 						disabled={busy}
@@ -535,6 +580,7 @@ export default function Editor({job}: {job: Job}) {
 				</div>
 			</div>
 
+			{!simple && (
 			<div className="toolbar" ref={scrollArea}>
 				<div className="row">
 					<button onClick={history.undo} disabled={!history.canUndo} title="Undo (⌘/Ctrl+Z)">
@@ -581,6 +627,9 @@ export default function Editor({job}: {job: Job}) {
 					<button disabled={!dirty || busy} onClick={save} title="Save as a new version (⌘/Ctrl+S)">
 						{dirty ? 'Save version' : 'Saved'}
 					</button>
+					<button onClick={() => setSimple(true)} title="Only the first steps: one suggested change, then export">
+						Simple view
+					</button>
 					<button className="primary" disabled={busy || render === 'running'} onClick={renderNow}>
 						{render === 'running' ? 'Rendering…' : 'Render video'}
 					</button>
@@ -591,6 +640,7 @@ export default function Editor({job}: {job: Job}) {
 					)}
 				</div>
 			</div>
+			)}
 			{render === 'running' && (
 				<p className="hint">Rendering the final video takes a few minutes. Keep editing and saving: the render is of the version you started it on.</p>
 			)}
@@ -604,6 +654,8 @@ export default function Editor({job}: {job: Job}) {
 			{fetching && <p className="hint">Fetching stock footage and generating pictures. Clips can take a minute or two each.</p>}
 			{error && <p className="error">{error}</p>}
 
+			{!simple && (
+			<>
 			<Timeline
 				plan={plan}
 				items={items}
@@ -639,6 +691,8 @@ export default function Editor({job}: {job: Job}) {
 				<WhyPanel why={why} onSeek={(t) => playerRef.current?.seekTo(Math.round(t * plan.output.fps))} />
 				<Versions history={versions} dirty={dirty} onRestore={goBackTo} onName={nameIt} onSaveNamed={saveNamed} />
 			</div>
+			</>
+			)}
 		</div>
 	);
 }

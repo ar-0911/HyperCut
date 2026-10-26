@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 
 from api import assets, jobs, kits, recipes
 from hypercut import plan as plan_mod
-from hypercut import assistant, checks, diff, edit, explain, export, generate, brand, history, llm, modes, project, qa, review, run, variants, vision
+from hypercut import assistant, checks, diff, edit, explain, export, generate, brand, history, llm, modes, project, qa, review, run, suggest, variants, vision
 from hypercut.analyze import cuts as cutting
 from hypercut.ingest import PROXY_FILE, IngestError, make_proxy, manifest
 from hypercut.matte import MATTE_FILE
@@ -457,6 +457,21 @@ def recut_plan(job_id: str, plan: EditPlan):
     _job(job_id)
     wav = jobs.job_dir(job_id) / "audio.wav"
     return cutting.recut(plan, str(wav) if wav.is_file() else None).model_dump(mode="json")
+
+
+@app.get("/jobs/{job_id}/suggestion")
+def suggestion(job_id: str):
+    """One change worth trying on the saved edit, for the editor's first steps (ADR 0029). No Claude call;
+    nothing is saved. `suggestion` is null when nothing stands out."""
+    state = _job(job_id)
+    if state["status"] != "done":
+        raise HTTPException(409, f"job is {state['status']}; wait for the plan first")
+    wav = jobs.job_dir(job_id) / "audio.wav"
+    found = suggest.suggest(plan_mod.load(_plan_path(job_id)), str(wav) if wav.is_file() else None)
+    if found is None:
+        return {"suggestion": None}
+    return {"suggestion": {"kind": found.kind, "label": found.label, "why": found.why, "changes": found.changes,
+                           "plan": found.plan.model_dump(mode="json")}}
 
 
 @app.post("/jobs/{job_id}/render", status_code=202)

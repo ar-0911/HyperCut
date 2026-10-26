@@ -87,6 +87,11 @@ Editing goes on during a render: the render works from a snapshot (`render.plan.
 into the plan only if nobody edited meanwhile; the job says which version the download is. The editor previews a
 960 px `proxy.mp4` instead of the full video. See [ADR 0028](decisions/0028-background-render-and-proxy-preview.md).
 
+New users get a short path (ADR 0029): the upload page asks only for the video and the goal, with the rest under
+"More options"; the editor opens on first steps (goal, first cut, one change suggested by `hypercut/suggest.py`
+without a Claude call, export) until they ask for all the controls. See
+[ADR 0029](decisions/0029-first-steps-onboarding.md).
+
 ## Understanding the footage
 
 Next to the transcript, the "look" stage (`hypercut/vision`) builds a visual index of the source: shots (the face

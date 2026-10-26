@@ -80,7 +80,10 @@ export default function UploadPage() {
 	return (
 		<form onSubmit={submit}>
 			<h1>New short</h1>
-			<p className="sub">Upload a talking-head video (10 seconds to 3 minutes). Your footage is never regenerated, only cut and overlaid.</p>
+			<p className="sub">
+				Upload a video of someone talking (10 seconds to 3 minutes) and say what it is for. HyperCut makes the first cut, suggests one
+				change, and you export. Your footage is never regenerated, only cut and overlaid.
+			</p>
 
 			<div className="card">
 				<label htmlFor="video">Video</label>
@@ -96,7 +99,7 @@ export default function UploadPage() {
 						</button>
 					))}
 				</div>
-				<p className="hint">{MODES.find((m) => m.name === mode)?.hint} It sets how the video is cut; the style below sets how it looks.</p>
+				<p className="hint">{MODES.find((m) => m.name === mode)?.hint} It sets how the video is cut; how it looks is under More options.</p>
 			</div>
 
 			{kits.length > 0 && (
@@ -115,6 +118,8 @@ export default function UploadPage() {
 				</div>
 			)}
 
+			<details className="more">
+				<summary>More options: look, hook, footage understanding, pictures</summary>
 			{recipes.length > 0 && (
 				<div className="card">
 					<label>Your recipes</label>
@@ -186,6 +191,15 @@ export default function UploadPage() {
 				</p>
 			</div>
 
+			</details>
+
+			<div className="row">
+				<button className="primary" disabled={!file || busy}>
+					{busy ? 'Uploading…' : 'Create short'}
+				</button>
+				{error && <span className="error">{error}</span>}
+			</div>
+
 			<div className="card">
 				<label htmlFor="project">Or open a project</label>
 				<p className="hint">A .hypercut file saved from the editor, with its versions. One saved without the video asks for the original, which HyperCut checks is the same file.</p>
@@ -201,13 +215,6 @@ export default function UploadPage() {
 						{busy && projectFile ? 'Opening…' : 'Open project'}
 					</button>
 				</div>
-			</div>
-
-			<div className="row">
-				<button className="primary" disabled={!file || busy}>
-					{busy ? 'Uploading…' : 'Create short'}
-				</button>
-				{error && <span className="error">{error}</span>}
 			</div>
 		</form>
 	);
