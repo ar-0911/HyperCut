@@ -20,9 +20,10 @@ from typing import Callable
 from hypercut import plan as plan_mod
 from hypercut.analyze import analyze
 from hypercut.analyze.transitions import plan_transitions
+from hypercut.generate import generate, pending
 from hypercut.ingest import ingest
 from hypercut.matte import MATTE_FILE, matte, needs_matte, place_titles
-from hypercut.plan import EditPlan
+from hypercut.plan import EditPlan, Style
 from hypercut.reframe import reframe
 from hypercut.style import style_from_prompt
 from hypercut.transcribe import transcribe
@@ -40,8 +41,13 @@ def run_pipeline(
     strategy: str = "cold_open",
     on_stage: Callable[[str], None] | None = None,
     visuals: bool = True,
+    recipe: Style | None = None,
+    pictures: bool = False,
 ) -> EditPlan:
-    """Run every stage and save `plan.json` in `job_dir`. `on_stage(name)` is called as each begins."""
+    """Run every stage and save `plan.json` in `job_dir`. `on_stage(name)` is called as each begins.
+    A `recipe` (a saved style, ADR 0018) is used as the style as it is, instead of reading the style prompt.
+    `pictures` lets some visuals be stock footage or generated pictures / clips (ADR 0020): off by default, and
+    without keys it changes nothing."""
     job_dir = Path(job_dir)
     note = on_stage or (lambda _name: None)
 
@@ -52,7 +58,7 @@ def run_pipeline(
     # Face tracking needs only the video and the style only the prompt, so both run while Whisper works.
     with ThreadPoolExecutor(max_workers=3) as pool:
         track = pool.submit(reframe, str(mp4), source)
-        styled = pool.submit(style_from_prompt, style_prompt)
+        styled = pool.submit(lambda: recipe.model_copy(deep=True)) if recipe is not None else pool.submit(style_from_prompt, style_prompt)
         transcript = transcribe(wav)
         reframe_result = track.result()
 
@@ -65,7 +71,8 @@ def run_pipeline(
             cutout = pool.submit(matte, mp4, source, reframe_result, job_dir / MATTE_FILE)
 
         note("analyze")
-        plan = analyze(transcript, source, style, audio_wav=str(wav), strategy=strategy, visuals=visuals)
+        plan = analyze(transcript, source, style, audio_wav=str(wav), strategy=strategy, visuals=visuals,
+                       pictures=pictures)
         if cutout is not None:
             note("matte")
             try:
@@ -74,6 +81,10 @@ def run_pipeline(
                 log.warning("speaker cut-out failed, rendering without green-screen effects: %s", e)
                 cutout = None
     plan = plan.model_copy(update={"reframe": reframe_result})
+    # Stock footage and generated pictures / clips the plan asks for (ADR 0016); none unless asked for and keys are set.
+    if pending(plan):
+        note("generate")
+        generate(plan, job_dir)
     # A few animated transitions at the shot changes face tracking found (ADR 0613).
     plan.cuts = plan_transitions(plan)
     if cutout is not None:
@@ -129,7 +140,16 @@ def draw_new_around(job_dir: str | Path, draw=None, illustrate=None, design=None
         plan_mod.save(plan, path)
 
 
-def render_plan(job_dir: str | Path, out_name: str = "output.mp4", render_dir: Path = RENDER_DIR) -> Path:
+def fetch_new_assets(job_dir: str | Path) -> None:
+    """Fetch the pictures and clips added or asked again for in the editor, before a render (ADR 0016)."""
+    path = Path(job_dir) / "plan.json"
+    plan = plan_mod.load(path)
+    if pending(plan):
+        plan_mod.save(generate(plan, job_dir), path)
+
+
+def render_plan(job_dir: str | Path, out_name: str = "output.mp4", render_dir: Path = RENDER_DIR,
+                extra_args: list[str] | None = None) -> Path:
     """Render `plan.json` + `normalized.mp4` in `job_dir` with the Remotion project's npm script.
     A `matte.webm` next to the video is picked up by the render script."""
     job_dir = Path(job_dir).resolve()
@@ -142,12 +162,17 @@ def render_plan(job_dir: str | Path, out_name: str = "output.mp4", render_dir: P
         draw_new_around(job_dir)
     except Exception as e:
         log.warning("drawing effects around the speaker failed, rendering built-in icons: %s", e)
+    try:
+        fetch_new_assets(job_dir)
+    except Exception as e:
+        log.warning("fetching generated pictures failed, rendering without them: %s", e)
     out = job_dir / out_name
     cmd = [
         "npm", "run", "render", "--",
         "--plan", str(job_dir / "plan.json"),
         "--video", str(job_dir / "normalized.mp4"),
         "--out", str(out),
+        *(extra_args or []),
     ]
     res = subprocess.run(cmd, cwd=render_dir, capture_output=True, text=True)
     if res.returncode != 0 or not out.is_file():
@@ -163,6 +188,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", help="output directory (default media/cli-<video name>)")
     ap.add_argument("--render", action="store_true", help="also render output.mp4 with Remotion")
     ap.add_argument("--no-visuals", action="store_true", help="skip per-beat layouts and illustrations")
+    ap.add_argument("--pictures", action="store_true",
+                    help="let some visuals be stock footage or generated pictures (needs keys, see .env.example)")
     args = ap.parse_args(argv)
 
     job_dir = Path(args.out) if args.out else ROOT / "media" / ("cli-" + Path(args.video).stem)
@@ -170,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
         plan = run_pipeline(
             args.video, job_dir, args.style, args.strategy,
             on_stage=lambda s: print("[" + s + "]", file=sys.stderr),
-            visuals=not args.no_visuals,
+            visuals=not args.no_visuals, pictures=args.pictures,
         )
         print(
             f"{len(plan.transcript.words)} words, {len(plan.hook.candidates)} hooks, "

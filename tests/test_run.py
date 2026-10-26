@@ -27,7 +27,7 @@ def stages(monkeypatch):
         seen["style"] = prompt
         return Style()
 
-    def analyze(transcript, source, style, audio_wav=None, strategy="cold_open", visuals=False):
+    def analyze(transcript, source, style, audio_wav=None, strategy="cold_open", visuals=False, pictures=False):
         seen["strategy"] = strategy
         seen["visuals"] = visuals
         return EditPlan(source=source, transcript=transcript, style=style)

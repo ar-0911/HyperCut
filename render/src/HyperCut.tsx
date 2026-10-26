@@ -21,19 +21,76 @@ export const mediaSrc = (name: string, assetBase?: string) => (assetBase ? `${as
 
 const num = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
 
+export type StillMove = 'push_in' | 'pull_out' | 'pan_left' | 'pan_right' | 'rise';
+
 /**
- * An imported picture or clip filling its box (the split panel or the whole frame). Pictures drift in
- * slowly; clips play from `trim_start`, muted (the speaker keeps the audio), and hold their last frame
- * if the block outlasts the clip.
+ * How a still picture moves over its time on screen (k: 0..1, eased), so a picture plays like a shot: a slow
+ * push in (the default), pull out, pan either way, or a rise. Always scaled past 1 so no edge ever shows.
+ */
+export function stillTransform(move: unknown, k: number): string {
+	const e = k * k * (3 - 2 * k); // smoothstep: starts and ends gently
+	switch (move as StillMove) {
+		case 'pull_out':
+			return `scale(${1.14 - 0.1 * e})`;
+		case 'pan_left':
+			return `scale(1.14) translateX(${4 - 8 * e}%)`;
+		case 'pan_right':
+			return `scale(1.14) translateX(${-4 + 8 * e}%)`;
+		case 'rise':
+			return `scale(1.12) translateY(${3.5 - 7 * e}%)`;
+		default:
+			return `scale(${1.02 + 0.1 * e})`;
+	}
+}
+
+/** The small on-screen credit a stock picture whose licence requires one carries (CC BY, ADR 0016). */
+const Credit: React.FC<{text: string}> = ({text}) => (
+	<div
+		style={{
+			position: 'absolute',
+			right: 18,
+			bottom: 14,
+			maxWidth: '70%',
+			padding: '4px 10px',
+			borderRadius: 6,
+			background: 'rgba(0,0,0,0.45)',
+			color: 'rgba(255,255,255,0.85)',
+			fontFamily: 'Inter, Arial, sans-serif',
+			fontSize: 22,
+			whiteSpace: 'nowrap',
+			overflow: 'hidden',
+			textOverflow: 'ellipsis',
+		}}
+	>
+		{text}
+	</div>
+);
+
+/**
+ * An imported, stock or generated picture or clip filling its box (the split panel or the whole frame).
+ * Pictures move slowly (`move`, see stillTransform); clips play from `trim_start`, muted (the speaker keeps the
+ * audio), and hold their last frame if the block outlasts the clip. Nothing shows until the file exists.
  */
 const MediaFill: React.FC<{graphic: Graphic; tl: Timeline; t: number; frame: number; assetBase?: string}> = ({graphic, tl, t, frame, assetBase}) => {
+	const {props} = graphic;
+	if (!props.src) return null;
+	const credit = props.credit_required && props.credit ? <Credit text={String(props.credit)} /> : null;
+	return (
+		<>
+			<MediaBody graphic={graphic} tl={tl} t={t} frame={frame} assetBase={assetBase} />
+			{credit}
+		</>
+	);
+};
+
+const MediaBody: React.FC<{graphic: Graphic; tl: Timeline; t: number; frame: number; assetBase?: string}> = ({graphic, tl, t, frame, assetBase}) => {
 	const {props} = graphic;
 	const src = mediaSrc(String(props.src ?? ''), assetBase);
 	const fit = props.fit === 'contain' ? 'contain' : 'cover';
 	const fill: React.CSSProperties = {position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: fit};
 	if (props.kind !== 'video') {
 		const k = Math.min(1, Math.max(0, (t - graphic.start) / Math.max(0.1, graphic.end - graphic.start)));
-		return <Img src={src} style={{...fill, transform: `scale(${1.02 + 0.06 * k})`}} />;
+		return <Img src={src} style={{...fill, transform: stillTransform(props.move, k)}} />;
 	}
 	const run = mediaRuns(tl, graphic).find((r) => frame >= r.from && frame < r.from + r.frames);
 	if (!run) return null;
@@ -230,6 +287,32 @@ const VisualBox: React.FC<{
 /** The editorial serif motion-graphic titles are set in (ADR 0613). */
 export const MOTION_TITLE_FONT = 'Instrument Serif';
 
+/** The title over a generated motion clip: serif, white, rising in over a soft shade at the top. */
+const ClipTitle: React.FC<{text: string; t: number; width: number}> = ({text, t, width}) => {
+	if (!text) return null;
+	const k = Math.min(1, Math.max(0, t / 0.5));
+	const e = 1 - Math.pow(1 - k, 3);
+	return (
+		<div style={{position: 'absolute', left: 0, top: 0, width, paddingTop: 230, paddingBottom: 120, background: 'linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0))'}}>
+			<div
+				style={{
+					fontFamily: captionFamily(MOTION_TITLE_FONT),
+					fontSize: 112,
+					lineHeight: 1,
+					color: '#fff',
+					textAlign: 'center',
+					padding: '0 70px',
+					opacity: e,
+					transform: `translateY(${(1 - e) * 40}px)`,
+					textShadow: '0 4px 30px rgba(0,0,0,0.35)',
+				}}
+			>
+				{text}
+			</div>
+		</div>
+	);
+};
+
 const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string; hasMatte: boolean}> = ({plan, tl, assetBase, hasMatte}) => {
 	const frame = useCurrentFrame();
 	const t = frameToSource(tl, frame);
@@ -277,7 +360,13 @@ const Overlays: React.FC<{plan: EditPlan; tl: Timeline; assetBase?: string; hasM
 					<StudioBackdrop seconds={frame / fps} accent={accent} />
 					{mediaLayer}
 					<VisualBox graphics={boxed.filter((g) => g.type !== 'motion')} t={t} plan={plan} mode="visual" top={VISUAL_AREA.top * height} height={(VISUAL_AREA.bottom - VISUAL_AREA.top) * height} />
-					{motion ? (
+					{motion && motion.props.src ? (
+						// A generated clip of the moment (ADR 0016) plays instead of the 3D scene, under its serif title.
+						<>
+							<MediaFill graphic={{...motion, props: {...motion.props, kind: 'video', fit: 'cover'}}} tl={tl} t={t} frame={frame} assetBase={assetBase} />
+							<ClipTitle text={String(motion.props.title ?? '')} t={t - motion.start} width={width} />
+						</>
+					) : motion ? (
 						<MotionGraphic
 							scene={(motion.props.scene ?? {objects: []}) as SceneSpec}
 							title={String(motion.props.title ?? '')}
@@ -346,7 +435,7 @@ const Footage: React.FC<{plan: EditPlan; tl: Timeline; src: string; matteSrc?: s
 	);
 };
 
-export const HyperCut: React.FC<CompositionProps> = ({plan: rawPlan, videoSrc, assetBase, matteSrc: rawMatte}) => {
+export const HyperCut: React.FC<CompositionProps> = ({plan: rawPlan, videoSrc, assetBase, matteSrc: rawMatte, overlaysOnly}) => {
 	const plan = useMemo(() => normalizePlan(rawPlan), [rawPlan]);
 	const tl = useMemo(() => buildTimeline(plan.segments, plan.source.duration, plan.output.fps, plan.style.pacing.speed), [plan]);
 	const windows = useMemo(() => cutWindows(plan, tl), [plan, tl]);
@@ -358,6 +447,14 @@ export const HyperCut: React.FC<CompositionProps> = ({plan: rawPlan, videoSrc, a
 	// An animated transition (ADR 0613): the held last frame moves away over the live incoming footage.
 	const cut = cutAt(windows, frame);
 	const moves = cut ? cutStyles(cut.kind, cut.k, plan.output.width, plan.output.height) : null;
+	if (overlaysOnly) {
+		// Graphics and captions alone on transparency, for finishing in another editor (ADR 0017).
+		return (
+			<AbsoluteFill>
+				<Overlays plan={plan} tl={tl} assetBase={assetBase} hasMatte={false} />
+			</AbsoluteFill>
+		);
+	}
 	return (
 		<AbsoluteFill style={{background: '#000'}}>
 			<AbsoluteFill style={moves?.in}>

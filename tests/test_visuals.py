@@ -122,3 +122,27 @@ def test_merge_keeps_overlays_and_drops_panel_graphics_in_busy_beats():
     art = [Graphic(id="v1", type="illustration", start=3.0, end=6.5, props={"layers": ["<g/>"]})]
     layout = [LayoutSpan(start=0.0, end=3.0, mode="speaker"), LayoutSpan(start=3.0, end=6.5, mode="split")]
     assert [g.id for g in vis.merge_graphics(existing, art, layout)] == ["g3", "v1", "g2"]
+
+
+def test_director_offers_footage_and_pictures_only_when_they_can_be_fetched(fake_llm):
+    calls = fake_llm({"look": "editorial 3D render, coral accents", "beats": [
+        {"i": 0, "mode": "speaker", "visual": None},
+        {"i": 1, "mode": "split", "visual": {"kind": "footage", "query": "busy morning kitchen", "media": "video",
+                                             "title": "All day", "brief": "a kitchen at sunrise"}},
+        {"i": 2, "mode": "split", "visual": {"kind": "picture", "prompt": "a shaker bottle glowing on a counter", "title": "Kids"}},
+    ]})
+    layout, graphics = vis.plan_visuals(SPEECH, SEGMENTS, 9.0, Style(), sources={"stock", "image"})
+    assert "kind\": \"footage\"" in calls[0][0] and '"look"' in calls[0][0]
+    assert [g.type for g in graphics] == ["media", "media"]
+    stock_req, pic_req = graphics[0].props["generate"], graphics[1].props["generate"]
+    assert stock_req == {"kind": "stock", "query": "busy morning kitchen", "media": "video"}
+    assert pic_req["kind"] == "image" and pic_req["look"] == "editorial 3D render, coral accents"
+    assert graphics[0].props["brief"] == "a kitchen at sunrise" and "src" not in graphics[0].props
+    assert graphics[0].props["move"] != graphics[1].props["move"]
+    assert [s.mode for s in layout] == ["speaker", "split"]
+
+
+def test_without_sources_footage_is_ignored(fake_llm):
+    calls = fake_llm({"beats": [{"i": 1, "mode": "split", "visual": {"kind": "footage", "query": "kitchen", "title": "x"}}]})
+    layout, graphics = vis.plan_visuals(SPEECH, SEGMENTS, 9.0, Style())
+    assert graphics == [] and "footage" not in calls[0][0]

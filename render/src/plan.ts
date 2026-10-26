@@ -125,7 +125,14 @@ export type EditPlan = {
  * matteSrc: the speaker cut-out video (transparent outside the speaker) for green-screen effects; without
  * it those effects are skipped and graphics meant to go behind the speaker are drawn in front, off the face.
  */
-export type CompositionProps = {plan: EditPlan; videoSrc: string; assetBase?: string; matteSrc?: string};
+export type CompositionProps = {
+	plan: EditPlan;
+	videoSrc: string;
+	assetBase?: string;
+	matteSrc?: string;
+	/** Draw only the graphics and captions, on transparency (the overlay track of an editor export, ADR 0017). */
+	overlaysOnly?: boolean;
+};
 
 export const DEFAULT_CAPTION: CaptionStyle = {
 	font: 'Montserrat',

@@ -26,6 +26,7 @@ from hypercut.analyze import cuts as cutting
 from hypercut.analyze import motion, stage, visuals
 from hypercut.analyze.analyze import MAX_AROUND_SECONDS, around_props, draw_around
 from hypercut.analyze.transitions import LENGTH as CUT_LENGTH
+from hypercut.generate import available as available_assets
 from hypercut.plan import EditPlan
 
 TEXT_TYPES = ("kinetic_text", "stat_card", "list_build", "lower_third")
@@ -84,6 +85,7 @@ lower_third {{"title","subtitle"}}
 - {{"op": "set_layout", "start": s, "end": e, "mode": "speaker" | "split" | "visual"}}
 - {{"op": "add_zoom", "start": s, "end": e, "scale": 1.05-1.5}}
 - {{"op": "move", "key": "g1", "start": s, "end": e}}
+- {{"op": "anchor", "key": "g1", "anchor": "top" | "center" | "bottom" | "auto"}}  move a graphic up or down the frame
 - {{"op": "edit", "key": "g1", "props": {{...}}}}  change a graphic's text or other props (merged in)
 - {{"op": "caption_style", "changes": {{"font"|"color"|"highlight_color"|"size"|"position"|"uppercase"|\
 "words_per_line"|"animation": value}}}}  fonts: {fonts}
@@ -97,7 +99,7 @@ speed up the whole reel; keep_pause is how much pause stays around each cut (re-
 - {{"op": "motion", "start": s, "end": e, "title": "1-4 words", "idea": "the one 3D object or moment to show"}}  a 2-3 s full-screen 3D motion graphic of what is said there (the speaker keeps talking)
 - {{"op": "cut_transition", "at": s, "kind": "drop" | "whip" | "zoom" | "push" | "none"}}  an animated transition at a cut or shot change: drop = the old shot falls off screen, whip = a fast blurred pan, zoom = pushing through, push = slides up; "none" removes the one there. Use sparingly
 - {{"op": "depth", "enabled": false}}  turn all green-screen effects off
-- {{"op": "transitions", "style": "editorial" | "hard" | "smooth" | "zoom", "fade_out": seconds}}  editorial (J-cuts, \
+{pictures}- {{"op": "transitions", "style": "editorial" | "hard" | "smooth" | "zoom", "fade_out": seconds}}  editorial (J-cuts, \
 punch-ins across jump cuts, a settle on new shots), hard cuts, short crossfades, or alternating punch-ins at cuts; fade to black at the end
 
 A new visual (illustration, footage, big text, stat card, list) replaces any visual already in that stretch.
@@ -107,11 +109,25 @@ playhead. If the request is unclear or impossible, return no operations and say 
 Return {{"message": "<one short sentence for the user>", "ops": [...]}}"""
 
 
+PICTURES_OP = """- {{"op": "add_picture", "source": {sources}, "start": s, "end": e, "title": "0-4 words", "brief": "what the \
+shot should show", "query": "<2-5 stock search words, for footage>", "prompt": "<generation prompt for picture or clip: \
+subject, action, setting, angle, light; no text, logos or faces>", "layout": "split" | "visual"}}  a real stock clip or \
+photo (footage), a generated still (picture) or a generated moving clip (clip) of what is said; fetched when \
+the user previews or renders
+"""
+PICTURE_SOURCES = {"footage": "stock", "picture": "image", "clip": "video"}
+
+
 @dataclass
 class AssistResult:
     plan: EditPlan
     message: str
     changes: list[str] = field(default_factory=list)
+
+
+def pictures_prompt(sources: set[str]) -> str:
+    names = [name for name, kind in PICTURE_SOURCES.items() if kind in sources]
+    return PICTURES_OP.format(sources=" | ".join(f'"{n}"' for n in names)) if names else ""
 
 
 def _fmt(span: tuple[float, float] | None) -> str:
@@ -186,8 +202,11 @@ def _reel_span(op: dict, duration: float, playhead: float, default_len: float = 
 
 
 def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], draw=visuals.illustrate,
-              audio_wav: str | None = None, draw_icons=visuals.draw_icons, design=None) -> tuple[EditPlan, list[str]]:
-    """Validate and apply Claude's operations to a copy of the plan. Unknown or invalid ops are skipped."""
+              audio_wav: str | None = None, draw_icons=visuals.draw_icons, design=None,
+              sources: set[str] | None = None) -> tuple[EditPlan, list[str]]:
+    """Validate and apply Claude's operations to a copy of the plan. Unknown or invalid ops are skipped.
+    `sources`: the asset kinds this machine can fetch (default: `hypercut.generate.available()`)."""
+    sources = available_assets() if sources is None else sources
     plan = plan.model_copy(deep=True)
     duration = edit.reel_duration(plan)
     asset_by_name = {a["name"]: a for a in assets}
@@ -270,6 +289,22 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
             if span and not gone(target):
                 target.start, target.end = span
                 changes.append(f"Moved {op['key']}")
+        elif kind == "anchor" and isinstance(by_key.get(op.get("key")), plan_mod.Graphic) and op.get("anchor") in ("auto", "top", "center", "bottom"):
+            by_key[op["key"]].anchor = op["anchor"]
+            changes.append(f"Moved {op['key']} to the {op['anchor']}" if op["anchor"] != "auto" else f"Placed {op['key']} automatically")
+        elif kind == "add_picture" and PICTURE_SOURCES.get(op.get("source")) in sources:
+            req_kind = PICTURE_SOURCES[op["source"]]
+            words = " ".join(str(op.get("query" if req_kind == "stock" else "prompt") or op.get("brief") or "").split())
+            span = span_of(op, 3.5, MAX_ADD_SECONDS)
+            if span and words:
+                title = str(op.get("title") or "")[:40]
+                req = {"kind": req_kind, "query": words[:80], "media": "any"} if req_kind == "stock" else {"kind": req_kind, "prompt": words[:1000]}
+                g = edit.add_graphic(plan, "media", *span, {"generate": req, "title": title, "label": title or words[:40],
+                                                            "brief": str(op.get("brief") or words)[:1500], "fit": "cover",
+                                                            "kind": "video" if req_kind == "video" else "image"}, prefix="p")
+                edit.set_layout(plan, *span, "visual" if op.get("layout") == "visual" else "split")
+                changes.append(f"Added {op['source']} {g.id}: {title or words[:40]}")
+                changes += [f"Replaced {x}" for x in edit.clear_visuals(plan, *span, keep=g.id)]
         elif kind == "edit" and isinstance(by_key.get(op.get("key")), plan_mod.Graphic) and isinstance(op.get("props"), dict):
             g = by_key[op["key"]]
             g.props = {**g.props, **{k: v for k, v in op["props"].items() if k not in ("src", "layers", "defs", "viewBox")}}
@@ -375,6 +410,8 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
     if moments:
         motion.add_motion(plan, moments)
         motion.design_scenes(plan.graphics, plan.transcript, plan.style, design)
+        if "video" in sources:
+            motion.ask_for_clips(plan, moments)
         changes += [f"Added motion graphic {g.id}" for g in moments]
     draw_around(plan.graphics, plan.style, draw_icons)
     stage.draw_stage(plan.graphics, plan.style, draw)
@@ -417,6 +454,7 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
 def assist(plan: EditPlan, instruction: str, playhead: float = 0.0, assets: list[dict] | None = None,
            selected: str | None = None, audio_wav: str | None = None) -> AssistResult:
     assets = assets or []
+    sources = available_assets()
     selection = f"The user has {selected} selected." if selected else ""
     raw = llm.ask_json(
         PROMPT.format(
@@ -424,12 +462,13 @@ def assist(plan: EditPlan, instruction: str, playhead: float = 0.0, assets: list
             speed=plan.style.pacing.speed, keep_pause=plan.style.pacing.keep_pause,
             transition=plan.style.transitions.style, font=plan.style.caption.font,
             instruction=instruction.strip()[:2000], text_types=", ".join(TEXT_TYPES), fonts=", ".join(plan_mod.CAPTION_FONTS),
+            pictures=pictures_prompt(sources),
             **summarize(plan, assets),
         ),
         system=SYSTEM,
     )
     ops = raw.get("ops") if isinstance(raw.get("ops"), list) else []
-    new_plan, changes = apply_ops(plan, ops, playhead, assets, audio_wav=audio_wav)
+    new_plan, changes = apply_ops(plan, ops, playhead, assets, audio_wav=audio_wav, sources=sources)
     message = str(raw.get("message") or "")[:300] or ("Done." if changes else "I couldn't make that change.")
     return AssistResult(new_plan, message, changes)
 

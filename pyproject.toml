@@ -17,6 +17,10 @@ reframe = ["mediapipe>=0.10", "opencv-python-headless>=4.9"]
 matte = ["mediapipe>=0.10", "opencv-python-headless>=4.9", "numpy>=1.24", "onnxruntime>=1.17"]
 api = ["fastapi>=0.110", "uvicorn>=0.29", "python-multipart>=0.0.9"]
 anthropic = ["anthropic>=1.0"]
+# Stock footage and hosted image / video generation (fal.ai), ADR 0016.
+generate = ["httpx>=0.27"]
+# Open image / video models on this machine (needs a CUDA GPU with 16-24 GB), ADR 0016.
+local-gen = ["torch>=2.4", "diffusers>=0.35", "transformers>=4.45", "accelerate>=0.34", "imageio[ffmpeg]>=2.34"]
 
 [tool.setuptools.packages.find]
 include = ["hypercut*"]

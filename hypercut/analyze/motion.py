@@ -277,6 +277,29 @@ def add_motion(plan: EditPlan, moments: list[Graphic]) -> None:
     plan.graphics = sorted([x for x in plan.graphics if not clash(x)] + moments, key=lambda x: x.start)
 
 
+CLIP_LOOK = ("premium product-shot 3D animation, one hero subject, soft studio light, a clean {look} studio with a "
+             "subtle grid floor, accents {accent} and {secondary}")
+
+
+def clip_request(g: Graphic, style: Style) -> dict:
+    """What to ask a video model for, for one motion moment (ADR 0016): its idea, in the reel's colours."""
+    gs = style.graphics
+    look = (g.props.get("scene") or {}).get("look", "light")
+    return {
+        "kind": "video",
+        "prompt": f"{g.props.get('idea', '')} ({g.props.get('title', '')})".strip(),
+        "look": CLIP_LOOK.format(look="pale grey" if look == "light" else "near-black", accent=gs.accent_color,
+                                 secondary=gs.secondary_color or gs.accent_color),
+    }
+
+
+def ask_for_clips(plan: EditPlan, moments: list[Graphic]) -> None:
+    """Have each motion moment fetched as a generated clip (by `hypercut.generate`), keeping its 3D scene."""
+    for g in moments:
+        if g.type == "motion" and not isinstance(g.props.get("generate"), dict):
+            g.props = {**g.props, "generate": clip_request(g, plan.style)}
+
+
 def _context(transcript: Transcript, g: Graphic, pad: float = 4.0) -> str:
     words = [w.text for w in transcript.words if g.start - pad <= w.start <= g.end + pad]
     said = " ".join(w.text for w in transcript.words if g.start <= w.start < g.end)

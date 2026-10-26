@@ -29,8 +29,9 @@ def fake_stages(monkeypatch):
         (Path(job_dir) / "audio.wav").write_bytes(b"wav")
         return SOURCE, Path(job_dir) / "normalized.mp4", Path(job_dir) / "audio.wav"
 
-    def analyze(transcript, source, style, audio_wav=None, strategy="cold_open", visuals=False):
+    def analyze(transcript, source, style, audio_wav=None, strategy="cold_open", visuals=False, pictures=False):
         calls["strategy"] = strategy
+        calls["pictures"] = pictures
         calls["style"] = style.name
         hook = Hook(strategy=strategy, candidates=[
             HookCandidate(start=0, end=2, text="a", score=0.9), HookCandidate(start=3, end=5, text="b", score=0.5)])
@@ -289,3 +290,74 @@ def test_matte_endpoint_makes_the_cut_out_once(client, fake_stages, monkeypatch)
     body = _wait(client, job_id, key="matte")
     assert body["matte"] == "done" and "matte.webm" in body["files"]
     assert client.post(f"/jobs/{job_id}/matte").json()["matte"] == "done" and len(made) == 1
+
+
+def test_recipes_round_trip_and_start_a_job(client, fake_stages):
+    from hypercut.plan import Style
+
+    style = Style(name="mine").model_dump(mode="json")
+    style["caption"]["color"] = "#FF0000"
+    assert client.post("/recipes", json={"name": "Red captions", "style": style}).status_code == 201
+    assert [r["name"] for r in client.get("/recipes").json()["recipes"]] == ["Red captions"]
+    body = _wait(client, _submit(client, recipe="Red captions"))
+    assert body["plan"]["style"]["caption"]["color"] == "#FF0000"  # used as is, not read from a prompt
+    assert client.post("/jobs", files={"video": ("c.mp4", b"x")}, data={"recipe": "nope"}).status_code == 422
+    assert client.delete("/recipes/Red captions").status_code == 200
+    assert client.get("/recipes").json()["recipes"] == []
+
+
+def test_generated_files_may_be_used_and_generate_endpoint(client, fake_stages, monkeypatch):
+    from hypercut import generate
+
+    job_id = _submit(client)
+    plan = _wait(client, job_id)["plan"]
+    assert client.get(f"/jobs/{job_id}").json()["generation"]["spent"] == 0
+    plan["graphics"] = [{"id": "p1", "type": "media", "start": 0, "end": 1, "props": {"src": "gen-0123456789abcdef.jpg", "kind": "image"}}]
+    assert client.put(f"/jobs/{job_id}/plan", json=plan).status_code == 422  # not fetched for this job
+    from api import jobs
+
+    (jobs.job_dir(job_id) / "gen-0123456789abcdef.jpg").write_bytes(b"jpg")
+    assert client.put(f"/jobs/{job_id}/plan", json=plan).status_code == 200
+
+    def fake_generate(p, job_dir, **kw):
+        for g in p.graphics:
+            g.props = {**g.props, "src": "gen-0123456789abcdef.jpg"}
+        return p
+
+    monkeypatch.setattr(generate, "generate", fake_generate)
+    plan["graphics"][0]["props"] = {"generate": {"kind": "image", "prompt": "a"}, "title": "A"}
+    r = client.post(f"/jobs/{job_id}/generate", json={"plan": plan, "graphic_id": "p1", "prompt": "b"})
+    assert r.status_code == 200
+    props = r.json()["plan"]["graphics"][0]["props"]
+    assert props["src"] == "gen-0123456789abcdef.jpg" and props["generate"]["prompt"] == "b"
+    assert client.post(f"/jobs/{job_id}/generate", json={"plan": plan, "graphic_id": "zz"}).status_code == 404
+
+
+def test_variants_become_their_own_jobs(client, fake_stages):
+    job_id = _submit(client)
+    plan = _wait(client, job_id)["plan"]
+    plan["segments"] = [{"start": 0, "end": 20, "reason": "body"}]
+    r = client.post(f"/jobs/{job_id}/variants", json=plan)
+    assert r.status_code == 201
+    made = r.json()["variants"]
+    assert made and made[0]["label"].startswith("Hook 2")
+    other = client.get(f"/jobs/{made[0]['id']}").json()
+    assert other["status"] == "done" and other["plan"]["hook"]["chosen"] == 1 and other["variant_of"] == job_id
+    assert "normalized.mp4" in other["files"]
+
+
+def test_review_needs_a_render(client, fake_stages):
+    job_id = _submit(client)
+    _wait(client, job_id)
+    assert client.post(f"/jobs/{job_id}/review").status_code == 409
+
+
+def test_pictures_are_off_unless_asked(client, fake_stages, monkeypatch):
+    from hypercut import generate
+
+    monkeypatch.setattr(generate, "available", lambda: set())
+    assert client.get("/generation").json() == {"available": []}
+    _wait(client, _submit(client))
+    assert fake_stages["pictures"] is False
+    _wait(client, _submit(client, pictures="true"))
+    assert fake_stages["pictures"] is True

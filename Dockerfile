@@ -31,7 +31,7 @@ USER ubuntu
 # Python pipeline and job server, with every optional backend so a .env switch is all it takes.
 COPY --chown=ubuntu:ubuntu pyproject.toml ./
 COPY --chown=ubuntu:ubuntu hypercut/ hypercut/
-RUN pip install --no-cache-dir -e '.[api,whisper,deepgram,reframe,matte,anthropic]'
+RUN pip install --no-cache-dir -e '.[api,whisper,deepgram,reframe,matte,anthropic,generate]'
 
 # Renderer, plus the headless Chrome it drives (downloaded now, not on the first render).
 COPY --chown=ubuntu:ubuntu render/package.json render/package-lock.json render/

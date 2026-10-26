@@ -454,3 +454,9 @@ export const fmtTime = (t: number): string => {
 	const s = t - m * 60;
 	return `${m}:${s.toFixed(1).padStart(4, '0')}`;
 };
+
+/** Graphics showing at reel second t (what the viewer sees there), for picking one off the preview. */
+export function onScreenAt(plan: EditPlan, tl: Timeline, t: number): Graphic[] {
+	const s = toSource(tl, t);
+	return plan.graphics.filter((g) => s >= g.start && s < g.end);
+}
