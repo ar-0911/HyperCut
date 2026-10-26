@@ -2,7 +2,7 @@
 
 import {useRouter} from 'next/navigation';
 import {useEffect, useState, type FormEvent} from 'react';
-import {createJob, deleteRecipe, generationSources, listRecipes, type Recipe} from '@/lib/api';
+import {createJob, deleteRecipe, generationSources, kitFileUrl, listKits, listRecipes, type Kit, type Recipe} from '@/lib/api';
 import {MODES, type Mode} from '@/lib/modes';
 import {PRESETS} from '@/lib/presets';
 
@@ -19,11 +19,16 @@ export default function UploadPage() {
 	const [pictures, setPictures] = useState(false);
 	const [vision, setVision] = useState('none');
 	const [mode, setMode] = useState<Mode>('talking_head');
+	const [kits, setKits] = useState<Kit[]>([]);
+	const [kit, setKit] = useState('');
 
 	useEffect(() => {
 		listRecipes()
 			.then((r) => setRecipes(r.recipes))
 			.catch(() => setRecipes([])); // the upload still works without them
+		listKits()
+			.then((r) => setKits(r.kits))
+			.catch(() => setKits([]));
 		generationSources()
 			.then((r) => setSources(r.available))
 			.catch(() => setSources([])); // no keys or an older engine: everything is drawn
@@ -46,7 +51,7 @@ export default function UploadPage() {
 		setBusy(true);
 		setError(null);
 		try {
-			const {id} = await createJob(file, recipe ? '' : style, strategy, recipe, pictures && sources.length > 0, vision, mode);
+			const {id} = await createJob(file, recipe ? '' : style, strategy, recipe, pictures && sources.length > 0, vision, mode, kit);
 			router.push(`/jobs/${id}`);
 		} catch (err) {
 			setError((err as Error).message);
@@ -75,6 +80,22 @@ export default function UploadPage() {
 				</div>
 				<p className="hint">{MODES.find((m) => m.name === mode)?.hint} It sets how the video is cut; the style below sets how it looks.</p>
 			</div>
+
+			{kits.length > 0 && (
+				<div className="card">
+					<label>Brand kit</label>
+					<p className="hint">Your logo, music, end card and caption look on this reel. Pick it again to go without.</p>
+					<div className="chips">
+						{kits.map((k) => (
+							<button type="button" key={k.id} className={`chip${kit === k.id ? ' active' : ''}`} onClick={() => setKit(kit === k.id ? '' : k.id)}>
+								{/* eslint-disable-next-line @next/next/no-img-element */}
+								{k.logo ? <img className="chip-logo" src={kitFileUrl(k.id, k.logo)} alt="" /> : null}
+								{k.name}
+							</button>
+						))}
+					</div>
+				</div>
+			)}
 
 			{recipes.length > 0 && (
 				<div className="card">

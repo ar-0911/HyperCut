@@ -15,9 +15,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from api import assets, jobs, recipes
+from api import assets, jobs, kits, recipes
 from hypercut import plan as plan_mod
-from hypercut import assistant, checks, diff, edit, explain, export, generate, history, llm, modes, qa, review, run, variants, vision
+from hypercut import assistant, checks, diff, edit, explain, export, generate, brand, history, llm, modes, qa, review, run, variants, vision
 from hypercut.analyze import cuts as cutting
 from hypercut.ingest import manifest
 from hypercut.matte import MATTE_FILE
@@ -95,23 +95,26 @@ def _editable(job_id: str) -> dict:
 
 def _media_names(plan: EditPlan) -> set[str]:
     names = {str(g.props["src"]) for g in plan.graphics if g.type in ("media", "motion") and g.props.get("src")}
+    names |= {f for f in (plan.brand.logo, plan.brand.music, plan.brand.font) if f}
     return names | {b.src for b in plan.backgrounds if b.kind == "media" and b.src}
 
 
 def _known_media(job_id: str, state: dict) -> set[str]:
     """Files a plan may show: the user's imports and the stock / generated files fetched for this job."""
     generated = {p.name for p in jobs.job_dir(job_id).glob("gen-*") if p.suffix in (".jpg", ".jpeg", ".png", ".webp", ".mp4")}
-    return {a["name"] for a in state.get("assets", [])} | generated
+    branded = {p.name for p in jobs.job_dir(job_id).glob("brand-*")}  # a brand kit's files (ADR 0026)
+    return {a["name"] for a in state.get("assets", [])} | generated | branded
 
 
 def _process(job_id: str, video: Path, style: str, strategy: str, recipe: Style | None = None,
-             pictures: bool = False, vision_provider: str | None = None, mode: str | None = None) -> None:
+             pictures: bool = False, vision_provider: str | None = None, mode: str | None = None,
+             kit: str | None = None) -> None:
     try:
         jobs.write(job_id, status="running", stage="ingest")
         run.run_pipeline(
             video, jobs.job_dir(job_id), style, strategy,
             on_stage=lambda s: jobs.write(job_id, stage=s), recipe=recipe, pictures=pictures,
-            vision=vision_provider, mode=mode,
+            vision=vision_provider, mode=mode, kit=kits.kit_dir(kit) if kit else None,
         )
         jobs.write(job_id, status="done", stage="done", error=None)
     except Exception as e:
@@ -160,10 +163,14 @@ def create_job(
     vision: Literal["", "none", "ollama", "claude"] = Form(""),
     # What kind of video this is (ADR 0025): sets how it is edited. Empty: talking head.
     mode: Literal["", "talking_head", "podcast", "product_demo", "vlog"] = Form(""),
+    # A brand kit's id (ADR 0026): its look, logo, music, end card and font go on the reel.
+    kit: str = Form(""),
 ):
     saved_style = recipes.get(recipe) if recipe else None
     if recipe and saved_style is None:
         raise HTTPException(422, f"no recipe called {recipe!r}")
+    if kit and kits.kit_dir(kit) is None:
+        raise HTTPException(422, f"no brand kit {kit!r}")
     job_id = jobs.new_id()
     directory = jobs.job_dir(job_id)
     directory.mkdir(parents=True)
@@ -172,9 +179,9 @@ def create_job(
         shutil.copyfileobj(video.file, f)
     jobs.write(job_id, status="queued", stage=None, error=None, render=None, render_error=None,
                style=style or (f"recipe: {recipe}" if recipe else ""), hook_strategy=hook_strategy, filename=video.filename,
-               pictures=pictures, vision=vision or None, mode=mode or None)
+               pictures=pictures, vision=vision or None, mode=mode or None, kit=kit or None)
     background.add_task(_process, job_id, upload, style, hook_strategy, saved_style, pictures, vision or None,
-                        mode or None)
+                        mode or None, kit or None)
     return {"id": job_id, "status": "queued"}
 
 
@@ -193,7 +200,8 @@ def retry_job(job_id: str, background: BackgroundTasks):
     jobs.write(job_id, status="queued", stage=None, error=None, interrupted=False)
     background.add_task(_process, job_id, upload, "" if saved else state.get("style", ""),
                         state.get("hook_strategy", "cold_open"), saved, bool(state.get("pictures")),
-                        state.get("vision"), state.get("mode"))
+                        state.get("vision"), state.get("mode"),
+                        state.get("kit") if state.get("kit") and kits.kit_dir(state["kit"]) else None)
     return {"id": job_id, "status": "queued"}
 
 
@@ -506,6 +514,87 @@ def delete_recipe(name: str):
     if not recipes.delete(name):
         raise HTTPException(404, "no such recipe")
     return {"deleted": name}
+
+
+@app.get("/kits")
+def list_kits():
+    return {"kits": kits.all_kits()}
+
+
+@app.post("/kits", status_code=201)
+async def create_kit(
+    name: str = Form(..., min_length=1, max_length=60),
+    # The look to keep: the current style of this job, else an explicit Style JSON, else the defaults.
+    from_job: str = Form(""),
+    style: str = Form(""),
+    logo: UploadFile | None = File(None),
+    music: UploadFile | None = File(None),
+    font: UploadFile | None = File(None),
+    logo_corner: Literal["top_left", "top_right", "bottom_left", "bottom_right"] = Form("top_right"),
+    logo_size: float = Form(0.16),
+    end_card: str = Form("", max_length=80),
+    music_volume: float = Form(0.25),
+    duck: float = Form(0.3),
+    font_name: str = Form("", max_length=40),
+):
+    """Save a brand kit: the look of an edit plus a logo, music, a font and an end card line."""
+    if from_job:
+        path = _plan_path(from_job)
+        if not path.is_file():
+            raise HTTPException(404, "no plan for that job")
+        look = plan_mod.load(path).style
+    else:
+        try:
+            look = Style.model_validate_json(style) if style else Style()
+        except ValueError as e:
+            raise HTTPException(422, f"style: {e}") from None
+    files = {}
+    for kind, upload in (("logo", logo), ("music", music), ("font", font)):
+        if upload is not None and upload.filename:
+            files[kind] = (upload.filename, await upload.read())
+    try:
+        kit_brand = plan_mod.Brand(logo_corner=logo_corner, logo_size=logo_size, end_card=" ".join(end_card.split()),
+                                   music_volume=music_volume, duck=duck,
+                                   font_name=(" ".join(font_name.split()) or "Brand font") if "font" in files else "")
+        kit_id = kits.create(brand.Kit(name=" ".join(name.split()), look=brand.look_of(look), brand=kit_brand), files)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    return {"id": kit_id, **brand.summary(kits.kit_dir(kit_id))}
+
+
+@app.get("/kits/{kit_id}/files/{name}")
+def kit_file(kit_id: str, name: str):
+    path = kits.kit_dir(kit_id)
+    if path is None or name not in {f for f in brand.files_of(path).values() if f}:
+        raise HTTPException(404, "no such file")
+    return FileResponse(path / name)
+
+
+@app.delete("/kits/{kit_id}")
+def delete_kit(kit_id: str):
+    if not kits.delete(kit_id):
+        raise HTTPException(404, "no such brand kit")
+    return {"deleted": kit_id}
+
+
+class KitRequest(BaseModel):
+    kit: str
+
+
+@app.post("/jobs/{job_id}/kit")
+def apply_kit(job_id: str, req: KitRequest):
+    """Put a brand kit on the current edit, as a new version."""
+    state = _job(job_id)
+    path = _plan_path(job_id)
+    if state["status"] != "done" or not path.is_file():
+        raise HTTPException(409, "the job has no edit yet")
+    folder = kits.kit_dir(req.kit)
+    if folder is None:
+        raise HTTPException(404, "no such brand kit")
+    plan = plan_mod.load(path)
+    changes = brand.apply(plan, folder, jobs.job_dir(job_id))
+    history.commit(jobs.job_dir(job_id), plan, "edit", changes=changes, note=changes[0])
+    return {"plan": plan.model_dump(mode="json"), "changes": changes}
 
 
 def _clone(job_id: str, plan: EditPlan, label: str) -> str:

@@ -18,6 +18,7 @@ import {
 	getJob,
 	nameVersion,
 	recutPlan,
+	applyKit,
 	requestMatte,
 	restorePlan,
 	restoreVersion,
@@ -479,6 +480,15 @@ export default function Editor({job}: {job: Job}) {
 						} catch (e) {
 							setError((e as Error).message);
 						}
+					}}
+					onKit={async (kit) => {
+						// The kit goes on the saved edit, so save unsaved edits first.
+						if (dirty) await commit(plan);
+						const res = await applyKit(job.id, kit.id);
+						change(res.plan);
+						setSaved(res.plan);
+						setSelected(null);
+						refreshVersions();
 					}}
 				/>
 				<div className="player">

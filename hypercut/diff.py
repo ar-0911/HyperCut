@@ -173,6 +173,26 @@ def _fields(a: Any, b: Any, path: str) -> list[str]:
     return out
 
 
+def _brand(a, b) -> list[str]:
+    """Brand kit changes (ADR 0026) in words."""
+    if a == b:
+        return []
+    out = []
+    if a.name != b.name and b.name:
+        out.append(f"Brand kit: {b.name}")
+    for field, noun in (("logo", "the logo"), ("music", "the music"), ("font", "the brand font")):
+        was, now = getattr(a, field), getattr(b, field)
+        if bool(was) != bool(now):
+            out.append(f"{'Added' if now else 'Removed'} {noun}")
+    if b.logo and (a.logo_corner, a.logo_size, a.logo_opacity) != (b.logo_corner, b.logo_size, b.logo_opacity) and a.logo:
+        out.append(f"Logo: {b.logo_corner.replace('_', ' ')}, {round(b.logo_size * 100)}% wide")
+    if b.music and a.music and (a.music_volume, a.duck) != (b.music_volume, b.duck):
+        out.append(f"Music at {round(b.music_volume * 100)}%, {round(b.duck * 100)}% of that under speech")
+    if a.end_card != b.end_card:
+        out.append(f"End card: “{b.end_card}”" if b.end_card else "Removed the end card")
+    return out or ["Changed the brand settings"]
+
+
 def explain(before: EditPlan, after: EditPlan) -> list[str]:
     """Every meaningful difference from `before` to `after`, most important first."""
     out = _segments(before, after)
@@ -194,6 +214,7 @@ def explain(before: EditPlan, after: EditPlan) -> list[str]:
     if before.hook.strategy != after.hook.strategy:
         out.append("Hook plays first as a cold open" if after.hook.strategy == "cold_open" else "Reel starts at the hook")
     out += _fields(before.style, after.style, "")
+    out += _brand(before.brand, after.brand)
     if before.reframe != after.reframe:
         out.append("Changed the framing")
     if before.output != after.output:

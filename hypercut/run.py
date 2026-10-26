@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
-from hypercut import audio, history, modes
+from hypercut import audio, brand, history, modes
 from hypercut import plan as plan_mod
 from hypercut.analyze import analyze
 from hypercut.analyze.transitions import plan_transitions
@@ -77,6 +77,7 @@ def run_pipeline(
     pictures: bool = False,
     vision: str | None = None,
     mode: str | None = None,
+    kit: str | Path | None = None,
 ) -> EditPlan:
     """Run every stage and save `plan.json` in `job_dir`. `on_stage(name)` is called as each begins.
     A `recipe` (a saved style, ADR 0018) is used as the style as it is, instead of reading the style prompt.
@@ -84,7 +85,8 @@ def run_pipeline(
     without keys it changes nothing. `vision` picks who describes the sampled frames of the visual index
     (ADR 0024): "none" (local signals only), "ollama" (a local model) or "claude" (sends frames to Claude);
     default `HYPERCUT_VISION` or "none"; "off" skips the index. `mode` is the editing mode (ADR 0025): podcast,
-    product_demo, vlog or talking_head; what the style prompt or recipe asked for still wins over it."""
+    product_demo, vlog or talking_head; what the style prompt or recipe asked for still wins over it. `kit` is a brand
+    kit folder (ADR 0026): its look, logo, music, end card and font go on the reel."""
     job_dir = Path(job_dir)
     note = on_stage or (lambda _name: None)
 
@@ -137,6 +139,8 @@ def run_pipeline(
                 log.warning("speaker cut-out failed, rendering without green-screen effects: %s", e)
                 cutout = None
     plan = plan.model_copy(update={"reframe": reframe_result})
+    if kit is not None:
+        brand.apply(plan, kit, job_dir)
     # Stock footage and generated pictures / clips the plan asks for (ADR 0016); none unless asked for and keys are set.
     if pending(plan):
         note("generate")

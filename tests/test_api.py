@@ -456,3 +456,32 @@ def test_job_shows_what_ingest_found(client, fake_stages):
     assert client.get(f"/jobs/{job_id}").json()["manifest"] is None  # the fake ingest wrote none
     manifest.save(jobs.job_dir(job_id), {"video": {"orientation": "portrait"}, "warnings": ["The video is HDR"]})
     assert client.get(f"/jobs/{job_id}").json()["manifest"]["warnings"] == ["The video is HDR"]
+
+
+def test_brand_kits(client, fake_stages):
+    files = {"logo": ("logo.png", b"png"), "music": ("bed.mp3", b"mp3")}
+    r = client.post("/kits", data={"name": "Acme  Co", "end_card": "Follow Acme", "logo_corner": "bottom_left"}, files=files)
+    assert r.status_code == 201, r.text
+    kit = r.json()
+    assert kit["name"] == "Acme Co" and kit["logo"] == "logo.png" and kit["music"]
+    assert [k["id"] for k in client.get("/kits").json()["kits"]] == [kit["id"]]
+    assert client.get(f"/kits/{kit['id']}/files/logo.png").content == b"png"
+    assert client.get(f"/kits/{kit['id']}/files/kit.json").status_code == 404
+    bad = client.post("/kits", data={"name": "x"}, files={"logo": ("logo.exe", b"x")})
+    assert bad.status_code == 422
+
+    # On a finished edit, as a new version; its files become the job's own.
+    job_id = _submit(client)
+    _wait(client, job_id)
+    r = client.post(f"/jobs/{job_id}/kit", json={"kit": kit["id"]})
+    assert r.status_code == 200 and r.json()["plan"]["brand"]["logo_corner"] == "bottom_left"
+    logo = r.json()["plan"]["brand"]["logo"]
+    assert client.get(f"/jobs/{job_id}/files/{logo}").content == b"png"
+    assert client.put(f"/jobs/{job_id}/plan", json=r.json()["plan"]).status_code == 200  # its files are known
+    assert client.get(f"/jobs/{job_id}/history").json()["versions"][0]["note"].startswith("Applied the brand kit")
+
+    # At upload.
+    body = _wait(client, _submit(client, kit=kit["id"]))
+    assert body["plan"]["brand"]["end_card"] == "Follow Acme"
+    assert client.post("/jobs", files={"video": ("c.mp4", b"x")}, data={"kit": "nope"}).status_code == 422
+    assert client.delete(f"/kits/{kit['id']}").status_code == 200 and client.get("/kits").json()["kits"] == []

@@ -120,6 +120,41 @@ export type EditPlan = {
 	style: Style;
 	/** Animated transitions (ADR 0613); elsewhere footage meets by style.transitions. */
 	cuts: CutTransition[];
+	/** The brand kit on this reel (ADR 0026): logo, music bed with ducking, end card, font. */
+	brand: Brand;
+};
+
+export type LogoCorner = 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right';
+export type Brand = {
+	name: string;
+	logo: string | null;
+	logo_corner: LogoCorner;
+	/** Width as a fraction of the frame width. */
+	logo_size: number;
+	logo_opacity: number;
+	music: string | null;
+	/** Music level where nobody speaks; `duck` is the share kept while someone does. */
+	music_volume: number;
+	duck: number;
+	end_card: string;
+	end_card_seconds: number;
+	font: string | null;
+	font_name: string;
+};
+
+export const DEFAULT_BRAND: Brand = {
+	name: '',
+	logo: null,
+	logo_corner: 'top_right',
+	logo_size: 0.16,
+	logo_opacity: 0.9,
+	music: null,
+	music_volume: 0.25,
+	duck: 0.3,
+	end_card: '',
+	end_card_seconds: 2,
+	font: null,
+	font_name: '',
 };
 
 /**
@@ -192,6 +227,7 @@ export function normalizePlan(raw: unknown): EditPlan {
 		backgrounds: (r.backgrounds ?? []).map((b: object) => ({kind: 'blur' as const, parallax: 0, ...b})),
 		reframe: {keys: [], shots: [], ...(r.reframe ?? {})},
 		cuts: (r.cuts ?? []).map((c: object) => ({kind: 'drop' as const, length: 0.5, ...c})),
+		brand: {...DEFAULT_BRAND, ...(r.brand ?? {})},
 		style: {
 			...DEFAULT_STYLE,
 			...style,

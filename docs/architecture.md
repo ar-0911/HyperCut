@@ -96,6 +96,14 @@ settings applied over the style's preset (what the user asked for still wins), a
 on hooks, what to keep and which graphics suit it. It is picked on the upload page or switched later with the
 assistant, which re-cuts the pauses and keeps the rest of the edit. See [ADR 0025](decisions/0025-editing-modes.md).
 
+## Brand kits
+
+A brand kit (`hypercut/brand.py`, stored by `api/kits.py` under `media/kits/`) is the look of a style (captions,
+colours, cuts) plus a logo, music, an end card line and a font. Applying one copies its files into the job as
+`brand-*` and records them in `plan.brand`; the renderer's `BrandLayer` puts the logo in its corner, loops the music
+under the reel with ducking from the word timings, and shows the end card over the last seconds. Chosen at upload
+or in the editor's Brand tab. See [ADR 0026](decisions/0026-brand-kits.md).
+
 ## Quality: checks, export validation, benchmark
 
 Plan checks (`hypercut/checks.py`) find what a first watch would: clipped words, leftover pauses, a reel that ends

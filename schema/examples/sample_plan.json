@@ -278,5 +278,19 @@
       "kind": "drop",
       "length": 0.6
     }
-  ]
+  ],
+  "brand": {
+    "name": "",
+    "logo": null,
+    "logo_corner": "top_right",
+    "logo_size": 0.16,
+    "logo_opacity": 0.9,
+    "music": null,
+    "music_volume": 0.25,
+    "duck": 0.3,
+    "end_card": "",
+    "end_card_seconds": 2.0,
+    "font": null,
+    "font_name": ""
+  }
 }
