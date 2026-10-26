@@ -414,3 +414,24 @@ def test_interrupted_work_is_marked_and_can_be_retried(client, fake_stages, monk
     assert client.post(f"/jobs/{job_id}/retry").status_code == 202
     assert _wait(client, job_id)["status"] == "done"
     assert client.post(f"/jobs/{job_id}/retry").status_code == 409
+
+
+def test_render_is_validated_and_plans_can_be_checked(client, fake_stages, monkeypatch):
+    def render(job_dir):
+        (Path(job_dir) / "output.mp4").write_bytes(b"not a video")
+        return Path(job_dir) / "output.mp4"
+
+    monkeypatch.setattr(run, "render_plan", render)
+    job_id = _done_job(client, fake_stages)
+    client.post(f"/jobs/{job_id}/render")
+    for _ in range(100):
+        body = client.get(f"/jobs/{job_id}").json()
+        if isinstance(body.get("qa"), dict):
+            break
+        time.sleep(0.02)
+    assert body["render"] == "done" and body["qa"]["ok"] is False  # the file does not open as a video
+    assert "output.qa.json" in body["files"]
+
+    plan = body["plan"]
+    report = client.post(f"/jobs/{job_id}/checks", json=plan).json()
+    assert report["ok"] and [i["code"] for i in report["issues"]] == ["ends_mid_sentence"]

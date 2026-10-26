@@ -7,6 +7,7 @@ import type {EditPlan} from '@render/plan';
 import {
 	API_URL,
 	askAssistant,
+	checkPlan,
 	deleteAsset,
 	discardDraft,
 	explainCut,
@@ -24,6 +25,7 @@ import {
 	savePlan,
 	startRender,
 	uploadAsset,
+	type CheckReport,
 	type Draft,
 	type Explanation,
 	type Generation,
@@ -48,6 +50,7 @@ import Bin from './Bin';
 import Finish from './Finish';
 import Inspector from './Inspector';
 import OnScreen from './OnScreen';
+import Quality from './Quality';
 import Timeline from './Timeline';
 import Versions from './Versions';
 import WhyPanel from './WhyPanel';
@@ -99,6 +102,9 @@ export default function Editor({job}: {job: Job}) {
 	// An assistant edit waiting to be kept or rejected; the preview shows it (or the edit before it).
 	const [proposal, setProposal] = useState<{before: EditPlan; after: EditPlan; instruction: string; showing: 'after' | 'before'} | null>(null);
 	const shown = proposal ? proposal[proposal.showing] : plan;
+	// Automatic checks of the edit as it is now, and the validation of the last render (ADR 0023).
+	const [report, setReport] = useState<CheckReport | null>(null);
+	const [qa, setQa] = useState<Job['qa']>(job.qa);
 	const wantsMatte = Boolean(plan.style.depth?.enabled && plan.style.depth?.cutout);
 	const playerRef = useRef<PlayerRef>(null);
 	const latest = useRef(plan);
@@ -141,12 +147,34 @@ export default function Editor({job}: {job: Job}) {
 				const next = await getJob(job.id);
 				setRender(next.render);
 				setRenderError(next.render_error);
+				setQa(next.qa);
 			} catch (e) {
 				setError((e as Error).message);
 			}
 		}, 2000);
 		return () => clearInterval(timer);
 	}, [render, job.id]);
+
+	// The file is checked right after the render finishes; poll until that is done too.
+	useEffect(() => {
+		if (qa !== 'running' || render === 'running') return;
+		const timer = setInterval(async () => {
+			try {
+				setQa((await getJob(job.id)).qa);
+			} catch {
+				// keep polling
+			}
+		}, 2000);
+		return () => clearInterval(timer);
+	}, [qa, render, job.id]);
+
+	// Re-check the edit shortly after each change (cheap: no AI, no rendering).
+	useEffect(() => {
+		const timer = setTimeout(() => {
+			checkPlan(job.id, plan).then(setReport, () => setReport(null));
+		}, 800);
+		return () => clearTimeout(timer);
+	}, [plan, job.id]);
 
 	// Green-screen effects turned on (style prompt, AI box): make the cut-out, then poll until it is there.
 	useEffect(() => {
@@ -265,6 +293,7 @@ export default function Editor({job}: {job: Job}) {
 			await startRender(job.id);
 			setRender('running');
 			setRenderError(null);
+			setQa(null);
 		});
 
 	const restore = () => {
@@ -587,6 +616,7 @@ export default function Editor({job}: {job: Job}) {
 			/>
 
 			<div className="history-row">
+				<Quality report={report} qa={render === 'done' ? qa : null} onSeek={(t) => playerRef.current?.seekTo(Math.round(t * plan.output.fps))} />
 				<WhyPanel why={why} onSeek={(t) => playerRef.current?.seekTo(Math.round(t * plan.output.fps))} />
 				<Versions history={versions} dirty={dirty} onRestore={goBackTo} onName={nameIt} onSaveNamed={saveNamed} />
 			</div>

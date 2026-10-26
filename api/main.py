@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from api import assets, jobs, recipes
 from hypercut import plan as plan_mod
-from hypercut import assistant, diff, edit, explain, export, generate, history, llm, review, run, variants
+from hypercut import assistant, checks, diff, edit, explain, export, generate, history, llm, qa, review, run, variants
 from hypercut.analyze import cuts as cutting
 from hypercut.matte import MATTE_FILE
 from hypercut.plan import EditPlan, Style
@@ -55,6 +55,8 @@ def recover_interrupted() -> None:
         for task in ("render", "matte", "export"):
             if state.get(task) == "running":
                 fields.update({task: "error", f"{task}_error": INTERRUPTED})
+        if state.get("qa") == "running":
+            fields["qa"] = None
         if fields:
             jobs.write(job_id, **fields)
 
@@ -118,9 +120,16 @@ def _render(job_id: str) -> None:
     with _render_slot:
         try:
             run.render_plan(jobs.job_dir(job_id))
-            jobs.write(job_id, render="done")
+            jobs.write(job_id, render="done", qa="running")
         except Exception as e:
             jobs.write(job_id, render="error", render_error=str(e))
+            return
+    # A render that exited cleanly is not yet a good file: inspect it (ADR 0023).
+    try:
+        result = qa.validate_job(jobs.job_dir(job_id))
+        jobs.write(job_id, qa=result)
+    except Exception as e:
+        jobs.write(job_id, qa={"ok": None, "error": str(e)[:300]})
 
 
 _matte_jobs: set[str] = set()  # jobs whose cut-out is being made by this server process
@@ -307,6 +316,13 @@ def get_draft(job_id: str):
 def delete_draft(job_id: str):
     history.discard_draft(_history_dir(job_id))
     return {"deleted": True}
+
+
+@app.post("/jobs/{job_id}/checks")
+def check_plan(job_id: str, plan: EditPlan):
+    """Automatic checks of an (unsaved) plan: clipped words, leftover pauses, length, hook, visuals (ADR 0023)."""
+    _job(job_id)
+    return checks.report(plan, jobs.job_dir(job_id))
 
 
 @app.get("/jobs/{job_id}/explain")

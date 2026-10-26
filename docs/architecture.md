@@ -77,6 +77,17 @@ The assistant has word-accurate operations (remove a pause, tighten a stretch, c
 [ADR 0021](decisions/0021-project-history-autosave-recovery.md) and
 [ADR 0022](decisions/0022-explained-edits-and-word-accurate-ops.md).
 
+## Quality: checks, export validation, benchmark
+
+Plan checks (`hypercut/checks.py`) find what a first watch would: clipped words, leftover pauses, a reel that ends
+mid-sentence or runs outside 15-60 s, hooks that start mid-sentence, visuals fighting for the same moment, missing
+picture files. The editor re-runs them on every change. After each render the API validates the file itself
+(`hypercut/qa.py`: size, frame rate, length against the plan, audio/video sync, black and frozen frames, sound
+dropouts, loudness and peaks) into `output.qa.json`. `python -m hypercut.bench` scores the whole pipeline on a
+folder of real videos (checks, caption WER, hook match, pacing, export validation), compares against an earlier
+run to catch regressions, and with `--jobs` measures how much people correct the first cut. See
+[ADR 0023](decisions/0023-quality-checks-export-validation-benchmark.md).
+
 ## Stage details
 
 **Ingest.** `ingest(input_path, job_dir) -> (Source, normalized_mp4, audio_wav)`. `ffprobe` reads size, rate

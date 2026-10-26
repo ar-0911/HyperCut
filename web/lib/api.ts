@@ -33,6 +33,8 @@ export type Job = {
 	variant_of?: string;
 	/** The server stopped while this job was being processed; it can be retried. */
 	interrupted?: boolean;
+	/** Validation of the last render (ADR 0023): 'running' just after it finishes. */
+	qa?: QAResult | 'running' | null;
 };
 
 export type Generation = {spent: number; budget: number; available: ('stock' | 'image' | 'video')[]; items?: unknown[]};
@@ -187,3 +189,11 @@ export const explainCut = (id: string) => request<{first_cut: Explanation; curre
 
 /** Run the pipeline again on a job that failed or was interrupted. */
 export const retryJob = (id: string) => request<{id: string; status: string}>(`/jobs/${id}/retry`, {method: 'POST'});
+
+/** An automatic check of the plan (ADR 0023): `fail` is a defect a viewer notices, `warn` is worth a look. */
+export type Issue = {code: string; severity: 'fail' | 'warn'; message: string; at: number | null; key: string | null};
+export type CheckReport = {ok: boolean; issues: Issue[]};
+export type QACheck = {name: string; status: 'pass' | 'warn' | 'fail'; detail: string};
+export type QAResult = {ok: boolean | null; checks?: QACheck[]; error?: string};
+
+export const checkPlan = (id: string, plan: EditPlan) => request<CheckReport>(`/jobs/${id}/checks`, json(plan));

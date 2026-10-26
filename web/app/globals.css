@@ -166,5 +166,9 @@ span.chip.active { background: var(--accent); color: #fff; border-color: var(--a
 .proposal { margin-top: 8px; gap: 8px; }
 .banner { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); margin-bottom: 12px; }
 .banner p { margin: 0; flex: 1; min-width: 200px; }
-.history-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.history-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; align-items: start; }
 @media (max-width: 1000px) { .history-row { grid-template-columns: 1fr; } }
+.tag.fail { border-color: #d64545; color: #d64545; }
+.tag.warn { border-color: #c98a12; color: #c98a12; }
+.tag.pass { border-color: #2f9e5b; color: #2f9e5b; }
+.quality h3 { margin: 12px 0 4px; font-size: 0.95rem; }
