@@ -97,6 +97,14 @@ events whose fields are numbers, yes/no or fixed words, never footage, text or n
 and a caption to the system share sheet, or downloads it with the caption copied. See
 [ADR 0030](decisions/0030-opt-in-local-usage-counts-and-sharing.md).
 
+## The editing agent
+
+One long recording (up to an hour) becomes several reels (`hypercut/agent.py`, ADR 0031): it is transcribed once,
+Claude plans the clips from the numbered sentences (code checks them and fills in without Claude), the plan is
+shown before anything is made, then each clip is cut out and made into a normal job by the usual pipeline with its
+words passed in, and checked: the plan checks run and code fixes what it can (length, hook, stray graphics) as an
+undoable version. The session page (`/agent/<id>`) lists each reel; each opens in the editor.
+
 ## Understanding the footage
 
 Next to the transcript, the "look" stage (`hypercut/vision`) builds a visual index of the source: shots (the face

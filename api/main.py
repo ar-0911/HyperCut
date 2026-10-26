@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 
 from api import assets, jobs, kits, recipes
 from hypercut import plan as plan_mod
-from hypercut import assistant, checks, diff, edit, explain, export, generate, brand, history, llm, modes, project, qa, review, run, suggest, telemetry, variants, vision
+from hypercut import agent, assistant, checks, diff, edit, explain, export, generate, brand, history, llm, modes, project, qa, review, run, suggest, telemetry, variants, vision
 from hypercut.analyze import cuts as cutting
 from hypercut.ingest import PROXY_FILE, IngestError, make_proxy, manifest
 from hypercut.matte import MATTE_FILE
@@ -859,3 +859,78 @@ def telemetry_file():
 def telemetry_clear():
     telemetry.clear(jobs.media_root())
     return telemetry.summary(jobs.media_root())
+
+
+# The editing agent (ADR 0031): several reels from one long recording. The session is a job folder of its own
+# (`kind: "agent"`) holding the recording, its transcript and `agent.json`; each reel is a normal job.
+
+def _run_agent(session_id: str, video: Path, count: int, style: str, mode: str | None, kit: str | None) -> None:
+    session = jobs.job_dir(session_id)
+    title = Path(jobs.read(session_id).get("filename") or "recording").stem
+
+    def job_dir_for(i: int) -> Path:
+        reel_id = jobs.new_id()
+        jobs.job_dir(reel_id).mkdir(parents=True)
+        jobs.write(reel_id, status="running", stage="ingest", error=None, render=None, render_error=None,
+                   filename=f"{title} – reel {i}", style=style, hook_strategy="cold_open", mode=mode, kit=kit,
+                   agent=session_id)
+        return jobs.job_dir(reel_id)
+
+    def make(excerpt, job_dir, style_prompt, strategy, **kw):
+        reel_id = Path(job_dir).name
+        try:
+            plan = run.run_pipeline(excerpt, job_dir, style_prompt, strategy,
+                                    on_stage=lambda s: jobs.write(reel_id, stage=s), **kw)
+        except Exception as e:
+            jobs.write(reel_id, status="error", error=str(e))
+            raise
+        jobs.write(reel_id, status="done", stage="done", error=None)
+        return plan
+
+    def update(state: dict) -> None:
+        jobs.write(session_id, step=state["step"], status="done" if state["status"] == "done" else
+                   "error" if state["status"] == "error" else "running", error=state.get("error"))
+
+    state = agent.run_agent(video, session, count, job_dir_for=job_dir_for, style_prompt=style, mode=mode,
+                            kit=kits.kit_dir(kit) if kit else None, make=make, on_update=update)
+    _count("agent_done", reels=sum(c["status"] == "done" for c in state["clips"]), asked=count)
+
+
+@app.post("/agent", status_code=202)
+def start_agent(
+    background: BackgroundTasks,
+    video: UploadFile = File(...),
+    count: int = Form(4, ge=1, le=agent.MAX_REELS),
+    style: str = Form(""),
+    mode: Literal["", "talking_head", "podcast", "product_demo", "vlog"] = Form(""),
+    kit: str = Form(""),
+):
+    """Several reels from one long recording (up to an hour). Claude plans the clips first (or code does, without
+    Claude); each reel is then made and checked, and opens in the editor."""
+    if kit and kits.kit_dir(kit) is None:
+        raise HTTPException(422, f"no brand kit {kit!r}")
+    session_id = jobs.new_id()
+    directory = jobs.job_dir(session_id)
+    directory.mkdir(parents=True)
+    upload = directory / ("upload" + Path(video.filename or "").suffix.lower()[:8])
+    with upload.open("wb") as f:
+        shutil.copyfileobj(video.file, f)
+    jobs.write(session_id, kind="agent", status="queued", step=None, error=None, filename=video.filename, count=count,
+               style=style, mode=mode or None, kit=kit or None)
+    background.add_task(_run_agent, session_id, upload, count, style, mode or None, kit or None)
+    return {"id": session_id, "status": "queued"}
+
+
+@app.get("/agent/{session_id}")
+def get_agent(session_id: str):
+    """The session: its step (understand, plan, make, done) and each clip, with the reel's job id and status."""
+    state = _job(session_id)
+    if state.get("kind") != "agent":
+        raise HTTPException(404, "no such session")
+    plan = agent.load(jobs.job_dir(session_id)) or {"clips": []}
+    clips = []
+    for c in plan.get("clips", []):
+        reel = jobs.read(c["job_id"]) if c.get("job_id") and (jobs.job_dir(c["job_id"]) / "job.json").is_file() else {}
+        clips.append({**c, "stage": reel.get("stage"), "render": reel.get("render")})
+    return {"id": session_id, "status": state.get("status"), "step": state.get("step"), "error": state.get("error"),
+            "filename": state.get("filename"), "count": state.get("count"), "clips": clips}

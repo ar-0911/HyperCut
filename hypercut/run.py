@@ -26,7 +26,7 @@ from hypercut.analyze.transitions import plan_transitions
 from hypercut.generate import generate, pending
 from hypercut.ingest import ingest, ingest_files, make_proxy, manifest
 from hypercut.matte import MATTE_FILE, matte, needs_matte, place_titles
-from hypercut.plan import EditPlan, Style
+from hypercut.plan import EditPlan, Style, Transcript
 from hypercut.reframe import reframe
 from hypercut.style import style_from_prompt
 from hypercut.transcribe import transcribe
@@ -85,6 +85,7 @@ def run_pipeline(
     vision: str | None = None,
     mode: str | None = None,
     kit: str | Path | None = None,
+    transcript: Transcript | None = None,
 ) -> EditPlan:
     """Run every stage and save `plan.json` in `job_dir`. `on_stage(name)` is called as each begins.
     A `recipe` (a saved style, ADR 0018) is used as the style as it is, instead of reading the style prompt.
@@ -93,7 +94,8 @@ def run_pipeline(
     (ADR 0024): "none" (local signals only), "ollama" (a local model) or "claude" (sends frames to Claude);
     default `HYPERCUT_VISION` or "none"; "off" skips the index. `mode` is the editing mode (ADR 0025): podcast,
     product_demo, vlog or talking_head; what the style prompt or recipe asked for still wins over it. `kit` is a brand
-    kit folder (ADR 0026): its look, logo, music, end card and font go on the reel."""
+    kit folder (ADR 0026): its look, logo, music, end card and font go on the reel. A `transcript` already made (the
+    editing agent's excerpt of a long recording, ADR 0031) is used instead of transcribing again."""
     job_dir = Path(job_dir)
     note = on_stage or (lambda _name: None)
 
@@ -112,7 +114,8 @@ def run_pipeline(
         # What is on screen (ADR 0024): shots need the face track's cuts, so it starts once those are known.
         provider = (vision or os.environ.get("HYPERCUT_VISION") or "none").lower()
         looked = pool.submit(lambda: build_index(mp4, source, track.result(), job_dir, provider)) if provider != "off" else None
-        transcript = transcribe(wav)
+        if transcript is None:
+            transcript = transcribe(wav)
         reframe_result = track.result()
 
         note("style")
