@@ -46,7 +46,7 @@ finished plan.
 | 3 | style | `hypercut/style` | prompt text | `Style` | presets + Claude |
 | 4 | analyze | `hypercut/analyze` | transcript + style | `hook`, `segments`, `graphics`, `zooms` | Claude + FFmpeg loudness |
 | 5 | reframe | `hypercut/reframe` | `normalized.mp4` | `Reframe` | MediaPipe face detection |
-| 6 | render | `render/` | `plan.json` + video | `output.mp4` | Remotion (React, TypeScript) |
+| 6 | render | `render/` | `plan.json` + video | `output.mp4`, loudness-normalized to -14 LUFS (ADR 0616) | Remotion (React, TypeScript), FFmpeg loudnorm |
 | 7 | matte (only when asked) | `hypercut/matte` | `normalized.mp4` + reframe | `matte.webm` (speaker cut-out) | MediaPipe selfie segmentation + MODNet + FFmpeg |
 | 8 | generate (only with keys) | `hypercut/generate` | plan with `generate` requests | `gen-*` stock and generated pictures / clips | Pexels, Pixabay, Wikimedia Commons; fal.ai or local diffusers |
 | 9 | look (visual index) | `hypercut/vision` | `normalized.mp4` + reframe shots | `visual_index.json` (shots, frames, what is on screen), name respellings | FFmpeg, Tesseract if installed; Claude or Ollama only when chosen |

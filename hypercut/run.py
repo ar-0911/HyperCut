@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
-from hypercut import history
+from hypercut import audio, history
 from hypercut import plan as plan_mod
 from hypercut.analyze import analyze
 from hypercut.analyze.transitions import plan_transitions
@@ -205,6 +205,11 @@ def render_plan(job_dir: str | Path, out_name: str = "output.mp4", render_dir: P
     res = subprocess.run(cmd, cwd=render_dir, capture_output=True, text=True)
     if res.returncode != 0 or not out.is_file():
         raise RuntimeError("render failed: " + (res.stderr or res.stdout).strip()[-2000:])
+    if "--overlays" not in (extra_args or []):  # the overlays-only export has no sound to level
+        try:
+            audio.normalize(out)  # the level platforms play shorts at, without clipping (ADR 0616)
+        except Exception as e:
+            log.warning("loudness normalization failed, keeping the render's own levels: %s", e)
     return out
 
 
