@@ -182,6 +182,9 @@ class Reframe(_Model):
     keys: list[ReframeKey] = []  # empty: center crop
     # Source times where a new shot starts (hard cuts in the source), for animated transitions (ADR 0613).
     shots: list[float] = []
+    # Source times where, within one shot of two or more people, the crop moves to the person who started
+    # talking (ADR 0506). The keys already jump there; this says why.
+    switches: list[float] = []
 
 
 # Caption fonts the renderer bundles (Google Fonts). Any other name falls back to a system sans-serif.

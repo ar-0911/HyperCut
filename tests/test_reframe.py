@@ -150,3 +150,47 @@ def test_hard_cuts_are_kept_as_shots_for_transitions():
     d = [Detection(0.0, 0.35), Detection(0.2, 0.35), Detection(0.4, 0.65, cut=True), Detection(0.6, None, cut=True)]
     assert smooth_track(d, LANDSCAPE).shots == [0.4, 0.6]
     assert smooth_track([Detection(0.0, None), Detection(0.2, None, cut=True)], LANDSCAPE).shots == [0.2]
+
+
+def _two_people(talker, seconds=10, fps=5):
+    """Two people at x 0.3 and 0.7 for `seconds`; talker(t) says who is talking (0, 1 or None)."""
+    out = []
+    for k in range(seconds * fps):
+        t = k / fps
+        who = talker(t)
+        wobble = lambda p: (0.1 + 0.3 * (k % 2)) if who == p else 0.1  # noqa: E731
+        out.append(Detection(t, 0.3, 0.5, candidates=((0.3, 0.5, 0.9), (0.7, 0.5, 0.9)), mouths=(wobble(0), wobble(1))))
+    return out
+
+
+def test_crop_follows_whoever_is_talking():
+    dets = _two_people(lambda t: 0 if t < 5 else 1)
+    r = smooth_track(dets, LANDSCAPE)
+    at = lambda t: min(r.keys, key=lambda k: abs(k.t - t)).cx  # noqa: E731
+    assert at(2) < 0.5 < at(8)  # left person, then the right one
+    assert len(r.switches) == 1 and 4.4 <= r.switches[0] <= 5.2 and r.shots == []
+    # The move is a jump, not a pan: the key just before the switch is still on the left person.
+    before = max((k for k in r.keys if k.t < r.switches[0]), key=lambda k: k.t)
+    assert before.cx < 0.5
+
+
+def test_a_short_interjection_does_not_flip_the_frame():
+    dets = _two_people(lambda t: 1 if 4 <= t < 4.6 else 0)
+    r = smooth_track(dets, LANDSCAPE)
+    assert r.switches == [] and all(k.cx < 0.5 for k in r.keys)
+
+
+def test_without_mouth_readings_the_main_face_is_kept():
+    dets = [Detection(k / 5, 0.3, 0.5, candidates=((0.3, 0.5, 0.9), (0.7, 0.5, 0.6))) for k in range(50)]
+    r = smooth_track(dets, LANDSCAPE)
+    assert r.switches == [] and all(k.cx < 0.5 for k in r.keys)
+
+
+def test_switches_are_explained():
+    from hypercut import explain
+    from hypercut.plan import EditPlan, Reframe, Transcript, Word
+
+    plan = EditPlan(source=LANDSCAPE, transcript=Transcript(words=[Word(text="hi", start=0, end=1)]),
+                    reframe=Reframe(switches=[4.0]))
+    items = explain.first_cut(plan)["items"]
+    assert any(it["kind"] == "speaker" and abs(it["at"] - 4.0) < 0.02 for it in items)

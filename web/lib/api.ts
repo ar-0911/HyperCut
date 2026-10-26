@@ -195,7 +195,7 @@ export const saveDraft = (id: string, plan: EditPlan) =>
 export const getDraft = (id: string) => request<{draft: Draft | null}>(`/jobs/${id}/draft`);
 export const discardDraft = (id: string) => request<{deleted: boolean}>(`/jobs/${id}/draft`, {method: 'DELETE'});
 
-export type ExplainItem = {at: number; kind: 'hook' | 'silence' | 'filler' | 'trim' | 'ending' | 'graphic' | 'zoom'; text: string; id?: string};
+export type ExplainItem = {at: number; kind: 'hook' | 'silence' | 'filler' | 'trim' | 'ending' | 'graphic' | 'zoom' | 'spelling' | 'footage' | 'speaker'; text: string; id?: string};
 export type Explanation = {summary: string; items: ExplainItem[]};
 /** Why the first cut (and the current edit) look the way they do. */
 export const explainCut = (id: string) => request<{first_cut: Explanation; current: Explanation}>(`/jobs/${id}/explain`);

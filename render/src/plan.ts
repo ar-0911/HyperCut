@@ -115,7 +115,8 @@ export type EditPlan = {
 	layout: LayoutSpan[];
 	/** Only used with style.depth.enabled and a matte. */
 	backgrounds: BackgroundSpan[];
-	reframe: {keys: ReframeKey[]; shots: number[]};
+	/** `switches`: where the crop jumps to the person who started talking (ADR 0506); the keys already do it. */
+	reframe: {keys: ReframeKey[]; shots: number[]; switches?: number[]};
 	style: Style;
 	/** Animated transitions (ADR 0613); elsewhere footage meets by style.transitions. */
 	cuts: CutTransition[];

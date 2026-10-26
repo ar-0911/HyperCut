@@ -551,6 +551,14 @@
           },
           "title": "Shots",
           "type": "array"
+        },
+        "switches": {
+          "default": [],
+          "items": {
+            "type": "number"
+          },
+          "title": "Switches",
+          "type": "array"
         }
       },
       "title": "Reframe",
@@ -968,7 +976,8 @@
       "$ref": "#/$defs/Reframe",
       "default": {
         "keys": [],
-        "shots": []
+        "shots": [],
+        "switches": []
       }
     },
     "style": {

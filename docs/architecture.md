@@ -211,7 +211,11 @@ decision 0501. Small faces in wide shots are found by also searching full-height
 cuts are checked on every frame, and in each shot the crop follows the face with the strongest track across
 the shot rather than the biggest face-like thing in each frame (a shirt pattern, hands), with stray points
 dropped by a running median; a shot with no face is centred (decision 0505). The hard cuts are also kept as
-`reframe.shots` (source times), where animated transitions can go (decision 0613).
+`reframe.shots` (source times), where animated transitions can go (decision 0613). In a shot with two or more
+people (a podcast two-shot), the crop goes to whoever is talking: MediaPipe's face landmarker reads how open each
+mouth is, the person whose jaw moves most over a second leads, and after 1.5 s in the lead the crop jumps to them
+like a cut (`reframe.switches`, listed in "Why this cut"). Single-person footage never loads the landmarker
+(decision 0506).
 
 **Matte.** Only when the plan asks for the speaker cut out (`style.depth.enabled` and `style.depth.cutout`: a
 different background or things behind the speaker, decision 0614), `matte(video, source,

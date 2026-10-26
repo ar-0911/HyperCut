@@ -90,6 +90,12 @@ def first_cut(plan: EditPlan, index=None) -> dict:
             items.append({"at": round(r[0], 2), "kind": "zoom",
                           "text": f"Pushed in on the face ({z.scale:.2f}x) to keep the shot moving."})
 
+    for t in plan.reframe.switches:
+        hits = edit.to_reel(plan, t + 0.01)
+        if hits:
+            items.append({"at": round(hits[0], 2), "kind": "speaker",
+                          "text": "Moved the frame to the person who started talking."})
+
     if index is not None:
         for c in index.corrections:
             hits = edit.to_reel(plan, c.t + 0.01)
