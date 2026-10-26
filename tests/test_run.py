@@ -6,6 +6,7 @@ import pytest
 from hypercut import run
 from hypercut.ingest import IngestError
 from hypercut.plan import EditPlan, Reframe, ReframeKey, Source, Style, Transcript, Word
+from hypercut.vision import Observation, Shot, VisualIndex
 
 SOURCE = Source(path="n.mp4", width=1920, height=1080, fps=30, duration=20)
 
@@ -37,13 +38,14 @@ def stages(monkeypatch):
     monkeypatch.setattr(run, "reframe", lambda mp4, source: Reframe(keys=[ReframeKey(t=0, cx=0.3, cy=0.5)]))
     monkeypatch.setattr(run, "style_from_prompt", style)
     monkeypatch.setattr(run, "analyze", analyze)
+    monkeypatch.setattr(run, "build_index", lambda mp4, source, reframe, job_dir, provider: VisualIndex(duration=source.duration))
     return seen
 
 
 def test_run_pipeline_writes_plan(tmp_path, stages):
     stage_names = []
     plan = run.run_pipeline("in.mp4", tmp_path / "job", "calm", "trim", on_stage=stage_names.append)
-    assert stage_names == ["ingest", "transcribe", "style", "analyze"]
+    assert stage_names == ["ingest", "transcribe", "style", "look", "analyze"]
     assert stages["style"] == "calm" and stages["strategy"] == "trim" and stages["visuals"] is True
     saved = json.loads((tmp_path / "job" / "plan.json").read_text())
     assert saved["reframe"]["keys"][0]["cx"] == 0.3 and plan.reframe.keys
@@ -124,3 +126,22 @@ def test_items_added_in_the_editor_are_drawn_before_render(tmp_path):
     art = {"viewBox": "0 0 1080 1920", "defs": "", "layers": ["<g/>"]}
     run.draw_new_around(job, draw, illustrate=lambda briefs, *a: [art for _ in briefs])
     assert plan_mod.load(job / "plan.json").graphics[0].props["layers"] == ["<g/>"]
+
+
+def test_visual_index_reaches_the_planner_and_fixes_names(tmp_path, stages, monkeypatch):
+    seen = {}
+    shot = Shot(id="shot_001", start=0, end=20, observations=[
+        Observation(t=10, frame="f.jpg", description="a bottle on a table", scene_type="product", visible_text=["KACHAVA shake"], confidence=0.9)])
+    monkeypatch.setattr(run, "build_index", lambda mp4, source, reframe, job_dir, provider: seen.setdefault("provider", provider) and VisualIndex(duration=20, shots=[shot]))
+    monkeypatch.setattr(run, "transcribe", lambda wav: Transcript(words=[Word(text="and", start=0, end=0.5), Word(text="Kachaba,", start=0.5, end=1)]))
+
+    def analyze(transcript, source, style, audio_wav=None, strategy="cold_open", visuals=False, pictures=False, visual_index=None):
+        seen["index"] = visual_index
+        return EditPlan(source=source, transcript=transcript, style=style)
+
+    monkeypatch.setattr(run, "analyze", analyze)
+    plan = run.run_pipeline("in.mp4", tmp_path / "job", vision="claude")
+    assert seen["provider"] == "claude" and seen["index"].shots[0].scene_type == "product"
+    assert plan.transcript.words[1].text == "Kachava,"
+    saved = json.loads((tmp_path / "job" / "visual_index.json").read_text())
+    assert saved["corrections"] == [{"t": 0.5, "heard": "Kachaba", "written": "Kachava"}]

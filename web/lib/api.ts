@@ -3,7 +3,7 @@ import type {Asset} from '@/lib/timeline';
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/+$/, '');
 
-export const STAGES = ['ingest', 'transcribe', 'style', 'analyze', 'matte', 'generate'] as const;
+export const STAGES = ['ingest', 'transcribe', 'style', 'look', 'analyze', 'matte', 'generate'] as const;
 export type Stage = (typeof STAGES)[number];
 
 export type Job = {
@@ -76,13 +76,15 @@ export function fileUrl(id: string, name: string): string {
 	return `${API_URL}/jobs/${id}/files/${encodeURIComponent(name)}`;
 }
 
-export function createJob(video: File, style: string, hookStrategy: 'cold_open' | 'trim', recipe = '', pictures = false) {
+/** `vision`: who describes frames of the footage: '' (the server's default), 'none' (local only), 'ollama' or 'claude' (sends frames). */
+export function createJob(video: File, style: string, hookStrategy: 'cold_open' | 'trim', recipe = '', pictures = false, vision = '') {
 	const form = new FormData();
 	form.set('video', video);
 	form.set('style', style);
 	form.set('hook_strategy', hookStrategy);
 	if (recipe) form.set('recipe', recipe);
 	if (pictures) form.set('pictures', 'true');
+	if (vision) form.set('vision', vision);
 	return request<{id: string; status: string}>('/jobs', {method: 'POST', body: form});
 }
 

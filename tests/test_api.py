@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from hypercut import run
 from hypercut.ingest import IngestError
+from hypercut.vision import VisualIndex
 from hypercut.plan import EditPlan, Hook, HookCandidate, Reframe, ReframeKey, Source, Transcript, Word
 
 SOURCE = Source(path="n.mp4", width=1920, height=1080, fps=30, duration=20)
@@ -42,6 +43,7 @@ def fake_stages(monkeypatch):
     monkeypatch.setattr(run, "reframe", lambda mp4, source: Reframe(keys=[ReframeKey(t=0, cx=0.4, cy=0.5)]))
     monkeypatch.setattr(run, "style_from_prompt", _style)
     monkeypatch.setattr(run, "analyze", analyze)
+    monkeypatch.setattr(run, "build_index", lambda *a: VisualIndex(duration=SOURCE.duration))
     return calls
 
 

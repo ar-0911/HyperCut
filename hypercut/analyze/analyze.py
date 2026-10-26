@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from hypercut import llm
+from hypercut import llm, vision
 from hypercut.analyze import cuts as cutting
 from hypercut.analyze import cutaways, motion, stage
 from hypercut.analyze.visuals import merge_graphics, plan_visuals
@@ -54,6 +54,15 @@ never a trailing fragment, a half sentence or a line cut off by the recording
 Graphic props: kinetic_text {{"text"}}; stat_card {{"value","label"}}; list_build {{"items": [..]}}; lower_third {{"title","subtitle"}}; progress_bar {{}}.
 All times are source seconds within 0..{duration:.1f}."""
 
+# Added when a visual index of the footage exists (ADR 0024): what is on screen, shot by shot.
+VISION_PROMPT = """
+
+What the footage shows, shot by shot (source seconds; from sampled frames):
+{shots}
+Use it with the transcript: prefer hooks whose picture supports the words (a product shown, a reaction, the
+moment something happens on screen); when the speaker refers to something on screen ("look at this", "this
+dashboard"), leave that shot clear of graphics so it can be seen; don't put text over a shot with text on screen."""
+
 # Added to the prompt only when the style asks for green-screen effects (ADR 0901).
 DEPTH_PROMPT = """
 
@@ -84,12 +93,15 @@ def analyze(
     strategy: str = "cold_open",
     visuals: bool = False,
     pictures: bool = False,
+    visual_index=None,
 ) -> EditPlan:
     """Fill hook, segments, graphics and zooms of an EditPlan.
 
     With `visuals`, also mix layouts per beat and draw an original illustration for the beats that
     get a visual (more Claude calls; see `hypercut.analyze.visuals`). With `pictures` as well, some visuals
     become stock footage or generated pictures / clips where keys are set (ADR 0016, 0020); off by default.
+    A `visual_index` (`hypercut.vision`, ADR 0024) tells Claude what is on screen when, and keeps drawn visuals
+    off shots that already show what is said.
     """
     if strategy not in ("cold_open", "trim"):
         raise ValueError(f"unknown hook strategy: {strategy!r}")
@@ -124,7 +136,7 @@ def analyze(
             max_zooms=max_zooms,
             types=list(GENERATED_GRAPHIC_TYPES),
             motion=motion.PROMPT.format(max_motion=max_motion),
-        ) + extra,
+        ) + extra + (VISION_PROMPT.format(shots=vision.summary(visual_index)) if visual_index and visual_index.shots else ""),
         system=SYSTEM,
     )
 
@@ -165,6 +177,9 @@ def analyze(
         motion.design_scenes(plan.graphics, transcript, style)
         if "video" in sources:  # a generated clip plays instead of the 3D scene, which stays as the fallback
             motion.ask_for_clips(plan, moments)
+    # Visual relevance (ADR 0024): a shot that shows what is said plays as filmed, not under a drawing.
+    if visual_index is not None:
+        vision.keep_footage(plan, visual_index)
     # Visuals next to a jump cut straddle it, like B-roll laid over the cut (ADR 0614).
     cutaways.cover_cuts(plan)
     return plan

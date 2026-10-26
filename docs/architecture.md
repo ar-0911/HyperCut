@@ -49,6 +49,7 @@ finished plan.
 | 6 | render | `render/` | `plan.json` + video | `output.mp4` | Remotion (React, TypeScript) |
 | 7 | matte (only when asked) | `hypercut/matte` | `normalized.mp4` + reframe | `matte.webm` (speaker cut-out) | MediaPipe selfie segmentation + MODNet + FFmpeg |
 | 8 | generate (only with keys) | `hypercut/generate` | plan with `generate` requests | `gen-*` stock and generated pictures / clips | Pexels, Pixabay, Wikimedia Commons; fal.ai or local diffusers |
+| 9 | look (visual index) | `hypercut/vision` | `normalized.mp4` + reframe shots | `visual_index.json` (shots, frames, what is on screen), name respellings | FFmpeg, Tesseract if installed; Claude or Ollama only when chosen |
 
 The API (`api/`, FastAPI) runs these stages as a job per upload and stores everything under
 `media/<job_id>/`. The web app (`web/`, Next.js) uploads, shows the hook candidates, takes the style
@@ -76,6 +77,16 @@ explained from the plans themselves (`hypercut/diff.py`), the first cut has a "w
 The assistant has word-accurate operations (remove a pause, tighten a stretch, cut exact words). See
 [ADR 0021](decisions/0021-project-history-autosave-recovery.md) and
 [ADR 0022](decisions/0022-explained-edits-and-word-accurate-ops.md).
+
+## Understanding the footage
+
+Next to the transcript, the "look" stage (`hypercut/vision`) builds a visual index of the source: shots (the face
+tracker's hard cuts or FFmpeg's scene score), one sampled frame per shot (more for long ones, 24 at most), text on
+screen, and, if the user picks one, a description of each frame from a local vision model (Ollama) or Claude. The
+index is evidence about the footage, kept in `visual_index.json` and out of the plan. The analyze prompt reads a line
+per shot; shots that show a screen, a product or other footage are kept clear of drawn visuals; names written in
+the footage fix what speech recognition misheard. Without it, everything works from the transcript alone. See
+[ADR 0024](decisions/0024-visual-index.md).
 
 ## Quality: checks, export validation, benchmark
 

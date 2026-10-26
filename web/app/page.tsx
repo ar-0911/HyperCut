@@ -16,6 +16,7 @@ export default function UploadPage() {
 	const [recipe, setRecipe] = useState('');
 	const [sources, setSources] = useState<string[]>([]);
 	const [pictures, setPictures] = useState(false);
+	const [vision, setVision] = useState('none');
 
 	useEffect(() => {
 		listRecipes()
@@ -43,7 +44,7 @@ export default function UploadPage() {
 		setBusy(true);
 		setError(null);
 		try {
-			const {id} = await createJob(file, recipe ? '' : style, strategy, recipe, pictures && sources.length > 0);
+			const {id} = await createJob(file, recipe ? '' : style, strategy, recipe, pictures && sources.length > 0, vision);
 			router.push(`/jobs/${id}`);
 		} catch (err) {
 			setError((err as Error).message);
@@ -104,6 +105,20 @@ export default function UploadPage() {
 					<option value="cold_open">Cold open: play the hook first, then the whole video</option>
 					<option value="trim">Trim: start the video at the hook</option>
 				</select>
+			</div>
+
+			<div className="card">
+				<label htmlFor="vision">Understand the footage</label>
+				<select id="vision" value={vision} onChange={(e) => setVision(e.target.value)}>
+					<option value="none">On this computer: shots and on-screen text</option>
+					<option value="ollama">With a local vision model (Ollama must be running)</option>
+					<option value="claude">With Claude: sends about 24 still frames to Claude</option>
+				</select>
+				<p className="hint">
+					HyperCut looks at frames of the video so it can tell what is on screen when, keep shots that show what is said
+					clear of graphics, and spell names the way the footage writes them. Your video never leaves this computer
+					unless you pick Claude, and then only the sampled frames do.
+				</p>
 			</div>
 
 			<div className="card">

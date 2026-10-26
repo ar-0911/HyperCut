@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import subprocess
 import sys
 import threading
@@ -28,6 +29,8 @@ from hypercut.plan import EditPlan, Style
 from hypercut.reframe import reframe
 from hypercut.style import style_from_prompt
 from hypercut.transcribe import transcribe
+from hypercut.vision import build_index, fix_words
+from hypercut.vision import save as save_index
 
 ROOT = Path(__file__).resolve().parent.parent
 RENDER_DIR = ROOT / "render"
@@ -44,11 +47,14 @@ def run_pipeline(
     visuals: bool = True,
     recipe: Style | None = None,
     pictures: bool = False,
+    vision: str | None = None,
 ) -> EditPlan:
     """Run every stage and save `plan.json` in `job_dir`. `on_stage(name)` is called as each begins.
     A `recipe` (a saved style, ADR 0018) is used as the style as it is, instead of reading the style prompt.
     `pictures` lets some visuals be stock footage or generated pictures / clips (ADR 0020): off by default, and
-    without keys it changes nothing."""
+    without keys it changes nothing. `vision` picks who describes the sampled frames of the visual index
+    (ADR 0024): "none" (local signals only), "ollama" (a local model) or "claude" (sends frames to Claude);
+    default `HYPERCUT_VISION` or "none"; "off" skips the index."""
     job_dir = Path(job_dir)
     note = on_stage or (lambda _name: None)
 
@@ -60,6 +66,9 @@ def run_pipeline(
     with ThreadPoolExecutor(max_workers=3) as pool:
         track = pool.submit(reframe, str(mp4), source)
         styled = pool.submit(lambda: recipe.model_copy(deep=True)) if recipe is not None else pool.submit(style_from_prompt, style_prompt)
+        # What is on screen (ADR 0024): shots need the face track's cuts, so it starts once those are known.
+        provider = (vision or os.environ.get("HYPERCUT_VISION") or "none").lower()
+        looked = pool.submit(lambda: build_index(mp4, source, track.result(), job_dir, provider)) if provider != "off" else None
         transcript = transcribe(wav)
         reframe_result = track.result()
 
@@ -71,9 +80,23 @@ def run_pipeline(
         if style.depth.enabled and style.depth.cutout:
             cutout = pool.submit(matte, mp4, source, reframe_result, job_dir / MATTE_FILE)
 
+        index = None
+        if looked is not None:
+            note("look")
+            try:
+                index = looked.result()
+            except Exception as e:  # the edit still works from the transcript alone
+                log.warning("visual index failed, planning from the transcript only: %s", e)
+        extra = {}
+        if index is not None and any(s.observations for s in index.shots):
+            # Names spelled on screen fix what speech recognition misheard ("Kachaba" -> "Kachava").
+            index.corrections = fix_words(transcript, index)
+            save_index(index, job_dir / "visual_index.json")
+            extra["visual_index"] = index
+
         note("analyze")
         plan = analyze(transcript, source, style, audio_wav=str(wav), strategy=strategy, visuals=visuals,
-                       pictures=pictures)
+                       pictures=pictures, **extra)
         if cutout is not None:
             note("matte")
             try:

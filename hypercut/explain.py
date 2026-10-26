@@ -23,7 +23,8 @@ def _quote(words: list[str]) -> str:
     return f"“{text}”"
 
 
-def first_cut(plan: EditPlan) -> dict:
+def first_cut(plan: EditPlan, index=None) -> dict:
+    """`index`: the footage's visual index (`hypercut.vision`), when there is one, for what was decided from the picture."""
     items: list[dict] = []
     words = sorted(plan.transcript.words, key=lambda w: w.start)
     words_in = lambda a, b: [w for w in words if a - EPS <= (w.start + w.end) / 2 < b + EPS]  # noqa: E731
@@ -88,6 +89,21 @@ def first_cut(plan: EditPlan) -> dict:
         if r:
             items.append({"at": round(r[0], 2), "kind": "zoom",
                           "text": f"Pushed in on the face ({z.scale:.2f}x) to keep the shot moving."})
+
+    if index is not None:
+        for c in index.corrections:
+            hits = edit.to_reel(plan, c.t + 0.01)
+            if hits:
+                items.append({"at": round(hits[0], 2), "kind": "spelling",
+                              "text": f"Spelled “{c.heard}” as “{c.written}”, the way it is written in the footage."})
+        from hypercut.vision import showing_spans
+
+        for a, b, shot in showing_spans(index):
+            r = edit.first_reel(plan, a, b)
+            if r and not any(g.start < b and g.end > a and g.type in edit.VISUAL_TYPES for g in plan.graphics):
+                what = next((o.description for o in shot.observations if o.description), shot.scene_type)
+                items.append({"at": round(r[0], 2), "kind": "footage",
+                              "text": f"Kept the footage clear of graphics: it shows {what[0].lower() + what[1:].rstrip('.')}."})
 
     items.sort(key=lambda it: (it["at"], it["kind"] != "hook"))
     parts = []
