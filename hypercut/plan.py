@@ -222,6 +222,8 @@ class GraphicsStyle(_Model):
 
 class Pacing(_Model):
     remove_fillers: bool = True
+    # A line said again, or a sentence restarted: keep the last take (ADR 0405).
+    remove_retakes: bool = True
     max_silence: float = Field(default=0.35, ge=0)  # longer gaps get cut
     # Pause kept on each side of a cut, so speech doesn't run into itself. Older plans used 0.08.
     keep_pause: float = Field(default=0.15, ge=0, le=1)

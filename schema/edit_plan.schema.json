@@ -614,6 +614,11 @@
           "title": "Remove Fillers",
           "type": "boolean"
         },
+        "remove_retakes": {
+          "default": true,
+          "title": "Remove Retakes",
+          "type": "boolean"
+        },
         "max_silence": {
           "default": 0.35,
           "minimum": 0,
@@ -817,6 +822,7 @@
           "$ref": "#/$defs/Pacing",
           "default": {
             "remove_fillers": true,
+            "remove_retakes": true,
             "max_silence": 0.35,
             "keep_pause": 0.15,
             "speed": 1.0
@@ -1115,6 +1121,7 @@
           "keep_pause": 0.15,
           "max_silence": 0.35,
           "remove_fillers": true,
+          "remove_retakes": true,
           "speed": 1.0
         },
         "camera": {

@@ -9,6 +9,7 @@ import {PRESETS} from '@/lib/presets';
 export default function UploadPage() {
 	const router = useRouter();
 	const [file, setFile] = useState<File | null>(null);
+	const [more, setMore] = useState<File[]>([]);
 	const [style, setStyle] = useState('');
 	const [strategy, setStrategy] = useState<'cold_open' | 'trim'>('cold_open');
 	const [busy, setBusy] = useState(false);
@@ -58,7 +59,7 @@ export default function UploadPage() {
 		setBusy(true);
 		setError(null);
 		try {
-			const {id} = await createJob(file, recipe ? '' : style, strategy, recipe, pictures && sources.length > 0, vision, mode, kit);
+			const {id} = await createJob(file, recipe ? '' : style, strategy, recipe, pictures && sources.length > 0, vision, mode, kit, more);
 			router.push(`/jobs/${id}`);
 		} catch (err) {
 			setError((err as Error).message);
@@ -92,6 +93,17 @@ export default function UploadPage() {
 			<div className="card">
 				<label htmlFor="video">Video</label>
 				<input id="video" type="file" accept="video/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+				{file && (
+					<>
+						<label htmlFor="more">More clips (optional)</label>
+						<input id="more" type="file" accept="video/*" multiple onChange={(e) => setMore(Array.from(e.target.files ?? []))} />
+						<p className="hint">
+							{more.length
+								? `${more.length + 1} clips, joined in this order: ${[file, ...more].map((f) => f.name).join(', ')}.`
+								: 'Recorded in pieces? Add the rest here and they are joined in order. Retakes are cut either way, keeping the last take.'}
+						</p>
+					</>
+				)}
 			</div>
 
 			<div className="card">

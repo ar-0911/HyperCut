@@ -542,3 +542,16 @@ def test_usage_counts_are_opt_in(client, fake_stages):
     assert counts["job_created"] == 1 and counts["job_done"] == 1 and counts["share"] == 1
     assert "/x" not in client.get("/telemetry/file").text
     assert client.delete("/telemetry").json()["events"] == 0
+
+
+def test_several_clips_are_joined_in_order(client, fake_stages, monkeypatch):
+    seen = {}
+
+    def ingest_files(paths, job_dir):
+        seen["names"] = [Path(p).name for p in paths]
+        return run.ingest(paths[0], job_dir)
+
+    monkeypatch.setattr(run, "ingest_files", ingest_files)
+    r = client.post("/jobs", files=[("video", ("a.mov", b"1")), ("more", ("b.mp4", b"2")), ("more", ("c.mp4", b"3"))])
+    assert _wait(client, r.json()["id"])["status"] == "done"
+    assert seen["names"] == ["upload.mov", "upload-2.mp4", "upload-3.mp4"]

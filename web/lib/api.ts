@@ -88,8 +88,9 @@ export function fileUrl(id: string, name: string): string {
 }
 
 /** `vision`: who describes frames of the footage: '' (the server's default), 'none' (local only), 'ollama' or 'claude' (sends frames).
- * `mode`: the editing mode (ADR 0025); empty for the server's default (talking head). `kit`: a brand kit's id (ADR 0026). */
-export function createJob(video: File, style: string, hookStrategy: 'cold_open' | 'trim', recipe = '', pictures = false, vision = '', mode = '', kit = '') {
+ * `mode`: the editing mode (ADR 0025); empty for the server's default (talking head). `kit`: a brand kit's id (ADR 0026).
+ * `more`: more clips of the same recording, joined after `video` in order (ADR 0105). */
+export function createJob(video: File, style: string, hookStrategy: 'cold_open' | 'trim', recipe = '', pictures = false, vision = '', mode = '', kit = '', more: File[] = []) {
 	const form = new FormData();
 	form.set('video', video);
 	form.set('style', style);
@@ -99,6 +100,7 @@ export function createJob(video: File, style: string, hookStrategy: 'cold_open' 
 	if (vision) form.set('vision', vision);
 	if (mode) form.set('mode', mode);
 	if (kit) form.set('kit', kit);
+	for (const clip of more) form.append('more', clip);
 	return request<{id: string; status: string}>('/jobs', {method: 'POST', body: form});
 }
 
@@ -241,7 +243,7 @@ export const saveDraft = (id: string, plan: EditPlan) =>
 export const getDraft = (id: string) => request<{draft: Draft | null}>(`/jobs/${id}/draft`);
 export const discardDraft = (id: string) => request<{deleted: boolean}>(`/jobs/${id}/draft`, {method: 'DELETE'});
 
-export type ExplainItem = {at: number; kind: 'hook' | 'silence' | 'filler' | 'trim' | 'ending' | 'graphic' | 'zoom' | 'spelling' | 'footage' | 'speaker'; text: string; id?: string};
+export type ExplainItem = {at: number; kind: 'hook' | 'silence' | 'filler' | 'trim' | 'ending' | 'graphic' | 'zoom' | 'spelling' | 'footage' | 'speaker' | 'retake'; text: string; id?: string};
 export type Explanation = {summary: string; items: ExplainItem[]};
 /** Why the first cut (and the current edit) look the way they do. */
 export const explainCut = (id: string) => request<{first_cut: Explanation; current: Explanation}>(`/jobs/${id}/explain`);

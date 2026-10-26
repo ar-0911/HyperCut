@@ -145,6 +145,9 @@ transcription (ADR 0101). `Source` is probed from the normalized file. Manual ru
 Ingest also writes `manifest.json` (ADR 0104): the original's facts (SHA-256, codecs, rotation, orientation, frame
 rate and whether it varies, HDR, audio tracks), warnings in plain words for what it had to fix, and each stage's
 status, updated by the pipeline. The job page shows the warnings.
+Several clips of one session can make one reel (ADR 0105): the upload page's "More clips" or `python -m
+hypercut.run a.mp4 b.mp4`. They are joined in order at the first clip's size (another shape is fitted inside a
+blurred copy of itself), and the manifest lists each clip with where it starts.
 
 **Transcribe.** Returns every word with start and end times. faster-whisper runs locally for free (the
 `small` model handles 3 minutes in about a minute on CPU); Deepgram is the fast paid option, chosen with
@@ -181,7 +184,8 @@ gets the transcript as `index time word` lines and the style, and returns as JSO
 Every item is validated against the source duration and dropped if invalid. Cuts never involve Claude:
 filler words and gaps over `style.pacing.max_silence` come from word timings (plus FFmpeg `silencedetect`
 when the wav is given). Code then assembles `segments`: `cold_open` puts the hook first and keeps it in
-place; `trim` starts at the hook. See ADR 0401. Each cut pause keeps `pacing.keep_pause` (0.15 s) on each side
+place; `trim` starts at the hook. See ADR 0401. Retakes are cut too (`hypercut/analyze/takes.py`, ADR 0405): a
+line said again within 8 s, or a sentence restarted, keeps only the last take (`pacing.remove_retakes`). Each cut pause keeps `pacing.keep_pause` (0.15 s) on each side
 and is only cut if at least 0.25 s goes, so there are no tiny jump cuts. The same call names the ending, the
 last word worth keeping; code checks it ends a sentence in the second half (falling back to the last such word)
 and ends the reel 0.4 s after it, so a reel never stops mid-thought. `recut(plan, wav)` rebuilds the segments

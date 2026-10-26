@@ -24,7 +24,7 @@ from hypercut import plan as plan_mod
 from hypercut.analyze import analyze
 from hypercut.analyze.transitions import plan_transitions
 from hypercut.generate import generate, pending
-from hypercut.ingest import ingest, make_proxy, manifest
+from hypercut.ingest import ingest, ingest_files, make_proxy, manifest
 from hypercut.matte import MATTE_FILE, matte, needs_matte, place_titles
 from hypercut.plan import EditPlan, Style
 from hypercut.reframe import reframe
@@ -74,7 +74,7 @@ def _proxy(mp4: Path) -> None:
 
 @_tracked
 def run_pipeline(
-    video: str | Path,
+    video: str | Path | list[str | Path],
     job_dir: str | Path,
     style_prompt: str = "",
     strategy: str = "cold_open",
@@ -98,7 +98,10 @@ def run_pipeline(
     note = on_stage or (lambda _name: None)
 
     note("ingest")
-    source, mp4, wav = ingest(video, job_dir)
+    if isinstance(video, (list, tuple)) and len(video) > 1:
+        source, mp4, wav = ingest_files(video, job_dir)  # several clips, joined in order (ADR 0105)
+    else:
+        source, mp4, wav = ingest(video[0] if isinstance(video, (list, tuple)) else video, job_dir)
 
     note("transcribe")
     # Face tracking needs only the video and the style only the prompt, so both run while Whisper works.
@@ -273,7 +276,7 @@ def render_plan(job_dir: str | Path, out_name: str = "output.mp4", render_dir: P
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m hypercut.run", description=__doc__.splitlines()[0])
-    ap.add_argument("video")
+    ap.add_argument("video", nargs="+", help="the video, or several clips to join in order")
     ap.add_argument("--style", default="", help="style prompt, e.g. 'calm minimal, white captions'")
     ap.add_argument("--strategy", choices=["cold_open", "trim"], default="cold_open")
     ap.add_argument("--out", help="output directory (default media/cli-<video name>)")
@@ -284,7 +287,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--mode", choices=list(modes.MODES), help="editing mode (default talking_head)")
     args = ap.parse_args(argv)
 
-    job_dir = Path(args.out) if args.out else ROOT / "media" / ("cli-" + Path(args.video).stem)
+    job_dir = Path(args.out) if args.out else ROOT / "media" / ("cli-" + Path(args.video[0]).stem)
     try:
         plan = run_pipeline(
             args.video, job_dir, args.style, args.strategy,

@@ -51,6 +51,8 @@ def pack(job_dir: str | Path, out: str | Path, footage: bool = True, job: dict |
     if not (job_dir / "plan.json").is_file():
         raise ProjectError("this job has no edit yet")
     facts = media_manifest.load(job_dir) or {}
+    if not footage and facts.get("parts"):
+        raise ProjectError("a reel joined from several clips is saved with its video")
     names = [n for n in EDIT_FILES if (job_dir / n).is_file()]
     names += sorted(p.name for p in job_dir.iterdir() if p.is_file() and p.name.startswith(MEDIA_PREFIXES))
     if footage:

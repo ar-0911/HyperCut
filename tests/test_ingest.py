@@ -117,3 +117,18 @@ def test_preview_copy(tmp_path):
     out = make_proxy(big)
     info = probe(out)
     assert out.name == "proxy.mp4" and info["height"] == PROXY_HEIGHT and info["width"] == 540
+
+
+def test_several_clips_join_into_one(tmp_path):
+    from hypercut.ingest import ingest_files, probe
+
+    a = make_clip(tmp_path / "a.mp4", 6, size="320x240")
+    b = make_clip(tmp_path / "b.mp4", 5, size="240x320", audio=False)  # another shape, no sound
+    source, mp4, wav = ingest_files([a, b], tmp_path / "job")
+    assert (source.width, source.height) == (320, 240)
+    assert source.duration == pytest.approx(11, abs=0.3)
+    assert probe(mp4)["has_audio"]
+    facts = manifest.load(tmp_path / "job")
+    assert [p["name"] for p in facts["parts"]] == ["a.mp4", "b.mp4"] and facts["parts"][1]["start"] == pytest.approx(6, abs=0.1)
+    assert facts["warnings"][0].startswith("2 clips") and any(w.startswith("b.mp4: ") for w in facts["warnings"])
+    assert not (tmp_path / "job" / "joined.mp4").exists()

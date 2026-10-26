@@ -107,7 +107,10 @@ def _known_media(job_id: str, state: dict) -> set[str]:
     return {a["name"] for a in state.get("assets", [])} | generated | branded
 
 
-def _process(job_id: str, video: Path, style: str, strategy: str, recipe: Style | None = None,
+MAX_CLIPS = 10
+
+
+def _process(job_id: str, video: Path | list[Path], style: str, strategy: str, recipe: Style | None = None,
              pictures: bool = False, vision_provider: str | None = None, mode: str | None = None,
              kit: str | None = None) -> None:
     try:
@@ -211,6 +214,8 @@ def create_job(
     mode: Literal["", "talking_head", "podcast", "product_demo", "vlog"] = Form(""),
     # A brand kit's id (ADR 0026): its look, logo, music, end card and font go on the reel.
     kit: str = Form(""),
+    # More clips of the same recording, joined after `video` in this order (ADR 0105).
+    more: list[UploadFile] = File(default=[]),
 ):
     saved_style = recipes.get(recipe) if recipe else None
     if recipe and saved_style is None:
@@ -223,11 +228,20 @@ def create_job(
     upload = directory / ("upload" + Path(video.filename or "").suffix.lower()[:8])
     with upload.open("wb") as f:
         shutil.copyfileobj(video.file, f)
+    more = [m for m in more if m.filename]
+    if len(more) + 1 > MAX_CLIPS:
+        shutil.rmtree(directory, ignore_errors=True)
+        raise HTTPException(422, f"at most {MAX_CLIPS} clips in one reel")
+    clips: list[Path] = [upload]
+    for i, extra in enumerate(more, start=2):
+        clips.append(directory / (f"upload-{i}" + Path(extra.filename or "").suffix.lower()[:8]))
+        with clips[-1].open("wb") as f:
+            shutil.copyfileobj(extra.file, f)
     jobs.write(job_id, status="queued", stage=None, error=None, render=None, render_error=None,
                style=style or (f"recipe: {recipe}" if recipe else ""), hook_strategy=hook_strategy, filename=video.filename,
                pictures=pictures, vision=vision or None, mode=mode or None, kit=kit or None)
-    background.add_task(_process, job_id, upload, style, hook_strategy, saved_style, pictures, vision or None,
-                        mode or None, kit or None)
+    background.add_task(_process, job_id, clips if len(clips) > 1 else upload, style, hook_strategy, saved_style,
+                        pictures, vision or None, mode or None, kit or None)
     _count("job_created", mode=mode or "talking_head", kit=bool(kit), pictures=pictures, recipe=bool(recipe),
            style_prompt=bool(style))
     return {"id": job_id, "status": "queued"}
@@ -243,10 +257,11 @@ def retry_job(job_id: str, background: BackgroundTasks):
         iter(sorted(jobs.job_dir(job_id).glob("upload"))), None)
     if upload is None:
         raise HTTPException(409, "the uploaded video is gone; upload it again")
+    extra = sorted(jobs.job_dir(job_id).glob("upload-*"), key=lambda p: int(p.stem.split("-")[1]) if p.stem.split("-")[1].isdigit() else 0)
     recipe = state.get("style", "")
     saved = recipes.get(recipe.removeprefix("recipe: ")) if recipe.startswith("recipe: ") else None
     jobs.write(job_id, status="queued", stage=None, error=None, interrupted=False)
-    background.add_task(_process, job_id, upload, "" if saved else state.get("style", ""),
+    background.add_task(_process, job_id, [upload, *extra] if extra else upload, "" if saved else state.get("style", ""),
                         state.get("hook_strategy", "cold_open"), saved, bool(state.get("pictures")),
                         state.get("vision"), state.get("mode"),
                         state.get("kit") if state.get("kit") and kits.kit_dir(state["kit"]) else None)
