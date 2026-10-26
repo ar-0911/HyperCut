@@ -5,26 +5,55 @@ import type {CaptionAnimation, Word} from './plan';
 export type Group = {words: Word[]; start: number; end: number};
 
 const SENTENCE_END = /[.!?…]["')\]]*$/;
+/** A clause end: a line may stop here once it has two words. */
+const CLAUSE_END = /[,;:—–]["')\]]*$/;
+/** Words that lean on the next one: a line never ends on them when the next word can join it (ADR 0617). */
+const LEANS_FORWARD = new Set(
+	'a an the of to in on at by for with from into onto and but or nor if than my your his her its our their'.split(' '),
+);
+const bare = (text: string) => text.toLowerCase().replace(/[^a-z']/g, '');
 /** A pause this long starts a new line even if the line is not full. */
 const BREAK_GAP = 0.7;
 /** How long a line lingers after its last word, capped by the gap to the next line. */
 const HOLD = 0.25;
 
-/** Group words into lines of at most `perLine`, breaking early at sentence ends and long pauses. */
-export function groupWords(words: Word[], perLine: number): Group[] {
+/**
+ * Group words into lines by phrase (ADR 0617): at most `perLine` words and `maxChars` characters, breaking early at
+ * sentence ends, long pauses and (from two words) clause ends, never ending a full line on a word that leans on
+ * the next ("the", "of", "and"): that word starts the next line instead, and never leaving a sentence's last word
+ * alone on a line (the full line takes one word more).
+ */
+export function groupWords(words: Word[], perLine: number, maxChars = Infinity): Group[] {
 	const groups: Group[] = [];
 	let cur: Word[] = [];
-	const flush = () => {
-		if (cur.length) groups.push({words: cur, start: cur[0].start, end: cur[cur.length - 1].end});
-		cur = [];
+	const flush = (keep = 0) => {
+		const line = cur.slice(0, cur.length - keep);
+		if (line.length) groups.push({words: line, start: line[0].start, end: line[line.length - 1].end});
+		cur = cur.slice(cur.length - keep);
 	};
+	const leans = (x: Word) => LEANS_FORWARD.has(bare(x.text));
+	const solid = (ws: Word[]) => ws.some((x) => !leans(x));
+	// Move a last word that leans on the next one to the next line, if what stays still has a word of its own.
+	const carry = (ws: Word[]) => (ws.length > 1 && leans(ws[ws.length - 1]) && solid(ws.slice(0, -1)) ? 1 : 0);
+	const chars = (ws: Word[]) => ws.reduce((n, x) => n + x.text.length, 0) + Math.max(0, ws.length - 1);
 	words.forEach((w, i) => {
+		// Too long with this word: end the line before it, unless that would leave only words leaning forward.
+		if (cur.length && chars([...cur, w]) > maxChars && solid(cur)) flush(carry(cur));
 		cur.push(w);
 		const next = words[i + 1];
-		if (cur.length >= perLine || SENTENCE_END.test(w.text) || (next && next.start - w.end > BREAK_GAP)) flush();
+		const pause = next && next.start - w.end > BREAK_GAP;
+		if (SENTENCE_END.test(w.text) || pause || (cur.length >= 2 && CLAUSE_END.test(w.text))) flush();
+		// A sentence's last word joins the full line rather than sit alone on the next one, if it fits.
+		else if (cur.length >= perLine && !(next && SENTENCE_END.test(next.text) && perLine >= 3 && cur.length === perLine && chars([...cur, next]) <= maxChars))
+			flush(next ? carry(cur) : 0);
 	});
 	flush();
 	return groups;
+}
+
+/** About how many characters fit on one caption line at this size (960 px of a 1080-wide frame). */
+export function lineChars(size: number, uppercase: boolean, width = 960): number {
+	return Math.max(8, Math.floor(width / (size * (uppercase ? 0.6 : 0.52))));
 }
 
 /** The group on screen at source time t, with its index; null between lines. */

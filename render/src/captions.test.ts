@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {groupAt, groupWords, wordState} from './captions';
+import {groupAt, groupWords, lineChars, wordState} from './captions';
 import type {Word} from './plan';
 
 const w = (text: string, start: number, end: number): Word => ({text, start, end});
@@ -63,5 +63,34 @@ describe('wordState', () => {
 		expect(wordState('bounce', group, 0, 0.2).lift).toBeLessThan(0);
 		expect(wordState('bounce', group, 0, 0.9).lift).toBeCloseTo(0);
 		expect(wordState('bounce', group, 0, 0.9).scale).toBeCloseTo(1);
+	});
+});
+
+describe('phrase line breaks', () => {
+	const said = (text: string) => text.split(' ').map((t, i) => w(t, i * 0.3, i * 0.3 + 0.25));
+	const lines = (g: ReturnType<typeof groupWords>) => g.map((x) => x.words.map((y) => y.text).join(' '));
+	it('never ends a full line on a word that leans on the next', () => {
+		expect(lines(groupWords(said('I went to the store today'), 3))).toEqual(['I went', 'to the store', 'today']);
+	});
+	it('stops at a clause end once the line has two words', () => {
+		expect(lines(groupWords(said('Honestly, the best part, every time'), 4))).toEqual(['Honestly, the best part,', 'every time']);
+		expect(lines(groupWords(said('So, here we go'), 3))).toEqual(['So, here we', 'go']);
+	});
+	it('keeps a line within the characters that fit', () => {
+		const g = groupWords(said('extraordinary unbelievable results'), 3, 20);
+		expect(lines(g)).toEqual(['extraordinary', 'unbelievable results']);
+		expect(lineChars(72, true)).toBe(22);
+	});
+});
+
+describe('phrase line breaks, orphans', () => {
+	const said = (text: string) => text.split(' ').map((t, i) => w(t, i * 0.3, i * 0.3 + 0.25));
+	const lines = (g: ReturnType<typeof groupWords>) => g.map((x) => x.words.map((y) => y.text).join(' '));
+	it("puts a sentence's last word on the full line instead of alone", () => {
+		expect(lines(groupWords(said('been in the past.'), 3))).toEqual(['been in the past.']);
+		expect(lines(groupWords(said('been in the past.'), 3, 12))).toEqual(['been in', 'the past.']);
+	});
+	it('moves only the last leaning word, so lines do not chain', () => {
+		expect(lines(groupWords(said('good in the world today'), 3))).toEqual(['good in', 'the world today']);
 	});
 });

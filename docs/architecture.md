@@ -235,7 +235,8 @@ CLI `python -m hypercut.matte normalized.mp4 --plan plan.json`. See decisions 09
 
 **Render.** A Remotion composition (`HyperCut`, props `{plan, videoSrc}`) draws, per output frame: the
 cropped and zoomed source frame, the caption line for the current words (styled and animated by
-`Style.caption`), and any active graphic templates. Output is 1080x1920, 30 fps H.264, with size, fps and
+`Style.caption`; lines break by phrase, never on "the" or "of", never leaving a sentence's last word alone, and
+within the characters that fit at the caption size, decision 0617), and any active graphic templates. Output is 1080x1920, 30 fps H.264, with size, fps and
 length taken from the plan. The video layer is one Remotion sequence per segment; overlays are driven by the
 *source* time of the current frame, so the cold-open hook shows its captions and graphics both times it plays
 and cut material shows nothing. The logic is in pure, unit-tested modules (`timing.ts`, `layout.ts`,
