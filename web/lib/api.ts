@@ -160,6 +160,16 @@ export const listRecipes = () => request<{recipes: Recipe[]}>('/recipes');
 export const saveRecipe = (name: string, style: Style, note = '') => request<Recipe>('/recipes', json({name, style, note}));
 export const deleteRecipe = (name: string) => request<{deleted: string}>(`/recipes/${encodeURIComponent(name)}`, {method: 'DELETE'});
 
+/** The edit as a `.hypercut` project file (ADR 0027), with or without the footage. */
+export const projectUrl = (id: string, footage: boolean) => `${API_URL}/jobs/${id}/project${footage ? '' : '?footage=false'}`;
+/** Open a `.hypercut` file as a new job; one saved without its footage needs the original video. */
+export function openProject(file: File, source?: File | null) {
+	const form = new FormData();
+	form.set('project_file', file);
+	if (source) form.set('source', source);
+	return request<{id: string; footage: boolean; versions: number}>('/projects', {method: 'POST', body: form});
+}
+
 /** A brand kit (ADR 0026): a look plus a logo, music, font and end card, reused on every reel. */
 export type Kit = {id: string; name: string; logo: string | null; music: boolean; font: string | null; end_card: string; caption_font: string | null; colors: string[]};
 export type NewKit = {

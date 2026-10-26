@@ -485,3 +485,22 @@ def test_brand_kits(client, fake_stages):
     assert body["plan"]["brand"]["end_card"] == "Follow Acme"
     assert client.post("/jobs", files={"video": ("c.mp4", b"x")}, data={"kit": "nope"}).status_code == 422
     assert client.delete(f"/kits/{kit['id']}").status_code == 200 and client.get("/kits").json()["kits"] == []
+
+
+def test_project_export_and_import(client, fake_stages):
+    job_id = _submit(client)
+    _wait(client, job_id)
+    r = client.get(f"/jobs/{job_id}/project")
+    assert r.status_code == 200 and r.headers["content-disposition"].endswith('.hypercut"')
+    opened = client.post("/projects", files={"project_file": ("clip.hypercut", r.content)})
+    assert opened.status_code == 201, opened.text
+    new_id = opened.json()["id"]
+    assert new_id != job_id and opened.json()["versions"] >= 1
+    body = client.get(f"/jobs/{new_id}").json()
+    assert body["status"] == "done" and body["filename"] == "clip.mov" and body["plan"]["source"]["path"].endswith(f"{new_id}/normalized.mp4")
+    assert not any(f.endswith(".hypercut") for f in body["files"])  # the export's temp file is gone
+
+    light = client.get(f"/jobs/{job_id}/project?footage=false")
+    refused = client.post("/projects", files={"project_file": ("clip.hypercut", light.content)})
+    assert refused.status_code == 422 and "footage" in refused.json()["detail"]
+    assert client.post("/projects", files={"project_file": ("x.hypercut", b"junk")}).status_code == 422

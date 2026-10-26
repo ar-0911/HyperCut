@@ -78,6 +78,11 @@ The assistant has word-accurate operations (remove a pause, tighten a stretch, c
 [ADR 0021](decisions/0021-project-history-autosave-recovery.md) and
 [ADR 0022](decisions/0022-explained-edits-and-word-accurate-ops.md).
 
+A project travels as one `.hypercut` file (`hypercut/project.py`): the plan, every version, the transcript, the
+visual index and manifest, the files the plan shows, and the footage unless it is left out. Opening one makes a
+new job; a project without footage asks for the original, recognised by its SHA-256 even if it was moved or
+renamed. See [ADR 0027](decisions/0027-portable-projects.md).
+
 ## Understanding the footage
 
 Next to the transcript, the "look" stage (`hypercut/vision`) builds a visual index of the source: shots (the face

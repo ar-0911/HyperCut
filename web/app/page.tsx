@@ -2,7 +2,7 @@
 
 import {useRouter} from 'next/navigation';
 import {useEffect, useState, type FormEvent} from 'react';
-import {createJob, deleteRecipe, generationSources, kitFileUrl, listKits, listRecipes, type Kit, type Recipe} from '@/lib/api';
+import {createJob, deleteRecipe, openProject, generationSources, kitFileUrl, listKits, listRecipes, type Kit, type Recipe} from '@/lib/api';
 import {MODES, type Mode} from '@/lib/modes';
 import {PRESETS} from '@/lib/presets';
 
@@ -21,6 +21,9 @@ export default function UploadPage() {
 	const [mode, setMode] = useState<Mode>('talking_head');
 	const [kits, setKits] = useState<Kit[]>([]);
 	const [kit, setKit] = useState('');
+	const [projectFile, setProjectFile] = useState<File | null>(null);
+	const [projectSource, setProjectSource] = useState<File | null>(null);
+	const [needsSource, setNeedsSource] = useState(false);
 
 	useEffect(() => {
 		listRecipes()
@@ -55,6 +58,21 @@ export default function UploadPage() {
 			router.push(`/jobs/${id}`);
 		} catch (err) {
 			setError((err as Error).message);
+			setBusy(false);
+		}
+	}
+
+	async function open() {
+		if (!projectFile) return;
+		setBusy(true);
+		setError(null);
+		try {
+			const {id} = await openProject(projectFile, projectSource);
+			router.push(`/jobs/${id}`);
+		} catch (err) {
+			const message = (err as Error).message;
+			if (/footage|original/.test(message)) setNeedsSource(true);
+			setError(message);
 			setBusy(false);
 		}
 	}
@@ -166,6 +184,23 @@ export default function UploadPage() {
 						? 'Off: no stock or picture keys are set, so every visual is drawn. Everything else works the same.'
 						: 'Some visuals become real footage or generated pictures instead of drawings. Generated ones cost a little; drawings are free.'}
 				</p>
+			</div>
+
+			<div className="card">
+				<label htmlFor="project">Or open a project</label>
+				<p className="hint">A .hypercut file saved from the editor, with its versions. One saved without the video asks for the original, which HyperCut checks is the same file.</p>
+				<input id="project" type="file" accept=".hypercut" onChange={(e) => setProjectFile(e.target.files?.[0] ?? null)} />
+				{needsSource && (
+					<>
+						<label htmlFor="project-source">The original video</label>
+						<input id="project-source" type="file" accept="video/*" onChange={(e) => setProjectSource(e.target.files?.[0] ?? null)} />
+					</>
+				)}
+				<div className="row">
+					<button type="button" disabled={!projectFile || busy} onClick={open}>
+						{busy && projectFile ? 'Opening…' : 'Open project'}
+					</button>
+				</div>
 			</div>
 
 			<div className="row">

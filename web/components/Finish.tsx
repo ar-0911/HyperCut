@@ -2,7 +2,7 @@
 
 import {useEffect, useState} from 'react';
 import type {EditPlan} from '@render/plan';
-import {fileUrl, getJob, makeVariants, reviewRender, saveRecipe, startExport, type Job, type ReviewResult} from '@/lib/api';
+import {fileUrl, getJob, makeVariants, projectUrl, reviewRender, saveRecipe, startExport, type Job, type ReviewResult} from '@/lib/api';
 import {fmtTime} from '@/lib/timeline';
 
 /**
@@ -174,6 +174,26 @@ export default function Finish({
 					)}
 					{exporting === 'running' && <p className="hint">Rendering the graphics track takes about as long as a render.</p>}
 					{exporting === 'error' && <p className="error">Export failed: {exportError}</p>}
+				</section>
+
+				<section>
+					<h3>Save the project</h3>
+					<p className="hint">The whole edit with its versions in one .hypercut file, to open on another computer or keep. Without the video it is small, and opening it asks for the original.</p>
+					{[true, false].map((footage) => (
+						<button
+							key={String(footage)}
+							disabled={busy !== null}
+							onClick={() =>
+								go('project', async () => {
+									if (dirty) await onSave();
+									window.location.href = projectUrl(job.id, footage);
+								})
+							}
+						>
+							{footage ? 'With the video' : 'Without'}
+						</button>
+					))}
+					{dirty && <p className="hint">Unsaved edits are saved first.</p>}
 				</section>
 			</div>
 			{error && <p className="error">{error}</p>}

@@ -13,13 +13,14 @@ from typing import Literal
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 from pydantic import BaseModel, Field
 
 from api import assets, jobs, kits, recipes
 from hypercut import plan as plan_mod
-from hypercut import assistant, checks, diff, edit, explain, export, generate, brand, history, llm, modes, qa, review, run, variants, vision
+from hypercut import assistant, checks, diff, edit, explain, export, generate, brand, history, llm, modes, project, qa, review, run, variants, vision
 from hypercut.analyze import cuts as cutting
-from hypercut.ingest import manifest
+from hypercut.ingest import IngestError, manifest
 from hypercut.matte import MATTE_FILE
 from hypercut.plan import EditPlan, Style
 
@@ -514,6 +515,52 @@ def delete_recipe(name: str):
     if not recipes.delete(name):
         raise HTTPException(404, "no such recipe")
     return {"deleted": name}
+
+
+# What of a job's state a project file keeps (ADR 0027): never ids, paths or run state.
+PROJECT_STATE = ("filename", "style", "hook_strategy", "mode", "assets", "pictures", "vision")
+
+
+@app.get("/jobs/{job_id}/project")
+def export_project(job_id: str, footage: bool = True):
+    """The whole edit as one `.hypercut` file: plan, versions and files, and the footage unless `footage=false`."""
+    state = _job(job_id)
+    if not _plan_path(job_id).is_file():
+        raise HTTPException(409, "the job has no edit yet")
+    out = jobs.job_dir(job_id) / f"project-{uuid.uuid4().hex[:8]}.hypercut"
+    try:
+        project.pack(jobs.job_dir(job_id), out, footage=footage, job={k: state[k] for k in PROJECT_STATE if k in state})
+    except project.ProjectError as e:
+        raise HTTPException(409, str(e)) from None
+    name = Path(state.get("filename") or "project").stem + ".hypercut"
+    return FileResponse(out, filename=name, media_type="application/zip", background=BackgroundTask(out.unlink, missing_ok=True))
+
+
+@app.post("/projects", status_code=201)
+def import_project(project_file: UploadFile = File(...), source: UploadFile | None = File(None)):
+    """Open a `.hypercut` file as a new job. One saved without footage needs `source`, the original video, which
+    must match the project's SHA-256."""
+    job_id = jobs.new_id()
+    directory = jobs.job_dir(job_id)
+    directory.mkdir(parents=True)
+    incoming = directory / "incoming.hypercut"
+    try:
+        with incoming.open("wb") as f:
+            shutil.copyfileobj(project_file.file, f)
+        video = None
+        if source is not None and source.filename:
+            video = directory / ("upload" + Path(source.filename).suffix.lower()[:8])
+            with video.open("wb") as f:
+                shutil.copyfileobj(source.file, f)
+        meta = project.unpack(incoming, directory, video)
+    except (project.ProjectError, IngestError) as e:
+        shutil.rmtree(directory, ignore_errors=True)
+        raise HTTPException(422, str(e)) from None
+    finally:
+        incoming.unlink(missing_ok=True)
+    kept = {k: v for k, v in (meta.get("job") or {}).items() if k in PROJECT_STATE}
+    jobs.write(job_id, status="done", stage="done", error=None, render=None, render_error=None, **kept)
+    return {"id": job_id, "footage": meta.get("footage"), "versions": len(history.listing(directory)["versions"])}
 
 
 @app.get("/kits")
