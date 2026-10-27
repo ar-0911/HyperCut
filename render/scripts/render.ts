@@ -47,6 +47,7 @@ export function mediaFiles(plan: {
 	graphics: {type: string; props: Record<string, unknown>}[];
 	backgrounds?: {kind: string; src?: string | null}[];
 	style?: {depth?: {enabled: boolean}};
+	brand?: {logo?: string | null; music?: string | null; font?: string | null};
 }): string[] {
 	const names = new Set<string>();
 	const add = (raw: unknown) => {
@@ -58,6 +59,8 @@ export function mediaFiles(plan: {
 	for (const g of plan.graphics) if ((g.type === 'media' || g.type === 'motion') && g.props.src) add(g.props.src);
 	// Background pictures and clips behind the cut-out speaker (only drawn with green-screen effects on).
 	if (plan.style?.depth?.enabled) for (const b of plan.backgrounds ?? []) if (b.kind === 'media' && b.src) add(b.src);
+	// The brand kit's logo, music and font (ADR 0026).
+	for (const f of [plan.brand?.logo, plan.brand?.music, plan.brand?.font]) if (f) add(f);
 	return [...names];
 }
 

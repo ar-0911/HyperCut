@@ -18,6 +18,8 @@ import {
 	getJob,
 	nameVersion,
 	recutPlan,
+	applyKit,
+	count,
 	requestMatte,
 	restorePlan,
 	restoreVersion,
@@ -48,6 +50,8 @@ import {
 import Assistant from './Assistant';
 import Bin from './Bin';
 import Finish from './Finish';
+import FirstSteps from './FirstSteps';
+import Share from './Share';
 import Inspector from './Inspector';
 import OnScreen from './OnScreen';
 import Quality from './Quality';
@@ -77,6 +81,24 @@ export const pendingAssets = (plan: EditPlan) =>
 
 const typing = (el: EventTarget | null) => el instanceof HTMLElement && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
 
+const VIEW_KEY = 'hypercut.view'; // 'simple' (first steps only) or 'full'; per browser (ADR 0029)
+
+function readView(): boolean {
+	try {
+		return window.localStorage.getItem(VIEW_KEY) !== 'full'; // someone new starts simple
+	} catch {
+		return true;
+	}
+}
+
+function writeView(simple: boolean) {
+	try {
+		window.localStorage.setItem(VIEW_KEY, simple ? 'simple' : 'full');
+	} catch {
+		// private window: the choice lasts for this page only
+	}
+}
+
 export default function Editor({job}: {job: Job}) {
 	const history = useHistory<EditPlan>(job.plan as EditPlan);
 	const plan = history.value;
@@ -87,6 +109,8 @@ export default function Editor({job}: {job: Job}) {
 	const [pps, setPps] = useState(16);
 	const [snapping, setSnapping] = useState(true);
 	const [render, setRender] = useState<Job['render']>(job.render);
+	// The version the last render is of (ADR 0028); edits saved during a render are newer than the download.
+	const [renderedVersion, setRenderedVersion] = useState<number | null>(job.render_version ?? null);
 	const [renderError, setRenderError] = useState<string | null>(job.render_error);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
@@ -105,6 +129,13 @@ export default function Editor({job}: {job: Job}) {
 	// Automatic checks of the edit as it is now, and the validation of the last render (ADR 0023).
 	const [report, setReport] = useState<CheckReport | null>(null);
 	const [qa, setQa] = useState<Job['qa']>(job.qa);
+	const [simple, setSimpleState] = useState(false);
+	useEffect(() => setSimpleState(readView()), []);
+	const setSimple = (on: boolean) => {
+		setSimpleState(on);
+		writeView(on);
+		count('view', {simple: on});
+	};
 	const wantsMatte = Boolean(plan.style.depth?.enabled && plan.style.depth?.cutout);
 	const playerRef = useRef<PlayerRef>(null);
 	const latest = useRef(plan);
@@ -115,11 +146,12 @@ export default function Editor({job}: {job: Job}) {
 	const inputProps = useMemo(
 		() => ({
 			plan: shown,
-			videoSrc: fileUrl(job.id, 'normalized.mp4'),
+			// The light preview copy when there is one (ADR 0028); the render always uses the full video.
+			videoSrc: fileUrl(job.id, job.files?.includes('proxy.mp4') ? 'proxy.mp4' : 'normalized.mp4'),
 			assetBase: `${API_URL}/jobs/${job.id}/files/`,
 			matteSrc: matte === 'done' ? fileUrl(job.id, 'matte.webm') : undefined,
 		}),
-		[shown, job.id, matte],
+		[shown, job.id, job.files, matte],
 	);
 	const items = useMemo(() => buildItems(plan), [plan]);
 	const duration = useMemo(() => reelDuration(plan), [plan]);
@@ -148,6 +180,7 @@ export default function Editor({job}: {job: Job}) {
 				setRender(next.render);
 				setRenderError(next.render_error);
 				setQa(next.qa);
+				setRenderedVersion(next.render_version ?? null);
 			} catch (e) {
 				setError((e as Error).message);
 			}
@@ -461,7 +494,8 @@ export default function Editor({job}: {job: Job}) {
 				</div>
 			)}
 			{proposal && <p className="hint">The preview shows the AI’s proposed edit ({proposal.showing}). Keep or reject it in the AI box.</p>}
-			<div className="editor-top">
+			<div className={`editor-top${simple ? ' simple' : ''}`}>
+				{!simple && (
 				<Bin
 					jobId={job.id}
 					plan={plan}
@@ -480,7 +514,17 @@ export default function Editor({job}: {job: Job}) {
 							setError((e as Error).message);
 						}
 					}}
+					onKit={async (kit) => {
+						// The kit goes on the saved edit, so save unsaved edits first.
+						if (dirty) await commit(plan);
+						const res = await applyKit(job.id, kit.id);
+						change(res.plan);
+						setSaved(res.plan);
+						setSelected(null);
+						refreshVersions();
+					}}
 				/>
+				)}
 				<div className="player">
 					<Player
 						ref={playerRef}
@@ -497,6 +541,23 @@ export default function Editor({job}: {job: Job}) {
 					<OnScreen plan={plan} playerRef={playerRef} onSelect={setSelected} />
 				</div>
 				<div className="side">
+					{simple && (
+						<FirstSteps
+							jobId={job.id}
+							plan={plan}
+							duration={duration}
+							render={render}
+							downloadUrl={fileUrl(job.id, 'output.mp4')}
+							onTry={(p) => {
+								change(p);
+								setSelected(null);
+							}}
+							onKeep={save}
+							onExport={renderNow}
+							onShowAll={() => setSimple(false)}
+						/>
+					)}
+					{!simple && (
 					<Inspector
 						plan={plan}
 						item={selectedItem}
@@ -506,6 +567,7 @@ export default function Editor({job}: {job: Job}) {
 						onSplit={split}
 						onRegenerate={generation?.available.length ? (id, prompt) => void fetchPictures(plan, id, prompt) : undefined}
 					/>
+					)}
 					<Assistant
 						onAsk={ask}
 						disabled={busy}
@@ -521,6 +583,7 @@ export default function Editor({job}: {job: Job}) {
 				</div>
 			</div>
 
+			{!simple && (
 			<div className="toolbar" ref={scrollArea}>
 				<div className="row">
 					<button onClick={history.undo} disabled={!history.canUndo} title="Undo (⌘/Ctrl+Z)">
@@ -567,17 +630,29 @@ export default function Editor({job}: {job: Job}) {
 					<button disabled={!dirty || busy} onClick={save} title="Save as a new version (⌘/Ctrl+S)">
 						{dirty ? 'Save version' : 'Saved'}
 					</button>
+					<button onClick={() => setSimple(true)} title="Only the first steps: one suggested change, then export">
+						Simple view
+					</button>
 					<button className="primary" disabled={busy || render === 'running'} onClick={renderNow}>
 						{render === 'running' ? 'Rendering…' : 'Render video'}
 					</button>
 					{render === 'done' && (
-						<a className="btn" href={fileUrl(job.id, 'output.mp4')} download>
-							Download mp4
-						</a>
+						<>
+							<a className="btn" href={fileUrl(job.id, 'output.mp4')} download onClick={() => count('download')}>
+								Download mp4
+							</a>
+							<Share jobId={job.id} plan={plan} name={(job.filename ?? 'hypercut-reel').replace(/\.[^.]+$/, '')} />
+						</>
 					)}
 				</div>
 			</div>
-			{render === 'running' && <p className="hint">Rendering the final video takes a few minutes. Keep editing; the preview is always live.</p>}
+			)}
+			{render === 'running' && (
+				<p className="hint">Rendering the final video takes a few minutes. Keep editing and saving: the render is of the version you started it on.</p>
+			)}
+			{render === 'done' && renderedVersion != null && (dirty || (versions?.head != null && versions.head !== renderedVersion)) && (
+				<p className="hint">The download is version {renderedVersion}; your edits since then need another render.</p>
+			)}
 			{render === 'error' && <p className="error">Render failed: {renderError}</p>}
 			{wantsMatte && matte === 'running' && (
 				<p className="hint">Cutting the speaker out for the green-screen effects. The preview shows them once that is done (a few minutes).</p>
@@ -585,6 +660,8 @@ export default function Editor({job}: {job: Job}) {
 			{fetching && <p className="hint">Fetching stock footage and generating pictures. Clips can take a minute or two each.</p>}
 			{error && <p className="error">{error}</p>}
 
+			{!simple && (
+			<>
 			<Timeline
 				plan={plan}
 				items={items}
@@ -620,6 +697,8 @@ export default function Editor({job}: {job: Job}) {
 				<WhyPanel why={why} onSeek={(t) => playerRef.current?.seekTo(Math.round(t * plan.output.fps))} />
 				<Versions history={versions} dirty={dirty} onRestore={goBackTo} onName={nameIt} onSaveNamed={saveNamed} />
 			</div>
+			</>
+			)}
 		</div>
 	);
 }

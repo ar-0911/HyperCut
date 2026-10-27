@@ -66,6 +66,111 @@
       "title": "BackgroundSpan",
       "type": "object"
     },
+    "Brand": {
+      "additionalProperties": false,
+      "description": "A brand kit applied to this reel (ADR 0026): logo, music bed, end card and font. Files sit next to the video\n(`brand-*`). Empty fields mean none; the look (captions, colours, cuts) is in `style`.",
+      "properties": {
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        },
+        "logo": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Logo"
+        },
+        "logo_corner": {
+          "default": "top_right",
+          "enum": [
+            "top_left",
+            "top_right",
+            "bottom_left",
+            "bottom_right"
+          ],
+          "title": "Logo Corner",
+          "type": "string"
+        },
+        "logo_size": {
+          "default": 0.16,
+          "maximum": 0.4,
+          "minimum": 0.05,
+          "title": "Logo Size",
+          "type": "number"
+        },
+        "logo_opacity": {
+          "default": 0.9,
+          "maximum": 1,
+          "minimum": 0.1,
+          "title": "Logo Opacity",
+          "type": "number"
+        },
+        "music": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Music"
+        },
+        "music_volume": {
+          "default": 0.25,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Music Volume",
+          "type": "number"
+        },
+        "duck": {
+          "default": 0.3,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Duck",
+          "type": "number"
+        },
+        "end_card": {
+          "default": "",
+          "title": "End Card",
+          "type": "string"
+        },
+        "end_card_seconds": {
+          "default": 2.0,
+          "maximum": 5,
+          "minimum": 0.5,
+          "title": "End Card Seconds",
+          "type": "number"
+        },
+        "font": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Font"
+        },
+        "font_name": {
+          "default": "",
+          "title": "Font Name",
+          "type": "string"
+        }
+      },
+      "title": "Brand",
+      "type": "object"
+    },
     "Camera": {
       "additionalProperties": false,
       "properties": {
@@ -509,6 +614,11 @@
           "title": "Remove Fillers",
           "type": "boolean"
         },
+        "remove_retakes": {
+          "default": true,
+          "title": "Remove Retakes",
+          "type": "boolean"
+        },
         "max_silence": {
           "default": 0.35,
           "minimum": 0,
@@ -712,6 +822,7 @@
           "$ref": "#/$defs/Pacing",
           "default": {
             "remove_fillers": true,
+            "remove_retakes": true,
             "max_silence": 0.35,
             "keep_pause": 0.15,
             "speed": 1.0
@@ -1010,6 +1121,7 @@
           "keep_pause": 0.15,
           "max_silence": 0.35,
           "remove_fillers": true,
+          "remove_retakes": true,
           "speed": 1.0
         },
         "camera": {
@@ -1038,6 +1150,23 @@
       },
       "title": "Cuts",
       "type": "array"
+    },
+    "brand": {
+      "$ref": "#/$defs/Brand",
+      "default": {
+        "name": "",
+        "logo": null,
+        "logo_corner": "top_right",
+        "logo_size": 0.16,
+        "logo_opacity": 0.9,
+        "music": null,
+        "music_volume": 0.25,
+        "duck": 0.3,
+        "end_card": "",
+        "end_card_seconds": 2.0,
+        "font": null,
+        "font_name": ""
+      }
     }
   },
   "required": [

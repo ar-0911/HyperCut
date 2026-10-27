@@ -1,4 +1,4 @@
-import type {EditPlan, Style} from '@render/plan';
+import type {EditPlan, LogoCorner, Style} from '@render/plan';
 import type {Asset} from '@/lib/timeline';
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/+$/, '');
@@ -35,6 +35,8 @@ export type Job = {
 	interrupted?: boolean;
 	/** Validation of the last render (ADR 0023): 'running' just after it finishes. */
 	qa?: QAResult | 'running' | null;
+	/** The history version the last render is of (ADR 0028). */
+	render_version?: number | null;
 	/** What ingest found in the upload (ADR 0104); null for jobs from before the manifest. */
 	manifest?: Manifest | null;
 };
@@ -86,8 +88,9 @@ export function fileUrl(id: string, name: string): string {
 }
 
 /** `vision`: who describes frames of the footage: '' (the server's default), 'none' (local only), 'ollama' or 'claude' (sends frames).
- * `mode`: the editing mode (ADR 0025); empty for the server's default (talking head). */
-export function createJob(video: File, style: string, hookStrategy: 'cold_open' | 'trim', recipe = '', pictures = false, vision = '', mode = '') {
+ * `mode`: the editing mode (ADR 0025); empty for the server's default (talking head). `kit`: a brand kit's id (ADR 0026).
+ * `more`: more clips of the same recording, joined after `video` in order (ADR 0105). */
+export function createJob(video: File, style: string, hookStrategy: 'cold_open' | 'trim', recipe = '', pictures = false, vision = '', mode = '', kit = '', more: File[] = []) {
 	const form = new FormData();
 	form.set('video', video);
 	form.set('style', style);
@@ -96,6 +99,8 @@ export function createJob(video: File, style: string, hookStrategy: 'cold_open' 
 	if (pictures) form.set('pictures', 'true');
 	if (vision) form.set('vision', vision);
 	if (mode) form.set('mode', mode);
+	if (kit) form.set('kit', kit);
+	for (const clip of more) form.append('more', clip);
 	return request<{id: string; status: string}>('/jobs', {method: 'POST', body: form});
 }
 
@@ -159,6 +164,49 @@ export const listRecipes = () => request<{recipes: Recipe[]}>('/recipes');
 export const saveRecipe = (name: string, style: Style, note = '') => request<Recipe>('/recipes', json({name, style, note}));
 export const deleteRecipe = (name: string) => request<{deleted: string}>(`/recipes/${encodeURIComponent(name)}`, {method: 'DELETE'});
 
+/** The edit as a `.hypercut` project file (ADR 0027), with or without the footage. */
+export const projectUrl = (id: string, footage: boolean) => `${API_URL}/jobs/${id}/project${footage ? '' : '?footage=false'}`;
+/** Open a `.hypercut` file as a new job; one saved without its footage needs the original video. */
+export function openProject(file: File, source?: File | null) {
+	const form = new FormData();
+	form.set('project_file', file);
+	if (source) form.set('source', source);
+	return request<{id: string; footage: boolean; versions: number}>('/projects', {method: 'POST', body: form});
+}
+
+/** A brand kit (ADR 0026): a look plus a logo, music, font and end card, reused on every reel. */
+export type Kit = {id: string; name: string; logo: string | null; music: boolean; font: string | null; end_card: string; caption_font: string | null; colors: string[]};
+export type NewKit = {
+	name: string;
+	/** Keep the current look of this job's edit. */
+	fromJob?: string;
+	logo?: File | null;
+	music?: File | null;
+	font?: File | null;
+	logoCorner?: LogoCorner;
+	endCard?: string;
+	fontName?: string;
+};
+
+export const listKits = () => request<{kits: Kit[]}>('/kits');
+export function createKit(k: NewKit) {
+	const form = new FormData();
+	form.set('name', k.name);
+	if (k.fromJob) form.set('from_job', k.fromJob);
+	if (k.logo) form.set('logo', k.logo);
+	if (k.music) form.set('music', k.music);
+	if (k.font) form.set('font', k.font);
+	if (k.logoCorner) form.set('logo_corner', k.logoCorner);
+	if (k.endCard) form.set('end_card', k.endCard);
+	if (k.fontName) form.set('font_name', k.fontName);
+	return request<Kit>('/kits', {method: 'POST', body: form});
+}
+export const deleteKit = (id: string) => request<{deleted: string}>(`/kits/${encodeURIComponent(id)}`, {method: 'DELETE'});
+export const kitFileUrl = (id: string, name: string) => `${API_URL}/kits/${encodeURIComponent(id)}/files/${encodeURIComponent(name)}`;
+/** Put a kit on the job's edit; the server saves it as a new version. */
+export const applyKit = (jobId: string, kit: string) =>
+	request<{plan: EditPlan; changes: string[]}>(`/jobs/${jobId}/kit`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({kit})});
+
 /** New jobs from this edit: other hooks and shorter cuts. */
 export const makeVariants = (id: string, plan: EditPlan) =>
 	request<{variants: {id: string; label: string; duration: number}[]}>(`/jobs/${id}/variants`, json(plan));
@@ -195,7 +243,7 @@ export const saveDraft = (id: string, plan: EditPlan) =>
 export const getDraft = (id: string) => request<{draft: Draft | null}>(`/jobs/${id}/draft`);
 export const discardDraft = (id: string) => request<{deleted: boolean}>(`/jobs/${id}/draft`, {method: 'DELETE'});
 
-export type ExplainItem = {at: number; kind: 'hook' | 'silence' | 'filler' | 'trim' | 'ending' | 'graphic' | 'zoom' | 'spelling' | 'footage' | 'speaker'; text: string; id?: string};
+export type ExplainItem = {at: number; kind: 'hook' | 'silence' | 'filler' | 'trim' | 'ending' | 'graphic' | 'zoom' | 'spelling' | 'footage' | 'speaker' | 'retake'; text: string; id?: string};
 export type Explanation = {summary: string; items: ExplainItem[]};
 /** Why the first cut (and the current edit) look the way they do. */
 export const explainCut = (id: string) => request<{first_cut: Explanation; current: Explanation}>(`/jobs/${id}/explain`);
@@ -210,3 +258,40 @@ export type QACheck = {name: string; status: 'pass' | 'warn' | 'fail'; detail: s
 export type QAResult = {ok: boolean | null; checks?: QACheck[]; error?: string};
 
 export const checkPlan = (id: string, plan: EditPlan) => request<CheckReport>(`/jobs/${id}/checks`, json(plan));
+
+/** One change worth trying on a first cut (ADR 0029); made without Claude. */
+export type Suggestion = {kind: 'shorter' | 'hook' | 'tighter'; label: string; why: string; changes: string[]; plan: EditPlan};
+
+export function getSuggestion(id: string) {
+	return request<{suggestion: Suggestion | null}>(`/jobs/${id}/suggestion`);
+}
+
+/** Usage counts (ADR 0030): off until turned on, kept on this computer. */
+export type Telemetry = {
+	enabled: boolean;
+	events: number;
+	counts: Record<string, number>;
+	render_success: number | null;
+	suggestion_kept: number | null;
+};
+
+export function getTelemetry() {
+	return request<Telemetry>('/telemetry');
+}
+
+export function setTelemetry(enabled: boolean) {
+	return request<Telemetry>('/telemetry', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({enabled})});
+}
+
+export function clearTelemetry() {
+	return request<Telemetry>('/telemetry', {method: 'DELETE'});
+}
+
+export const telemetryFileUrl = `${API_URL}/telemetry/file`;
+
+/** Count something the web app sees (a suggestion kept, a share). Dropped by the server when counting is off; never fails. */
+export function count(event: string, fields: Record<string, string | number | boolean> = {}) {
+	void fetch(`${API_URL}/telemetry/events`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({event, fields})}).catch(
+		() => undefined,
+	);
+}

@@ -148,7 +148,7 @@ def analyze(
     silences = cutting.detect_silences(audio_wav, style.pacing.max_silence) if audio_wav else []
     cuts = cutting.cut_ranges(
         transcript, source.duration, style.pacing.max_silence, style.pacing.remove_fillers, silences,
-        keep_pause=style.pacing.keep_pause,
+        keep_pause=style.pacing.keep_pause, remove_retakes=style.pacing.remove_retakes,
     )
     hook_span = (candidates[0].start, candidates[0].end) if candidates else None
     plan.segments = cutting.build_segments(source.duration, cuts, hook_span, strategy)

@@ -105,6 +105,9 @@ speed up the whole reel; keep_pause is how much pause stays around each cut (re-
 - {{"op": "motion", "start": s, "end": e, "title": "1-4 words", "idea": "the one 3D object or moment to show"}}  a 2-3 s full-screen 3D motion graphic of what is said there (the speaker keeps talking)
 - {{"op": "cut_transition", "at": s, "kind": "drop" | "whip" | "zoom" | "push" | "none"}}  an animated transition at a cut or shot change: drop = the old shot falls off screen, whip = a fast blurred pan, zoom = pushing through, push = slides up; "none" removes the one there. Use sparingly
 - {{"op": "depth", "enabled": false}}  turn all green-screen effects off
+- {{"op": "brand", "logo_corner": "top_left" | "top_right" | "bottom_left" | "bottom_right", "logo_size": 0.05-0.4, \
+"logo_opacity": 0.1-1, "music_volume": 0-1, "duck": 0-1, "end_card": "short line or empty", "remove": ["logo" | "music" | \
+"end_card"]}}  change the brand kit's logo, music level (duck = share kept under speech), end card; only fields asked for
 - {{"op": "mode", "mode": "talking_head" | "podcast" | "product_demo" | "vlog"}}  edit the reel as another kind of video (pacing, zooms, captions, cuts; re-cuts the pauses): only when the user asks for that kind of edit
 {pictures}- {{"op": "transitions", "style": "editorial" | "hard" | "smooth" | "zoom", "fade_out": seconds}}  editorial (J-cuts, \
 punch-ins across jump cuts, a settle on new shots), hard cuts, short crossfades, or alternating punch-ins at cuts; fade to black at the end
@@ -349,6 +352,27 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
             if pause is not None and abs(pause - plan.style.pacing.keep_pause) > 1e-6:
                 plan.style.pacing.keep_pause = min(1.0, max(0.0, pause))
                 recut = True
+        elif kind == "brand":
+            b = plan.brand.model_dump()
+            for key in ("logo_size", "logo_opacity", "music_volume", "duck"):
+                if (v := _num(op.get(key))) is not None:
+                    b[key] = v
+            if op.get("logo_corner") in ("top_left", "top_right", "bottom_left", "bottom_right"):
+                b["logo_corner"] = op["logo_corner"]
+            if isinstance(op.get("end_card"), str):
+                b["end_card"] = " ".join(op["end_card"].split())[:80]
+            for gone_field in op.get("remove") or []:
+                if gone_field in ("logo", "music"):
+                    b[gone_field] = None
+                elif gone_field == "end_card":
+                    b["end_card"] = ""
+            limits = {"logo_size": (0.05, 0.4), "logo_opacity": (0.1, 1.0), "music_volume": (0.0, 1.0), "duck": (0.0, 1.0)}
+            for key, (lo, hi) in limits.items():
+                b[key] = min(hi, max(lo, b[key]))
+            new_brand = plan_mod.Brand.model_validate(b)
+            if new_brand != plan.brand:
+                changes += diff._brand(plan.brand, new_brand)
+                plan.brand = new_brand
         elif kind == "mode" and op.get("mode") in modes.MODES and op["mode"] != plan.style.mode:
             before = plan.style.pacing.model_copy()
             plan.style = modes.apply(plan.style, op["mode"])

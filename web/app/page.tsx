@@ -2,13 +2,14 @@
 
 import {useRouter} from 'next/navigation';
 import {useEffect, useState, type FormEvent} from 'react';
-import {createJob, deleteRecipe, generationSources, listRecipes, type Recipe} from '@/lib/api';
+import {clearTelemetry, createJob, deleteRecipe, getTelemetry, setTelemetry, telemetryFileUrl, type Telemetry, openProject, generationSources, kitFileUrl, listKits, listRecipes, type Kit, type Recipe} from '@/lib/api';
 import {MODES, type Mode} from '@/lib/modes';
 import {PRESETS} from '@/lib/presets';
 
 export default function UploadPage() {
 	const router = useRouter();
 	const [file, setFile] = useState<File | null>(null);
+	const [more, setMore] = useState<File[]>([]);
 	const [style, setStyle] = useState('');
 	const [strategy, setStrategy] = useState<'cold_open' | 'trim'>('cold_open');
 	const [busy, setBusy] = useState(false);
@@ -19,11 +20,23 @@ export default function UploadPage() {
 	const [pictures, setPictures] = useState(false);
 	const [vision, setVision] = useState('none');
 	const [mode, setMode] = useState<Mode>('talking_head');
+	const [kits, setKits] = useState<Kit[]>([]);
+	const [kit, setKit] = useState('');
+	const [projectFile, setProjectFile] = useState<File | null>(null);
+	const [projectSource, setProjectSource] = useState<File | null>(null);
+	const [needsSource, setNeedsSource] = useState(false);
+	const [usage, setUsage] = useState<Telemetry | null>(null);
 
 	useEffect(() => {
 		listRecipes()
 			.then((r) => setRecipes(r.recipes))
 			.catch(() => setRecipes([])); // the upload still works without them
+		listKits()
+			.then((r) => setKits(r.kits))
+			.catch(() => setKits([]));
+		getTelemetry()
+			.then(setUsage)
+			.catch(() => setUsage(null));
 		generationSources()
 			.then((r) => setSources(r.available))
 			.catch(() => setSources([])); // no keys or an older engine: everything is drawn
@@ -46,7 +59,7 @@ export default function UploadPage() {
 		setBusy(true);
 		setError(null);
 		try {
-			const {id} = await createJob(file, recipe ? '' : style, strategy, recipe, pictures && sources.length > 0, vision, mode);
+			const {id} = await createJob(file, recipe ? '' : style, strategy, recipe, pictures && sources.length > 0, vision, mode, kit, more);
 			router.push(`/jobs/${id}`);
 		} catch (err) {
 			setError((err as Error).message);
@@ -54,14 +67,43 @@ export default function UploadPage() {
 		}
 	}
 
+	async function open() {
+		if (!projectFile) return;
+		setBusy(true);
+		setError(null);
+		try {
+			const {id} = await openProject(projectFile, projectSource);
+			router.push(`/jobs/${id}`);
+		} catch (err) {
+			const message = (err as Error).message;
+			if (/footage|original/.test(message)) setNeedsSource(true);
+			setError(message);
+			setBusy(false);
+		}
+	}
+
 	return (
 		<form onSubmit={submit}>
 			<h1>New short</h1>
-			<p className="sub">Upload a talking-head video (10 seconds to 3 minutes). Your footage is never regenerated, only cut and overlaid.</p>
+			<p className="sub">
+				Upload a video of someone talking (10 seconds to 3 minutes) and say what it is for. HyperCut makes the first cut, suggests one
+				change, and you export. Your footage is never regenerated, only cut and overlaid.
+			</p>
 
 			<div className="card">
 				<label htmlFor="video">Video</label>
 				<input id="video" type="file" accept="video/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+				{file && (
+					<>
+						<label htmlFor="more">More clips (optional)</label>
+						<input id="more" type="file" accept="video/*" multiple onChange={(e) => setMore(Array.from(e.target.files ?? []))} />
+						<p className="hint">
+							{more.length
+								? `${more.length + 1} clips, joined in this order: ${[file, ...more].map((f) => f.name).join(', ')}.`
+								: 'Recorded in pieces? Add the rest here and they are joined in order. Retakes are cut either way, keeping the last take.'}
+						</p>
+					</>
+				)}
 			</div>
 
 			<div className="card">
@@ -73,9 +115,27 @@ export default function UploadPage() {
 						</button>
 					))}
 				</div>
-				<p className="hint">{MODES.find((m) => m.name === mode)?.hint} It sets how the video is cut; the style below sets how it looks.</p>
+				<p className="hint">{MODES.find((m) => m.name === mode)?.hint} It sets how the video is cut; how it looks is under More options.</p>
 			</div>
 
+			{kits.length > 0 && (
+				<div className="card">
+					<label>Brand kit</label>
+					<p className="hint">Your logo, music, end card and caption look on this reel. Pick it again to go without.</p>
+					<div className="chips">
+						{kits.map((k) => (
+							<button type="button" key={k.id} className={`chip${kit === k.id ? ' active' : ''}`} onClick={() => setKit(kit === k.id ? '' : k.id)}>
+								{/* eslint-disable-next-line @next/next/no-img-element */}
+								{k.logo ? <img className="chip-logo" src={kitFileUrl(k.id, k.logo)} alt="" /> : null}
+								{k.name}
+							</button>
+						))}
+					</div>
+				</div>
+			)}
+
+			<details className="more">
+				<summary>More options: look, hook, footage understanding, pictures</summary>
 			{recipes.length > 0 && (
 				<div className="card">
 					<label>Your recipes</label>
@@ -147,11 +207,58 @@ export default function UploadPage() {
 				</p>
 			</div>
 
+			<div className="card">
+				<label className="check">
+					<input
+						type="checkbox"
+						checked={usage?.enabled ?? false}
+						disabled={!usage}
+						onChange={(e) => void setTelemetry(e.target.checked).then(setUsage).catch((err) => setError((err as Error).message))}
+					/>
+					Count how I use HyperCut (optional, off by default)
+				</label>
+				<p className="hint">
+					Counts like “a render took 4 minutes” or “the suggested change was kept”, saved on this computer only. Never your video, frames,
+					words, prompts or file names. Nothing is sent: you can read the file and share it if you want to help improve HyperCut.
+					{usage && usage.events > 0 && (
+						<>
+							{' '}
+							{usage.events} counted.{' '}
+							<a href={telemetryFileUrl} download>
+								See the file
+							</a>{' '}
+							·{' '}
+							<button type="button" className="link" onClick={() => void clearTelemetry().then(setUsage)}>
+								Delete it
+							</button>
+						</>
+					)}
+				</p>
+			</div>
+			</details>
+
 			<div className="row">
 				<button className="primary" disabled={!file || busy}>
 					{busy ? 'Uploading…' : 'Create short'}
 				</button>
 				{error && <span className="error">{error}</span>}
+			</div>
+
+			<div className="card">
+				<label htmlFor="project">Or open a project</label>
+				<p className="hint">A .hypercut file saved from the editor, with its versions. One saved without the video asks for the original, which HyperCut checks is the same file.</p>
+				<input id="project" type="file" accept=".hypercut" onChange={(e) => setProjectFile(e.target.files?.[0] ?? null)} />
+				{needsSource && (
+					<>
+						<label htmlFor="project-source">The original video</label>
+						<input id="project-source" type="file" accept="video/*" onChange={(e) => setProjectSource(e.target.files?.[0] ?? null)} />
+					</>
+				)}
+				<div className="row">
+					<button type="button" disabled={!projectFile || busy} onClick={open}>
+						{busy && projectFile ? 'Opening…' : 'Open project'}
+					</button>
+				</div>
 			</div>
 		</form>
 	);

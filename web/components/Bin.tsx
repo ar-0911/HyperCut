@@ -2,13 +2,14 @@
 
 import type {EditPlan, GraphicType, LayoutMode} from '@render/plan';
 import {useRef, useState, type DragEvent} from 'react';
-import {fileUrl} from '@/lib/api';
+import {fileUrl, type Kit} from '@/lib/api';
 import {GRAPHIC_NAMES, LAYOUT_NAMES, graphicLabel, removedGraphics, type Asset, type BinPayload} from '@/lib/timeline';
 import {chooseHook, editWord} from '@/lib/rehook';
+import BrandPanel from './BrandPanel';
 import StylePanel from './StylePanel';
 import {DRAG_TYPE} from './Timeline';
 
-type Tab = 'add' | 'media' | 'style' | 'hook' | 'captions';
+type Tab = 'add' | 'media' | 'style' | 'brand' | 'hook' | 'captions';
 
 const ADDABLE: GraphicType[] = ['kinetic_text', 'stat_card', 'list_build', 'lower_third', 'progress_bar', 'motion', 'card_stack', 'scene', 'chart', 'particles'];
 const ICONS: Partial<Record<GraphicType, string>> = {
@@ -54,6 +55,7 @@ export default function Bin({
 	onUpload,
 	onDeleteAsset,
 	onRecut,
+	onKit,
 }: {
 	jobId: string;
 	plan: EditPlan;
@@ -64,6 +66,8 @@ export default function Bin({
 	onUpload: (files: File[]) => Promise<void>;
 	onDeleteAsset: (name: string) => void;
 	onRecut: (plan: EditPlan) => Promise<void>;
+	/** Put a brand kit on the edit (server side, as a new version). */
+	onKit: (kit: Kit) => Promise<void>;
 }) {
 	const [tab, setTab] = useState<Tab>('add');
 	const [uploading, setUploading] = useState(0);
@@ -89,6 +93,7 @@ export default function Bin({
 						['add', 'Add'],
 						['media', 'Media'],
 						['style', 'Style'],
+						['brand', 'Brand'],
 						['hook', 'Hook'],
 						['captions', 'Captions'],
 					] as [Tab, string][]
@@ -187,6 +192,8 @@ export default function Bin({
 			)}
 
 			{tab === 'style' && <StylePanel plan={plan} onChange={onChange} onRecut={onRecut} />}
+
+			{tab === 'brand' && <BrandPanel jobId={jobId} plan={plan} onChange={onChange} onUse={onKit} />}
 
 			{tab === 'hook' &&
 				(hook.candidates.length === 0 ? (

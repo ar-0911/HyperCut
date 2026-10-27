@@ -456,3 +456,102 @@ def test_job_shows_what_ingest_found(client, fake_stages):
     assert client.get(f"/jobs/{job_id}").json()["manifest"] is None  # the fake ingest wrote none
     manifest.save(jobs.job_dir(job_id), {"video": {"orientation": "portrait"}, "warnings": ["The video is HDR"]})
     assert client.get(f"/jobs/{job_id}").json()["manifest"]["warnings"] == ["The video is HDR"]
+
+
+def test_brand_kits(client, fake_stages):
+    files = {"logo": ("logo.png", b"png"), "music": ("bed.mp3", b"mp3")}
+    r = client.post("/kits", data={"name": "Acme  Co", "end_card": "Follow Acme", "logo_corner": "bottom_left"}, files=files)
+    assert r.status_code == 201, r.text
+    kit = r.json()
+    assert kit["name"] == "Acme Co" and kit["logo"] == "logo.png" and kit["music"]
+    assert [k["id"] for k in client.get("/kits").json()["kits"]] == [kit["id"]]
+    assert client.get(f"/kits/{kit['id']}/files/logo.png").content == b"png"
+    assert client.get(f"/kits/{kit['id']}/files/kit.json").status_code == 404
+    bad = client.post("/kits", data={"name": "x"}, files={"logo": ("logo.exe", b"x")})
+    assert bad.status_code == 422
+
+    # On a finished edit, as a new version; its files become the job's own.
+    job_id = _submit(client)
+    _wait(client, job_id)
+    r = client.post(f"/jobs/{job_id}/kit", json={"kit": kit["id"]})
+    assert r.status_code == 200 and r.json()["plan"]["brand"]["logo_corner"] == "bottom_left"
+    logo = r.json()["plan"]["brand"]["logo"]
+    assert client.get(f"/jobs/{job_id}/files/{logo}").content == b"png"
+    assert client.put(f"/jobs/{job_id}/plan", json=r.json()["plan"]).status_code == 200  # its files are known
+    assert client.get(f"/jobs/{job_id}/history").json()["versions"][0]["note"].startswith("Applied the brand kit")
+
+    # At upload.
+    body = _wait(client, _submit(client, kit=kit["id"]))
+    assert body["plan"]["brand"]["end_card"] == "Follow Acme"
+    assert client.post("/jobs", files={"video": ("c.mp4", b"x")}, data={"kit": "nope"}).status_code == 422
+    assert client.delete(f"/kits/{kit['id']}").status_code == 200 and client.get("/kits").json()["kits"] == []
+
+
+def test_project_export_and_import(client, fake_stages):
+    job_id = _submit(client)
+    _wait(client, job_id)
+    r = client.get(f"/jobs/{job_id}/project")
+    assert r.status_code == 200 and r.headers["content-disposition"].endswith('.hypercut"')
+    opened = client.post("/projects", files={"project_file": ("clip.hypercut", r.content)})
+    assert opened.status_code == 201, opened.text
+    new_id = opened.json()["id"]
+    assert new_id != job_id and opened.json()["versions"] >= 1
+    body = client.get(f"/jobs/{new_id}").json()
+    assert body["status"] == "done" and body["filename"] == "clip.mov" and body["plan"]["source"]["path"].endswith(f"{new_id}/normalized.mp4")
+    assert not any(f.endswith(".hypercut") for f in body["files"])  # the export's temp file is gone
+
+    light = client.get(f"/jobs/{job_id}/project?footage=false")
+    refused = client.post("/projects", files={"project_file": ("clip.hypercut", light.content)})
+    assert refused.status_code == 422 and "footage" in refused.json()["detail"]
+    assert client.post("/projects", files={"project_file": ("x.hypercut", b"junk")}).status_code == 422
+
+
+def test_editing_goes_on_during_a_render(client, fake_stages):
+    from api import jobs
+
+    job_id = _submit(client)
+    plan = _wait(client, job_id)["plan"]
+    jobs.write(job_id, render="running")  # a render started from the plan as it was
+    plan["hook"]["chosen"] = 1
+    assert client.put(f"/jobs/{job_id}/plan", json=plan).status_code == 200
+    assert client.get(f"/jobs/{job_id}").json()["render"] == "running"  # the render carries on
+
+
+def test_suggestion(client, fake_stages):
+    job_id = _submit(client)
+    _wait(client, job_id)
+    body = client.get(f"/jobs/{job_id}/suggestion").json()
+    assert "suggestion" in body
+    if body["suggestion"]:
+        assert body["suggestion"]["label"] and body["suggestion"]["plan"]["source"]
+
+
+def test_usage_counts_are_opt_in(client, fake_stages):
+    from api import jobs
+    from hypercut import telemetry
+
+    assert client.get("/telemetry").json()["enabled"] is False
+    _wait(client, _submit(client))
+    assert not (jobs.media_root() / telemetry.FILE).exists()  # off: nothing written
+
+    assert client.put("/telemetry", json={"enabled": True}).json()["enabled"] is True
+    _wait(client, _submit(client))
+    assert client.post("/telemetry/events", json={"event": "share", "fields": {"how": "download", "path": "/x"}}).status_code == 204
+    client.post("/telemetry/events", json={"event": "job_done", "fields": {"seconds": 1}})  # server-only: dropped
+    counts = client.get("/telemetry").json()["counts"]
+    assert counts["job_created"] == 1 and counts["job_done"] == 1 and counts["share"] == 1
+    assert "/x" not in client.get("/telemetry/file").text
+    assert client.delete("/telemetry").json()["events"] == 0
+
+
+def test_several_clips_are_joined_in_order(client, fake_stages, monkeypatch):
+    seen = {}
+
+    def ingest_files(paths, job_dir):
+        seen["names"] = [Path(p).name for p in paths]
+        return run.ingest(paths[0], job_dir)
+
+    monkeypatch.setattr(run, "ingest_files", ingest_files)
+    r = client.post("/jobs", files=[("video", ("a.mov", b"1")), ("more", ("b.mp4", b"2")), ("more", ("c.mp4", b"3"))])
+    assert _wait(client, r.json()["id"])["status"] == "done"
+    assert seen["names"] == ["upload.mov", "upload-2.mp4", "upload-3.mp4"]
