@@ -5,7 +5,7 @@
 // face, both drawn over the footage. All pure functions of time.
 
 import React from 'react';
-import {AbsoluteFill} from 'remotion';
+import {AbsoluteFill} from './frame';
 import {faceBox} from './Around';
 import {StudioBackdrop} from './Backdrop';
 import {captionFamily} from './fonts';

@@ -8,7 +8,7 @@ const nextConfig = {
 	// The preview imports the composition straight from ../render/src (ADR 0801).
 	experimental: {externalDir: true},
 	webpack(config) {
-		// render/ may have its own node_modules; look in ours first so React and Remotion are single copies.
+		// render/ has its own node_modules; look in ours first so React is a single copy.
 		config.resolve.modules = [path.join(here, 'node_modules'), ...(config.resolve.modules ?? ['node_modules'])];
 		config.resolve.alias['@render'] = path.join(here, '..', 'render', 'src');
 		// Caption fonts are imported as files by the composition (render/src/fonts.ts).

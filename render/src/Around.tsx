@@ -5,7 +5,7 @@
 // built-in icon.
 
 import React from 'react';
-import {AbsoluteFill} from 'remotion';
+import {AbsoluteFill} from './frame';
 import {builtinIcon} from './icons';
 import type {EditPlan, Graphic} from './plan';
 

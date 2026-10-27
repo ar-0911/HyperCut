@@ -1,5 +1,5 @@
 import React, {useMemo} from 'react';
-import {AbsoluteFill, Audio, Img, interpolate, spring, useCurrentFrame} from 'remotion';
+import {AbsoluteFill, Audio, Img, interpolate, spring, useCurrentFrame} from './frame';
 import {endCardFrames, logoBox, musicVolumes} from './brand';
 import {captionFamily, loadBrandFont} from './fonts';
 import type {EditPlan} from './plan';

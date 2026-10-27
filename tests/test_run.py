@@ -169,7 +169,7 @@ def test_stages_recorded_in_the_manifest(tmp_path, stages, monkeypatch):
 
 
 def _fake_render(monkeypatch, job_dir, during=None):
-    """render_plan with the Remotion render and the before-render drawing faked: drawing adds a title to the
+    """render_plan with the render and the before-render drawing faked: drawing adds a title to the
     snapshot; `during` runs while the 'render' is going (an edit saved meanwhile)."""
     import subprocess as sp
 

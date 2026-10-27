@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl ffmpeg python3 python3-venv \
         # MediaPipe (face tracking, speaker cut-out)
         libegl1 libgles2 libgl1 libglib2.0-0t64 \
-        # Chrome Headless Shell (Remotion rendering)
+        # Chrome Headless Shell (HyperFrames rendering)
         libnss3 libdbus-1-3 libatk1.0-0t64 libatk-bridge2.0-0t64 libgbm1 libasound2t64 libxrandr2 libxkbcommon0 \
         libxfixes3 libxcomposite1 libxdamage1 libpango-1.0-0 libcairo2 libcups2t64 \
     && rm -rf /var/lib/apt/lists/*
@@ -33,9 +33,11 @@ COPY --chown=ubuntu:ubuntu pyproject.toml ./
 COPY --chown=ubuntu:ubuntu hypercut/ hypercut/
 RUN pip install --no-cache-dir -e '.[api,whisper,deepgram,reframe,matte,anthropic,generate]'
 
-# Renderer, plus the headless Chrome it drives (downloaded now, not on the first render).
+# Renderer (HyperFrames), plus the headless Chrome it drives (downloaded now, not on the first render).
+# HyperFrames' anonymous usage reporting stays off: nothing about a reel leaves the machine.
+ENV HYPERFRAMES_NO_TELEMETRY=1 DO_NOT_TRACK=1
 COPY --chown=ubuntu:ubuntu render/package.json render/package-lock.json render/
-RUN cd render && npm ci && npx remotion browser ensure && npm cache clean --force
+RUN cd render && npm ci && npx hyperframes browser ensure && npm cache clean --force
 
 # Web app. The browser calls the API at this URL, so it is baked in at build time.
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000

@@ -3,27 +3,25 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Remotion project that renders a HyperCut edit plan to a 1080x1920 mp4",
+  "description": "Renders a HyperCut edit plan to a 1080x1920 mp4 with HyperFrames",
   "scripts": {
-    "studio": "remotion studio src/index.ts",
-    "render": "tsx scripts/render.ts",
+    "build": "node scripts/build.mjs",
+    "render": "node scripts/build.mjs && node dist/render.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@react-three/fiber": "8.17.10",
-    "@remotion/bundler": "4.0.250",
-    "@remotion/cli": "4.0.250",
-    "@remotion/renderer": "4.0.250",
-    "@remotion/three": "4.0.250",
+    "esbuild": "0.24.0",
+    "hyperframes": "0.8.207",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "remotion": "4.0.250",
     "three": "0.169.0"
   },
   "devDependencies": {
     "@types/node": "22.9.0",
     "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
     "@types/three": "0.169.0",
     "tsx": "4.19.2",
     "typescript": "5.6.3",

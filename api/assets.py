@@ -2,7 +2,7 @@
 
 Each upload is stored flat in the job folder as `asset-<12 hex><ext>` so the existing files endpoint serves
 it and the renderer can link it next to the video. Clips are re-encoded to a short silent H.264 mp4 so every
-browser previews them and Remotion renders them the same way.
+browser previews them and the renderer draws them the same way.
 """
 
 from __future__ import annotations

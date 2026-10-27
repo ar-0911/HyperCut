@@ -1,6 +1,6 @@
 # 0005: Render with Remotion
 
-Status: accepted, 2026-10-17
+Status: superseded by [0032](0032-render-with-hyperframes.md) (2026-10-27); accepted 2026-10-17
 
 **Decision.** The renderer is a Remotion (React) project in `render/` that takes `plan.json` and the
 normalized video.

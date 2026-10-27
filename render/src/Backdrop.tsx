@@ -3,7 +3,7 @@
 // slide. It drifts very slowly so a held frame still feels alive. Pure function of time.
 
 import React from 'react';
-import {AbsoluteFill} from 'remotion';
+import {AbsoluteFill} from './frame';
 
 export type StudioLook = 'light' | 'dark';
 

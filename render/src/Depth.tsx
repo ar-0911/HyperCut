@@ -2,7 +2,7 @@
 // changed; the cut-out video is the same footage with everything but the speaker made transparent.
 
 import React from 'react';
-import {AbsoluteFill, Img, OffthreadVideo} from 'remotion';
+import {AbsoluteFill, Img, OffthreadVideo} from './frame';
 import {StudioBackdrop} from './Backdrop';
 import {captionFamily} from './fonts';
 import {GraphicBody} from './Graphics';
