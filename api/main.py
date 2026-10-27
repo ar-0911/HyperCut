@@ -17,8 +17,9 @@ from pydantic import BaseModel, Field
 
 from api import assets, jobs, recipes
 from hypercut import plan as plan_mod
-from hypercut import assistant, checks, diff, edit, explain, export, generate, history, llm, qa, review, run, variants
+from hypercut import assistant, checks, diff, edit, explain, export, generate, history, llm, modes, qa, review, run, variants, vision
 from hypercut.analyze import cuts as cutting
+from hypercut.ingest import manifest
 from hypercut.matte import MATTE_FILE
 from hypercut.plan import EditPlan, Style
 
@@ -104,12 +105,13 @@ def _known_media(job_id: str, state: dict) -> set[str]:
 
 
 def _process(job_id: str, video: Path, style: str, strategy: str, recipe: Style | None = None,
-             pictures: bool = False) -> None:
+             pictures: bool = False, vision_provider: str | None = None, mode: str | None = None) -> None:
     try:
         jobs.write(job_id, status="running", stage="ingest")
         run.run_pipeline(
             video, jobs.job_dir(job_id), style, strategy,
             on_stage=lambda s: jobs.write(job_id, stage=s), recipe=recipe, pictures=pictures,
+            vision=vision_provider, mode=mode,
         )
         jobs.write(job_id, status="done", stage="done", error=None)
     except Exception as e:
@@ -153,6 +155,11 @@ def create_job(
     hook_strategy: Literal["cold_open", "trim"] = Form("cold_open"),
     recipe: str = Form(""),
     pictures: bool = Form(False),
+    # Who describes frames of the footage (ADR 0024): nobody (local signals only), a local model, or Claude (opt-in:
+    # frames leave the machine). Empty: the server's HYPERCUT_VISION, else nobody.
+    vision: Literal["", "none", "ollama", "claude"] = Form(""),
+    # What kind of video this is (ADR 0025): sets how it is edited. Empty: talking head.
+    mode: Literal["", "talking_head", "podcast", "product_demo", "vlog"] = Form(""),
 ):
     saved_style = recipes.get(recipe) if recipe else None
     if recipe and saved_style is None:
@@ -165,8 +172,9 @@ def create_job(
         shutil.copyfileobj(video.file, f)
     jobs.write(job_id, status="queued", stage=None, error=None, render=None, render_error=None,
                style=style or (f"recipe: {recipe}" if recipe else ""), hook_strategy=hook_strategy, filename=video.filename,
-               pictures=pictures)
-    background.add_task(_process, job_id, upload, style, hook_strategy, saved_style, pictures)
+               pictures=pictures, vision=vision or None, mode=mode or None)
+    background.add_task(_process, job_id, upload, style, hook_strategy, saved_style, pictures, vision or None,
+                        mode or None)
     return {"id": job_id, "status": "queued"}
 
 
@@ -184,7 +192,8 @@ def retry_job(job_id: str, background: BackgroundTasks):
     saved = recipes.get(recipe.removeprefix("recipe: ")) if recipe.startswith("recipe: ") else None
     jobs.write(job_id, status="queued", stage=None, error=None, interrupted=False)
     background.add_task(_process, job_id, upload, "" if saved else state.get("style", ""),
-                        state.get("hook_strategy", "cold_open"), saved, bool(state.get("pictures")))
+                        state.get("hook_strategy", "cold_open"), saved, bool(state.get("pictures")),
+                        state.get("vision"), state.get("mode"))
     return {"id": job_id, "status": "queued"}
 
 
@@ -196,6 +205,9 @@ def get_job(job_id: str):
     base = _base_path(job_id)
     state["base_plan"] = plan_mod.load(base).model_dump(mode="json") if base.is_file() else state["plan"]
     state.setdefault("assets", [])
+    # What ingest found in the upload (ADR 0104): the warnings are shown above the editor.
+    facts = manifest.load(jobs.job_dir(job_id)) or {}
+    state["manifest"] = {k: facts.get(k) for k in ("video", "audio", "warnings", "stages")} if facts else None
     state["files"] = sorted(p.name for p in jobs.job_dir(job_id).iterdir() if p.is_file() and p.name != "job.json")
     # What this machine can fetch for the editor's pictures, and what this video has spent on generating them.
     state["generation"] = {**generate.spent(jobs.job_dir(job_id)), "available": sorted(generate.available())}
@@ -332,7 +344,8 @@ def explain_cut(job_id: str):
     index = history.ensure(directory)
     first = next((v for v in index.versions if v.kind == "pipeline"), None)
     plan = history.load_version(directory, first.id) if first else plan_mod.load(_plan_path(job_id))
-    return {"first_cut": explain.first_cut(plan), "current": explain.first_cut(plan_mod.load(_plan_path(job_id)))}
+    index = vision.load(directory / vision.INDEX_FILE)
+    return {"first_cut": explain.first_cut(plan, index), "current": explain.first_cut(plan_mod.load(_plan_path(job_id)), index)}
 
 
 @app.post("/jobs/{job_id}/assets", status_code=201)
@@ -467,6 +480,12 @@ class RecipeRequest(BaseModel):
 def generation_sources():
     """Which kinds of picture this machine can fetch (stock / image / video); empty without keys (ADR 0020)."""
     return {"available": sorted(generate.available())}
+
+
+@app.get("/modes")
+def list_modes():
+    """The editing modes the upload page offers as "What are you making?" (ADR 0025)."""
+    return {"modes": modes.listing(), "default": modes.DEFAULT_MODE}
 
 
 @app.get("/recipes")

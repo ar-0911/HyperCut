@@ -226,10 +226,12 @@
     ],
     "shots": [
       5.9
-    ]
+    ],
+    "switches": []
   },
   "style": {
     "name": "bold_creator",
+    "mode": "talking_head",
     "pacing": {
       "speed": 1.0,
       "keep_pause": 0.15

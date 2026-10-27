@@ -92,6 +92,8 @@ export type TransitionStyle = 'hard' | 'smooth' | 'zoom' | 'editorial';
 export type Transitions = {style: TransitionStyle; length: number; fade_in: number; fade_out: number};
 export type Style = {
 	name: string;
+	/** How the reel is edited (ADR 0025); the renderer does not read it. */
+	mode?: "talking_head" | "podcast" | "product_demo" | "vlog";
 	caption: CaptionStyle;
 	graphics: GraphicsStyle;
 	pacing: Pacing;
@@ -113,7 +115,8 @@ export type EditPlan = {
 	layout: LayoutSpan[];
 	/** Only used with style.depth.enabled and a matte. */
 	backgrounds: BackgroundSpan[];
-	reframe: {keys: ReframeKey[]; shots: number[]};
+	/** `switches`: where the crop jumps to the person who started talking (ADR 0506); the keys already do it. */
+	reframe: {keys: ReframeKey[]; shots: number[]; switches?: number[]};
 	style: Style;
 	/** Animated transitions (ADR 0613); elsewhere footage meets by style.transitions. */
 	cuts: CutTransition[];

@@ -1,5 +1,5 @@
 import React, {useMemo} from 'react';
-import {groupAt, groupWords, wordState} from './captions';
+import {groupAt, groupWords, lineChars, wordState} from './captions';
 import {captionFamily, captionStretch, captionWeight} from './fonts';
 import {CAPTION_Y} from './layout';
 import type {CaptionStyle, Word} from './plan';
@@ -15,7 +15,10 @@ export const Captions: React.FC<{
 	/** Line center as a fraction of height; defaults to the style's position. */
 	y?: number;
 }> = ({words, style, t, height, y}) => {
-	const groups = useMemo(() => groupWords(words, style.words_per_line), [words, style.words_per_line]);
+	const groups = useMemo(
+		() => groupWords(words, style.words_per_line, lineChars(style.size, style.uppercase)),
+		[words, style.words_per_line, style.size, style.uppercase],
+	);
 	const hit = groupAt(groups, t);
 	if (!hit) return null;
 	const {group} = hit;

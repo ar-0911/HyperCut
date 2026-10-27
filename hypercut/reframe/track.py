@@ -17,6 +17,12 @@ TILE_MIN_SCORE = 0.7  # detector confidence needed for a face found in a zoomed-
 OUTLIER_WINDOW = 7  # samples (within a shot) in the running median that outlier faces are judged by
 OUTLIER_DISTANCE = 0.1  # fraction of source width a detection may sit from that median
 FOLLOW_DISTANCE = 0.15  # how far the main face may move between samples and still be the same person
+# Active speaker (ADR 0506): in a shot with two or more people, the crop goes to the one whose mouth moves.
+PRESENCE = 0.5  # share of a shot's samples a person must be found in to count as in the shot
+ACTIVITY_WINDOW = 5  # samples (1 s at 5 fps) mouth movement is averaged over
+QUIET = 0.02  # mean jaw change per sample below which nobody counts as talking
+MIN_TURN = 1.5  # seconds someone must lead before the crop moves to them
+SAME_FACE = 0.05  # candidates this close in one sample are the same face
 
 
 @dataclass(frozen=True)
@@ -30,6 +36,9 @@ class Detection:
     # Every face the detector found here as (cx, cy, score); cx/cy above is one of them. Empty when the
     # detector reports only one face, as fakes in tests do.
     candidates: tuple[tuple[float, float, float], ...] = ()
+    # How open each candidate's mouth is (0..1, MediaPipe's jawOpen), when there are two or more; None if unread.
+    mouths: tuple[float | None, ...] = ()
+    switch: bool = False  # the crop moves to another person here, inside the shot (ADR 0506)
 
 
 Detector = Callable[[str, Source, float], list[Detection]]
@@ -55,13 +64,15 @@ def smooth_track(
     cx is clamped so the crop window never leaves the frame. cy is the face's own height in the
     frame (smoothed the same way): the full-height crop never moves vertically, so the renderer
     uses it only to zoom in on the face and keep graphics off it (ADR 0504).
-    The hard cuts are kept as `shots`, where animated transitions can go (ADR 0613).
+    The hard cuts are kept as `shots`, where animated transitions can go (ADR 0613). In a shot with two or
+    more people the crop follows whoever is talking and jumps to them like a cut (`switches`, ADR 0506).
     """
     half = _crop_half_width(source)
     shots = [round(d.t, 3) for i, d in enumerate(detections) if d.cut and i > 0]
     if half >= 0.5 or not any(d.cx is not None for d in detections):
         return Reframe(shots=shots)  # already vertical (or narrower), or no face: center crop
-    detections = drop_outliers(follow_main_face(detections))
+    detections = drop_outliers(follow_main_face(follow_active_speaker(detections)))
+    switches = [round(d.t, 3) for d in detections if d.switch and not d.cut]
 
     lo, hi = half, 1 - half
     clamp = lambda x: min(max(x, lo), hi)  # noqa: E731
@@ -70,7 +81,7 @@ def smooth_track(
     def first_face(i: int) -> Detection | None:
         """First detection with a face at or after sample i, within the same shot."""
         for j in range(i, len(detections)):
-            if j > i and detections[j].cut:
+            if j > i and (detections[j].cut or detections[j].switch):
                 return None
             if detections[j].cx is not None:
                 return detections[j]
@@ -81,7 +92,7 @@ def smooth_track(
     keys: list[ReframeKey] = []
     key = lambda t: ReframeKey(t=max(0.0, t), cx=round(pos, 4), cy=round(pos_y, 4))  # noqa: E731
     for i, d in enumerate(detections):
-        if d.cut and i > 0:
+        if (d.cut or d.switch) and i > 0:
             # Snap to the new shot's speaker instead of easing across the cut, and hold the old
             # position right up to the cut so interpolation between keys can't glide over it.
             # A shot with no face at all (a title card, B-roll) is framed on its centre rather than on
@@ -97,14 +108,15 @@ def smooth_track(
             if abs(target_y - pos_y) > dead_zone:
                 pos_y += alpha * (target_y - pos_y)
         keys.append(key(d.t))
-    return Reframe(keys=keys, shots=shots)
+    return Reframe(keys=keys, shots=shots, switches=switches)
 
 
-def _shots(detections: list[Detection]) -> list[list[int]]:
-    """Indices of the detections grouped by shot (a new group at each hard cut)."""
+def _shots(detections: list[Detection], switches: bool = True) -> list[list[int]]:
+    """Indices of the detections grouped by shot (a new group at each hard cut, and at each move to another
+    person unless `switches` is False)."""
     shots: list[list[int]] = []
     for i, d in enumerate(detections):
-        if d.cut or not shots:
+        if d.cut or (switches and d.switch) or not shots:
             shots.append([])
         shots[-1].append(i)
     return shots
@@ -148,7 +160,90 @@ def follow_main_face(detections: list[Detection]) -> list[Detection]:
             continue
         for i, c in zip(shot, best):
             d = detections[i]
-            out[i] = Detection(d.t, c[0], c[1], d.cut, d.candidates) if c else Detection(d.t, cut=d.cut, candidates=d.candidates)
+            out[i] = (Detection(d.t, c[0], c[1], d.cut, d.candidates, d.mouths, d.switch) if c
+                      else Detection(d.t, cut=d.cut, candidates=d.candidates, mouths=d.mouths, switch=d.switch))
+    return out
+
+
+def _people(detections: list[Detection], shot: list[int]) -> list[dict[int, tuple]]:
+    """The people in a shot: each a track {sample index: (cx, cy, score, mouth)}, joining a sample's face to the
+    track whose last position is nearest (within FOLLOW_DISTANCE). Only tracks found in PRESENCE of the shot."""
+    tracks: list[dict[int, tuple]] = []
+    for i in shot:
+        d = detections[i]
+        taken: set[int] = set()
+        faces: list[tuple] = []  # the same face found in overlapping tiles counts once, at its surest
+        for k, c in sorted(enumerate(d.candidates), key=lambda kc: -kc[1][2]):
+            if not any(max(abs(f[0] - c[0]), abs(f[1] - c[1])) < SAME_FACE for f in faces):
+                faces.append((*c, d.mouths[k] if k < len(d.mouths) else None))
+        for c in faces:
+            best, gap = None, FOLLOW_DISTANCE
+            for n, tr in enumerate(tracks):
+                last = tr[max(tr)]
+                dist = max(abs(last[0] - c[0]), abs(last[1] - c[1]))
+                if n not in taken and dist <= gap:
+                    best, gap = n, dist
+            if best is None:
+                tracks.append({})
+                best = len(tracks) - 1
+            taken.add(best)
+            tracks[best][i] = c
+    return [tr for tr in tracks if len(tr) >= PRESENCE * len(shot)]
+
+
+def _activity(track: dict[int, tuple], shot: list[int]) -> list[float]:
+    """Mouth movement per sample of the shot: the mean absolute change in jaw opening over a short window."""
+    moves = []
+    prev = None
+    for i in shot:
+        m = track.get(i, (None,) * 4)[3]
+        moves.append(abs(m - prev) if m is not None and prev is not None else 0.0)
+        prev = m if m is not None else prev
+    half = ACTIVITY_WINDOW // 2
+    return [sum(moves[max(0, k - half) : k + half + 1]) / ACTIVITY_WINDOW for k in range(len(moves))]
+
+
+def follow_active_speaker(detections: list[Detection], min_turn: float = MIN_TURN) -> list[Detection]:
+    """In shots with two or more people, put the crop on whoever is talking (ADR 0506).
+
+    Talking is read from the mouth: whoever's jaw moves most over the last second leads, and the crop moves to a
+    new person only once they have led for `min_turn` seconds, so a "yeah" or a laugh doesn't flip the frame. The
+    move is a jump marked `switch`, like a cut, never a pan across the table. Shots with one person, or without
+    mouth readings, are left as they are.
+    """
+    out = list(detections)
+    for shot in _shots(detections, switches=False):
+        people = _people(detections, shot)
+        if len(people) < 2 or not any(tr[i][3] is not None for tr in people for i in tr):
+            continue
+        activity = [_activity(tr, shot) for tr in people]
+        dt = (detections[shot[-1]].t - detections[shot[0]].t) / max(1, len(shot) - 1) or 1 / SAMPLE_FPS
+        hold = max(1, round(min_turn / dt))
+        leaders = []
+        for k in range(len(shot)):
+            n = max(range(len(people)), key=lambda p: activity[p][k])
+            leaders.append(n if activity[n][k] >= QUIET else None)
+        # Whoever talks first frames the shot from its start; after that, a turn needs `hold` samples in a row.
+        current = next((n for n in leaders if n is not None), None)
+        if current is None:
+            continue
+        chosen = [current] * len(shot)
+        run_start, run_who = 0, current
+        for k, n in enumerate(leaders):
+            if n != run_who:
+                run_start, run_who = k, n
+            if run_who is not None and run_who != current and k - run_start + 1 >= hold:
+                current = run_who
+                for j in range(run_start, k + 1):
+                    chosen[j] = current
+            chosen[k] = current
+        for k, i in enumerate(shot):
+            d, face = detections[i], people[chosen[k]].get(i)
+            switch = k > 0 and chosen[k] != chosen[k - 1]
+            if face is None:
+                out[i] = Detection(d.t, cut=d.cut, switch=switch)
+            else:
+                out[i] = Detection(d.t, face[0], face[1], d.cut, (face[:3],), (face[3],), switch)
     return out
 
 
@@ -165,10 +260,10 @@ def drop_outliers(detections: list[Detection]) -> list[Detection]:
             window = sorted(x for _, x in xs[lo:hi])
             median = window[len(window) // 2]
             if abs(cx - median) > OUTLIER_DISTANCE:
-                out[i] = Detection(detections[i].t, cut=detections[i].cut)
+                out[i] = Detection(detections[i].t, cut=detections[i].cut, switch=detections[i].switch)
 
     for i, d in enumerate(detections):
-        if d.cut and shot:
+        if (d.cut or d.switch) and shot:
             flush()
             shot = []
         shot.append(i)
@@ -212,20 +307,68 @@ MODEL_URL = (
 )
 
 
-def _model_path() -> str:
-    """The MediaPipe face model, downloaded once into ~/.cache/hypercut (or HYPERCUT_CACHE)."""
+# Face landmarks with blendshapes, for how open each mouth is when a shot has two or more people (ADR 0506).
+LANDMARKER_URL = (
+    "https://storage.googleapis.com/mediapipe-models/face_landmarker/"
+    "face_landmarker/float16/latest/face_landmarker.task"
+)
+MOUTH_CROP = 2.4  # crop side around a face, in face widths, for the landmarker
+MOUTH_SIZE = 256  # px the crop is scaled to
+
+
+def _model_path(url: str = MODEL_URL) -> str:
+    """A MediaPipe model, downloaded once into ~/.cache/hypercut (or HYPERCUT_CACHE)."""
     import os
     import urllib.request
     from pathlib import Path
 
     cache = Path(os.environ.get("HYPERCUT_CACHE", Path.home() / ".cache" / "hypercut"))
-    path = cache / "blaze_face_short_range.tflite"
+    path = cache / url.rsplit("/", 1)[-1]
     if not path.exists():
         cache.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".part")
-        urllib.request.urlretrieve(MODEL_URL, tmp)
+        urllib.request.urlretrieve(url, tmp)
         tmp.replace(path)
     return str(path)
+
+
+def _mouth_reader():
+    """A function (rgb frame, faces as (cx, cy, score, area)) -> jaw openness per face (None where unread), or
+    None when the landmark model can't be had: then shots with several people keep the main face."""
+    try:
+        import cv2
+        import mediapipe as mp
+        import numpy as np
+        from mediapipe.tasks.python import BaseOptions, vision
+
+        landmarker = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(
+            base_options=BaseOptions(model_asset_path=_model_path(LANDMARKER_URL)),
+            running_mode=vision.RunningMode.IMAGE, num_faces=1, output_face_blendshapes=True))
+    except Exception as e:  # no network for the model, or an old MediaPipe
+        import logging
+
+        logging.getLogger(__name__).warning("active speaker detection is off: %s", e)
+        return None
+
+    def read(rgb, faces) -> tuple[float | None, ...]:
+        h, w = rgb.shape[:2]
+        out = []
+        for cx, cy, _score, area in faces:
+            side = int(MOUTH_CROP * (area * w * h) ** 0.5)
+            x0, y0 = max(0, int(cx * w - side / 2)), max(0, int(cy * h - side / 2))
+            crop = rgb[y0 : y0 + side, x0 : x0 + side]
+            if crop.size == 0:
+                out.append(None)
+                continue
+            crop = cv2.resize(crop, (MOUTH_SIZE, MOUTH_SIZE))
+            result = landmarker.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(crop)))
+            shapes = result.face_blendshapes[0] if result.face_blendshapes else []
+            jaw = next((b.score for b in shapes if b.category_name == "jawOpen"), None)
+            out.append(None if jaw is None else round(float(jaw), 4))
+        return tuple(out)
+
+    read.close = landmarker.close
+    return read
 
 
 def detect_faces(video_path: str, source: Source, sample_fps: float = SAMPLE_FPS) -> list[Detection]:
@@ -245,6 +388,7 @@ def detect_faces(video_path: str, source: Source, sample_fps: float = SAMPLE_FPS
         min_detection_confidence=FULL_MIN_SCORE,
     )
     out: list[Detection] = []
+    mouths = None  # loaded the first time a frame has two or more faces (False if it can't be)
     with vision.FaceDetector.create_from_options(options) as fd:
         def faces(rgb, min_score: float = 0.0) -> list[tuple[float, float, float, float]]:
             """(cx, cy, score, area) of each face scoring at least `min_score`, normalized to `rgb`."""
@@ -261,10 +405,26 @@ def detect_faces(video_path: str, source: Source, sample_fps: float = SAMPLE_FPS
 
         for t, frame, cut in _sample_frames(video_path, sample_fps):
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            found = faces(rgb, FULL_MIN_SCORE) + _search_tiles(rgb, faces)
+            found = _distinct(faces(rgb, FULL_MIN_SCORE) + _search_tiles(rgb, faces))
             best = max(found, key=lambda f: f[3], default=None)
             cands = tuple((round(cx, 4), round(cy, 4), round(score, 3)) for cx, cy, score, _ in found)
-            out.append(Detection(t, best[0], best[1], cut, cands) if best else Detection(t, cut=cut))
+            jaws: tuple[float | None, ...] = ()
+            if len(found) >= 2:
+                if mouths is None:
+                    mouths = _mouth_reader() or False  # False: tried, not available
+                jaws = mouths(rgb, found) if mouths else ()
+            out.append(Detection(t, best[0], best[1], cut, cands, jaws) if best else Detection(t, cut=cut))
+    if mouths:
+        mouths.close()
+    return out
+
+
+def _distinct(found: list[tuple]) -> list[tuple]:
+    """One entry per face: overlapping tiles find the same face several times; the surest one is kept."""
+    out: list[tuple] = []
+    for f in sorted(found, key=lambda f: -f[2]):
+        if not any(max(abs(o[0] - f[0]), abs(o[1] - f[1])) < SAME_FACE for o in out):
+            out.append(f)
     return out
 
 

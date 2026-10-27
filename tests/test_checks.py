@@ -133,3 +133,24 @@ def test_export_validation_on_real_files(tmp_path):
     assert not result["ok"]
     assert status["audio"] == status["size"] == status["frame_rate"] == status["black_frames"] == "fail"
     assert qa.validate(plan, tmp_path / "missing.mp4")["checks"][0]["status"] == "fail"
+
+
+@pytest.mark.skipif(not HAS_FFMPEG, reason="needs FFmpeg")
+def test_loudness_is_normalized_in_place(tmp_path):
+    from hypercut import audio
+
+    quiet = tmp_path / "quiet.mp4"
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "color=gray:size=320x240:rate=30:duration=6",
+                    "-f", "lavfi", "-i", "sine=frequency=220:duration=6,volume=0.03", "-shortest", "-pix_fmt", "yuv420p",
+                    "-c:a", "aac", str(quiet)], check=True)
+    before = float(audio.measure(quiet)["input_i"])
+    audio.normalize(quiet)
+    after = float(audio.measure(quiet)["input_i"])
+    assert before < -30 and abs(after - audio.TARGET) < 1.5
+    assert audio.normalize(quiet, lufs=None) is not None  # default target from the environment
+    import os
+    os.environ["HYPERCUT_LOUDNESS"] = "off"
+    try:
+        assert audio.normalize(quiet) is None
+    finally:
+        del os.environ["HYPERCUT_LOUDNESS"]

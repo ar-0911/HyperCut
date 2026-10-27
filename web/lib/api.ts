@@ -3,7 +3,7 @@ import type {Asset} from '@/lib/timeline';
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/+$/, '');
 
-export const STAGES = ['ingest', 'transcribe', 'style', 'analyze', 'matte', 'generate'] as const;
+export const STAGES = ['ingest', 'transcribe', 'style', 'look', 'analyze', 'matte', 'generate'] as const;
 export type Stage = (typeof STAGES)[number];
 
 export type Job = {
@@ -35,6 +35,15 @@ export type Job = {
 	interrupted?: boolean;
 	/** Validation of the last render (ADR 0023): 'running' just after it finishes. */
 	qa?: QAResult | 'running' | null;
+	/** What ingest found in the upload (ADR 0104); null for jobs from before the manifest. */
+	manifest?: Manifest | null;
+};
+
+export type Manifest = {
+	video: {width: number; height: number; display_width: number; display_height: number; orientation: 'portrait' | 'landscape' | 'square'; fps: number; variable_frame_rate: boolean; rotation: number; hdr: boolean} | null;
+	audio: {present: boolean; tracks: number} | null;
+	warnings: string[] | null;
+	stages: Record<string, {status: 'running' | 'done' | 'failed' | 'skipped'; at?: string}> | null;
 };
 
 export type Generation = {spent: number; budget: number; available: ('stock' | 'image' | 'video')[]; items?: unknown[]};
@@ -76,13 +85,17 @@ export function fileUrl(id: string, name: string): string {
 	return `${API_URL}/jobs/${id}/files/${encodeURIComponent(name)}`;
 }
 
-export function createJob(video: File, style: string, hookStrategy: 'cold_open' | 'trim', recipe = '', pictures = false) {
+/** `vision`: who describes frames of the footage: '' (the server's default), 'none' (local only), 'ollama' or 'claude' (sends frames).
+ * `mode`: the editing mode (ADR 0025); empty for the server's default (talking head). */
+export function createJob(video: File, style: string, hookStrategy: 'cold_open' | 'trim', recipe = '', pictures = false, vision = '', mode = '') {
 	const form = new FormData();
 	form.set('video', video);
 	form.set('style', style);
 	form.set('hook_strategy', hookStrategy);
 	if (recipe) form.set('recipe', recipe);
 	if (pictures) form.set('pictures', 'true');
+	if (vision) form.set('vision', vision);
+	if (mode) form.set('mode', mode);
 	return request<{id: string; status: string}>('/jobs', {method: 'POST', body: form});
 }
 
@@ -182,7 +195,7 @@ export const saveDraft = (id: string, plan: EditPlan) =>
 export const getDraft = (id: string) => request<{draft: Draft | null}>(`/jobs/${id}/draft`);
 export const discardDraft = (id: string) => request<{deleted: boolean}>(`/jobs/${id}/draft`, {method: 'DELETE'});
 
-export type ExplainItem = {at: number; kind: 'hook' | 'silence' | 'filler' | 'trim' | 'ending' | 'graphic' | 'zoom'; text: string; id?: string};
+export type ExplainItem = {at: number; kind: 'hook' | 'silence' | 'filler' | 'trim' | 'ending' | 'graphic' | 'zoom' | 'spelling' | 'footage' | 'speaker'; text: string; id?: string};
 export type Explanation = {summary: string; items: ExplainItem[]};
 /** Why the first cut (and the current edit) look the way they do. */
 export const explainCut = (id: string) => request<{first_cut: Explanation; current: Explanation}>(`/jobs/${id}/explain`);

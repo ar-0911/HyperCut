@@ -551,6 +551,14 @@
           },
           "title": "Shots",
           "type": "array"
+        },
+        "switches": {
+          "default": [],
+          "items": {
+            "type": "number"
+          },
+          "title": "Switches",
+          "type": "array"
         }
       },
       "title": "Reframe",
@@ -660,6 +668,17 @@
         "name": {
           "default": "bold_creator",
           "title": "Name",
+          "type": "string"
+        },
+        "mode": {
+          "default": "talking_head",
+          "enum": [
+            "talking_head",
+            "podcast",
+            "product_demo",
+            "vlog"
+          ],
+          "title": "Mode",
           "type": "string"
         },
         "caption": {
@@ -957,13 +976,15 @@
       "$ref": "#/$defs/Reframe",
       "default": {
         "keys": [],
-        "shots": []
+        "shots": [],
+        "switches": []
       }
     },
     "style": {
       "$ref": "#/$defs/Style",
       "default": {
         "name": "bold_creator",
+        "mode": "talking_head",
         "caption": {
           "animation": "pop",
           "box": null,

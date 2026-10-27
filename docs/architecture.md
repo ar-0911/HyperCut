@@ -46,9 +46,10 @@ finished plan.
 | 3 | style | `hypercut/style` | prompt text | `Style` | presets + Claude |
 | 4 | analyze | `hypercut/analyze` | transcript + style | `hook`, `segments`, `graphics`, `zooms` | Claude + FFmpeg loudness |
 | 5 | reframe | `hypercut/reframe` | `normalized.mp4` | `Reframe` | MediaPipe face detection |
-| 6 | render | `render/` | `plan.json` + video | `output.mp4` | Remotion (React, TypeScript) |
+| 6 | render | `render/` | `plan.json` + video | `output.mp4`, loudness-normalized to -14 LUFS (ADR 0616) | Remotion (React, TypeScript), FFmpeg loudnorm |
 | 7 | matte (only when asked) | `hypercut/matte` | `normalized.mp4` + reframe | `matte.webm` (speaker cut-out) | MediaPipe selfie segmentation + MODNet + FFmpeg |
 | 8 | generate (only with keys) | `hypercut/generate` | plan with `generate` requests | `gen-*` stock and generated pictures / clips | Pexels, Pixabay, Wikimedia Commons; fal.ai or local diffusers |
+| 9 | look (visual index) | `hypercut/vision` | `normalized.mp4` + reframe shots | `visual_index.json` (shots, frames, what is on screen), name respellings | FFmpeg, Tesseract if installed; Claude or Ollama only when chosen |
 
 The API (`api/`, FastAPI) runs these stages as a job per upload and stores everything under
 `media/<job_id>/`. The web app (`web/`, Next.js) uploads, shows the hook candidates, takes the style
@@ -77,6 +78,24 @@ The assistant has word-accurate operations (remove a pause, tighten a stretch, c
 [ADR 0021](decisions/0021-project-history-autosave-recovery.md) and
 [ADR 0022](decisions/0022-explained-edits-and-word-accurate-ops.md).
 
+## Understanding the footage
+
+Next to the transcript, the "look" stage (`hypercut/vision`) builds a visual index of the source: shots (the face
+tracker's hard cuts or FFmpeg's scene score), one sampled frame per shot (more for long ones, 24 at most), text on
+screen, and, if the user picks one, a description of each frame from a local vision model (Ollama) or Claude. The
+index is evidence about the footage, kept in `visual_index.json` and out of the plan. The analyze prompt reads a line
+per shot; shots that show a screen, a product or other footage are kept clear of drawn visuals; names written in
+the footage fix what speech recognition misheard. Without it, everything works from the transcript alone. See
+[ADR 0024](decisions/0024-visual-index.md).
+
+## Editing modes
+
+What the user is making (talking head, podcast clip, product demo, vlog) is `plan.style.mode`. A mode
+(`hypercut/modes.py`) is a policy over the same engine: a patch of pacing, camera, graphics, caption and cut
+settings applied over the style's preset (what the user asked for still wins), and a paragraph of planner guidance
+on hooks, what to keep and which graphics suit it. It is picked on the upload page or switched later with the
+assistant, which re-cuts the pauses and keeps the rest of the edit. See [ADR 0025](decisions/0025-editing-modes.md).
+
 ## Quality: checks, export validation, benchmark
 
 Plan checks (`hypercut/checks.py`) find what a first watch would: clipped words, leftover pauses, a reel that ends
@@ -91,11 +110,14 @@ run to catch regressions, and with `--jobs` measures how much people correct the
 ## Stage details
 
 **Ingest.** `ingest(input_path, job_dir) -> (Source, normalized_mp4, audio_wav)`. `ffprobe` reads size, rate
-and duration; inputs without video or audio, under 10 seconds or over 3 minutes are rejected with an
-`IngestError` carrying a clear message (ADR 0102). FFmpeg re-encodes to 30 fps constant frame rate H.264/AAC
+and duration; inputs without video, under 10 seconds or over 3 minutes are rejected with an
+`IngestError` carrying a clear message (ADR 0102); a file without sound gets a silent track (ADR 0104). FFmpeg re-encodes to 30 fps constant frame rate H.264/AAC
 (variable frame rate phone footage breaks frame-accurate rendering) and extracts 16 kHz mono audio for
 transcription (ADR 0101). `Source` is probed from the normalized file. Manual run:
 `python -m hypercut.ingest <file> <out_dir>`. Sources taller than 1920 pixels are scaled down to 1920 tall (decision 0103), since the 1080x1920 output never uses more.
+Ingest also writes `manifest.json` (ADR 0104): the original's facts (SHA-256, codecs, rotation, orientation, frame
+rate and whether it varies, HDR, audio tracks), warnings in plain words for what it had to fix, and each stage's
+status, updated by the pipeline. The job page shows the warnings.
 
 **Transcribe.** Returns every word with start and end times. faster-whisper runs locally for free (the
 `small` model handles 3 minutes in about a minute on CPU); Deepgram is the fast paid option, chosen with
@@ -189,7 +211,11 @@ decision 0501. Small faces in wide shots are found by also searching full-height
 cuts are checked on every frame, and in each shot the crop follows the face with the strongest track across
 the shot rather than the biggest face-like thing in each frame (a shirt pattern, hands), with stray points
 dropped by a running median; a shot with no face is centred (decision 0505). The hard cuts are also kept as
-`reframe.shots` (source times), where animated transitions can go (decision 0613).
+`reframe.shots` (source times), where animated transitions can go (decision 0613). In a shot with two or more
+people (a podcast two-shot), the crop goes to whoever is talking: MediaPipe's face landmarker reads how open each
+mouth is, the person whose jaw moves most over a second leads, and after 1.5 s in the lead the crop jumps to them
+like a cut (`reframe.switches`, listed in "Why this cut"). Single-person footage never loads the landmarker
+(decision 0506).
 
 **Matte.** Only when the plan asks for the speaker cut out (`style.depth.enabled` and `style.depth.cutout`: a
 different background or things behind the speaker, decision 0614), `matte(video, source,
@@ -209,7 +235,8 @@ CLI `python -m hypercut.matte normalized.mp4 --plan plan.json`. See decisions 09
 
 **Render.** A Remotion composition (`HyperCut`, props `{plan, videoSrc}`) draws, per output frame: the
 cropped and zoomed source frame, the caption line for the current words (styled and animated by
-`Style.caption`), and any active graphic templates. Output is 1080x1920, 30 fps H.264, with size, fps and
+`Style.caption`; lines break by phrase, never on "the" or "of", never leaving a sentence's last word alone, and
+within the characters that fit at the caption size, decision 0617), and any active graphic templates. Output is 1080x1920, 30 fps H.264, with size, fps and
 length taken from the plan. The video layer is one Remotion sequence per segment; overlays are driven by the
 *source* time of the current frame, so the cold-open hook shows its captions and graphics both times it plays
 and cut material shows nothing. The logic is in pure, unit-tested modules (`timing.ts`, `layout.ts`,
