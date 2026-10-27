@@ -44,6 +44,7 @@ EVENTS: dict[str, dict] = {
     "kit_applied": {},
     "share": {"how": {"share_sheet", "download", "copy_caption"}},
     "download": {},
+    "agent_done": {"reels": NUMBER, "asked": NUMBER},
 }
 # What the web app may send itself; the rest the server records.
 CLIENT_EVENTS = {"suggestion", "view", "share", "download", "assistant_asked"}

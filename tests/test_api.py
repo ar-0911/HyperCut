@@ -555,3 +555,30 @@ def test_several_clips_are_joined_in_order(client, fake_stages, monkeypatch):
     r = client.post("/jobs", files=[("video", ("a.mov", b"1")), ("more", ("b.mp4", b"2")), ("more", ("c.mp4", b"3"))])
     assert _wait(client, r.json()["id"])["status"] == "done"
     assert seen["names"] == ["upload.mov", "upload-2.mp4", "upload-3.mp4"]
+
+
+def test_agent_session_makes_reel_jobs(client, monkeypatch):
+    from hypercut import agent
+
+    def run_agent(video, session, count, job_dir_for, make, on_update, **kw):
+        state = {"status": "running", "step": "plan", "clips": []}
+        on_update(state)
+        clips = []
+        for i in range(1, count + 1):
+            job_dir = job_dir_for(i)
+            make(video, job_dir, "", "cold_open")
+            clips.append({"start": 0, "end": 30, "title": f"Clip {i}", "job_id": job_dir.name, "status": "done"})
+        state.update(status="done", step="done", clips=clips)
+        agent.save(session, state)
+        on_update(state)
+        return state
+
+    monkeypatch.setattr(agent, "run_agent", run_agent)
+    monkeypatch.setattr(run, "run_pipeline", lambda *a, **k: EditPlan(source=SOURCE))
+    r = client.post("/agent", files={"video": ("long talk.mp4", b"bytes")}, data={"count": "2"})
+    assert r.status_code == 202
+    body = client.get(f"/agent/{r.json()['id']}").json()
+    assert body["status"] == "done" and [c["title"] for c in body["clips"]] == ["Clip 1", "Clip 2"]
+    reel = client.get(f"/jobs/{body['clips'][0]['job_id']}").json()
+    assert reel["status"] == "done" and reel["agent"] == r.json()["id"] and reel["filename"] == "long talk – reel 1"
+    assert client.post("/agent", files={"video": ("a.mp4", b"x")}, data={"count": "99"}).status_code == 422

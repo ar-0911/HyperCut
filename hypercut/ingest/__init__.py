@@ -59,16 +59,22 @@ def probe(path: Path, info: dict | None = None) -> dict:
     }
 
 
-def validate_duration(duration: float) -> None:
+LONG_SECONDS = 3600.0  # a long recording the editing agent makes several reels from (ADR 0031)
+
+
+def validate_duration(duration: float, max_seconds: float = MAX_SECONDS) -> None:
     if duration < MIN_SECONDS:
         raise IngestError(f"Video is {duration:.1f}s long; the minimum is {MIN_SECONDS:.0f}s")
-    if duration > MAX_SECONDS:
-        raise IngestError(
-            f"Video is {duration:.0f}s long; the maximum is {MAX_SECONDS:.0f}s (3 minutes). Trim it and try again"
-        )
+    if duration > max_seconds:
+        if max_seconds == MAX_SECONDS:
+            raise IngestError(
+                f"Video is {duration:.0f}s long; the maximum for one reel is {MAX_SECONDS:.0f}s (3 minutes). Trim it, "
+                "or make several reels from it"
+            )
+        raise IngestError(f"Video is {duration / 60:.0f} minutes long; the maximum is {max_seconds / 60:.0f} minutes")
 
 
-def ingest(input_path: str | Path, job_dir: str | Path) -> tuple[Source, Path, Path]:
+def ingest(input_path: str | Path, job_dir: str | Path, max_seconds: float = MAX_SECONDS) -> tuple[Source, Path, Path]:
     """Probe and validate `input_path`, then write normalized.mp4, audio.wav and manifest.json into `job_dir`.
 
     A video without sound gets a silent track (ADR 0104): it still becomes a reel, without captions or speech cuts.
@@ -78,7 +84,7 @@ def ingest(input_path: str | Path, job_dir: str | Path) -> tuple[Source, Path, P
         raise IngestError(f"Input file not found: {input_path}")
     info = _probe_json(input_path)
     meta = probe(input_path, info)
-    validate_duration(meta["duration"])
+    validate_duration(meta["duration"], max_seconds)
 
     job_dir.mkdir(parents=True, exist_ok=True)
     mp4, wav = job_dir / "normalized.mp4", job_dir / "audio.wav"

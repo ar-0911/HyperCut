@@ -22,6 +22,8 @@ export type Job = {
 	plan: EditPlan | null;
 	/** The plan as the pipeline made it (before any edit). */
 	base_plan: EditPlan | null;
+	/** The editing agent's session this reel came from (ADR 0031). */
+	agent?: string | null;
 	assets: Asset[];
 	files: string[];
 	/** Stock and generated pictures: what this machine can fetch and what this video has spent (ADR 0016). */
@@ -295,3 +297,41 @@ export function count(event: string, fields: Record<string, string | number | bo
 		() => undefined,
 	);
 }
+
+/** The editing agent (ADR 0031): several reels from one long recording. */
+export type AgentClip = {
+	start: number;
+	end: number;
+	title: string;
+	why: string;
+	picked_by: 'claude' | 'code';
+	job_id: string | null;
+	status: 'planned' | 'making' | 'done' | 'failed';
+	error: string | null;
+	fixes: string[];
+	issues: string[];
+	reel_seconds: number | null;
+	stage: string | null;
+};
+
+export type AgentSession = {
+	id: string;
+	status: 'queued' | 'running' | 'done' | 'error';
+	step: 'understand' | 'plan' | 'make' | 'done' | null;
+	error: string | null;
+	filename: string | null;
+	count: number;
+	clips: AgentClip[];
+};
+
+export function startAgent(video: File, count: number, style = '', mode = '', kit = '') {
+	const form = new FormData();
+	form.set('video', video);
+	form.set('count', String(count));
+	form.set('style', style);
+	if (mode) form.set('mode', mode);
+	if (kit) form.set('kit', kit);
+	return request<{id: string; status: string}>('/agent', {method: 'POST', body: form});
+}
+
+export const getAgent = (id: string) => request<AgentSession>(`/agent/${id}`);

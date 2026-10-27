@@ -2,7 +2,7 @@
 
 import {useRouter} from 'next/navigation';
 import {useEffect, useState, type FormEvent} from 'react';
-import {clearTelemetry, createJob, deleteRecipe, getTelemetry, setTelemetry, telemetryFileUrl, type Telemetry, openProject, generationSources, kitFileUrl, listKits, listRecipes, type Kit, type Recipe} from '@/lib/api';
+import {clearTelemetry, createJob, startAgent, deleteRecipe, getTelemetry, setTelemetry, telemetryFileUrl, type Telemetry, openProject, generationSources, kitFileUrl, listKits, listRecipes, type Kit, type Recipe} from '@/lib/api';
 import {MODES, type Mode} from '@/lib/modes';
 import {PRESETS} from '@/lib/presets';
 
@@ -10,6 +10,8 @@ export default function UploadPage() {
 	const router = useRouter();
 	const [file, setFile] = useState<File | null>(null);
 	const [more, setMore] = useState<File[]>([]);
+	const [several, setSeveral] = useState(false);
+	const [reels, setReels] = useState(4);
 	const [style, setStyle] = useState('');
 	const [strategy, setStrategy] = useState<'cold_open' | 'trim'>('cold_open');
 	const [busy, setBusy] = useState(false);
@@ -59,6 +61,11 @@ export default function UploadPage() {
 		setBusy(true);
 		setError(null);
 		try {
+			if (several) {
+				const {id} = await startAgent(file, reels, recipe ? '' : style, mode, kit);
+				router.push(`/agent/${id}`);
+				return;
+			}
 			const {id} = await createJob(file, recipe ? '' : style, strategy, recipe, pictures && sources.length > 0, vision, mode, kit, more);
 			router.push(`/jobs/${id}`);
 		} catch (err) {
@@ -94,6 +101,27 @@ export default function UploadPage() {
 				<label htmlFor="video">Video</label>
 				<input id="video" type="file" accept="video/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
 				{file && (
+					<>
+						<label className="check">
+							<input type="checkbox" checked={several} onChange={(e) => setSeveral(e.target.checked)} />
+							It is a long recording: make several reels from it
+						</label>
+						{several && (
+							<p className="hint">
+								Up to an hour.{' '}
+								<select value={reels} onChange={(e) => setReels(Number(e.target.value))} aria-label="How many reels">
+									{[2, 3, 4, 5, 6, 8].map((n) => (
+										<option key={n} value={n}>
+											{n} reels
+										</option>
+									))}
+								</select>{' '}
+								HyperCut picks the moments that work on their own, shows you the plan, then makes and checks each reel.
+							</p>
+						)}
+					</>
+				)}
+				{file && !several && (
 					<>
 						<label htmlFor="more">More clips (optional)</label>
 						<input id="more" type="file" accept="video/*" multiple onChange={(e) => setMore(Array.from(e.target.files ?? []))} />
@@ -239,7 +267,7 @@ export default function UploadPage() {
 
 			<div className="row">
 				<button className="primary" disabled={!file || busy}>
-					{busy ? 'Uploading…' : 'Create short'}
+					{busy ? 'Uploading…' : several ? `Make ${reels} reels` : 'Create short'}
 				</button>
 				{error && <span className="error">{error}</span>}
 			</div>
