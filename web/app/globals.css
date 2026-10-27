@@ -151,3 +151,26 @@ span.chip.active { background: var(--accent); color: #fff; border-color: var(--a
 .finish ul { padding-left: 18px; margin: 8px 0; }
 .review li.high { color: var(--bad); }
 .review button.link { font-size: 0.85rem; color: var(--accent); }
+
+/* Versions, explanations and proposals (ADR 0021). */
+.linkish { background: none; border: 0; padding: 0; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.linkish:hover { text-decoration: underline; }
+.versions input { flex: 1; min-width: 0; }
+.version-list, .why-list { list-style: none; margin: 10px 0 0; padding: 0; max-height: 320px; overflow-y: auto; }
+.version-list li { padding: 8px 0; border-top: 1px solid var(--line); }
+.version-list li.current strong { color: var(--accent, inherit); }
+.version-list .row { gap: 8px; flex-wrap: wrap; }
+.version-list .changes { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 0.85rem; }
+.tag { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.why-list li { padding: 4px 0; font-size: 0.9rem; }
+.proposal { margin-top: 8px; gap: 8px; }
+.banner { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); margin-bottom: 12px; }
+.banner p { margin: 0; flex: 1; min-width: 200px; }
+.notes { margin: 0 0 12px; padding: 8px 14px 8px 30px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--muted); font-size: 13px; }
+.notes li + li { margin-top: 4px; }
+.history-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .history-row { grid-template-columns: 1fr; } }
+.tag.fail { border-color: #d64545; color: #d64545; }
+.tag.warn { border-color: #c98a12; color: #c98a12; }
+.tag.pass { border-color: #2f9e5b; color: #2f9e5b; }
+.quality h3 { margin: 12px 0 4px; font-size: 0.95rem; }

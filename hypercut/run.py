@@ -9,7 +9,9 @@ for green-screen effects], then writes plan.json (and output.mp4 with --render).
 from __future__ import annotations
 
 import argparse
+import functools
 import logging
+import os
 import subprocess
 import sys
 import threading
@@ -17,16 +19,19 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
+from hypercut import audio, history, modes
 from hypercut import plan as plan_mod
 from hypercut.analyze import analyze
 from hypercut.analyze.transitions import plan_transitions
 from hypercut.generate import generate, pending
-from hypercut.ingest import ingest
+from hypercut.ingest import ingest, manifest
 from hypercut.matte import MATTE_FILE, matte, needs_matte, place_titles
 from hypercut.plan import EditPlan, Style
 from hypercut.reframe import reframe
 from hypercut.style import style_from_prompt
 from hypercut.transcribe import transcribe
+from hypercut.vision import build_index, fix_words
+from hypercut.vision import save as save_index
 
 ROOT = Path(__file__).resolve().parent.parent
 RENDER_DIR = ROOT / "render"
@@ -34,6 +39,33 @@ RENDER_DIR = ROOT / "render"
 log = logging.getLogger(__name__)
 
 
+def _tracked(fn):
+    """Record each stage's status in the job's manifest.json (ADR 0104) as the pipeline reports it."""
+    @functools.wraps(fn)
+    def run(video, job_dir, *args, on_stage: Callable[[str], None] | None = None, **kwargs):
+        seen: list[str] = []
+
+        def note(name: str) -> None:
+            if seen:
+                manifest.mark(job_dir, seen[-1], "done")
+            seen.append(name)
+            manifest.mark(job_dir, name, "running")
+            if on_stage:
+                on_stage(name)
+
+        try:
+            plan = fn(video, job_dir, *args, on_stage=note, **kwargs)
+        except BaseException:
+            if seen:
+                manifest.mark(job_dir, seen[-1], "failed")
+            raise
+        if seen:
+            manifest.mark(job_dir, seen[-1], "done")
+        return plan
+    return run
+
+
+@_tracked
 def run_pipeline(
     video: str | Path,
     job_dir: str | Path,
@@ -43,11 +75,16 @@ def run_pipeline(
     visuals: bool = True,
     recipe: Style | None = None,
     pictures: bool = False,
+    vision: str | None = None,
+    mode: str | None = None,
 ) -> EditPlan:
     """Run every stage and save `plan.json` in `job_dir`. `on_stage(name)` is called as each begins.
     A `recipe` (a saved style, ADR 0018) is used as the style as it is, instead of reading the style prompt.
     `pictures` lets some visuals be stock footage or generated pictures / clips (ADR 0020): off by default, and
-    without keys it changes nothing."""
+    without keys it changes nothing. `vision` picks who describes the sampled frames of the visual index
+    (ADR 0024): "none" (local signals only), "ollama" (a local model) or "claude" (sends frames to Claude);
+    default `HYPERCUT_VISION` or "none"; "off" skips the index. `mode` is the editing mode (ADR 0025): podcast,
+    product_demo, vlog or talking_head; what the style prompt or recipe asked for still wins over it."""
     job_dir = Path(job_dir)
     note = on_stage or (lambda _name: None)
 
@@ -59,20 +96,39 @@ def run_pipeline(
     with ThreadPoolExecutor(max_workers=3) as pool:
         track = pool.submit(reframe, str(mp4), source)
         styled = pool.submit(lambda: recipe.model_copy(deep=True)) if recipe is not None else pool.submit(style_from_prompt, style_prompt)
+        # What is on screen (ADR 0024): shots need the face track's cuts, so it starts once those are known.
+        provider = (vision or os.environ.get("HYPERCUT_VISION") or "none").lower()
+        looked = pool.submit(lambda: build_index(mp4, source, track.result(), job_dir, provider)) if provider != "off" else None
         transcript = transcribe(wav)
         reframe_result = track.result()
 
         note("style")
         style = styled.result()
+        if mode:
+            style = modes.apply(style, mode)
         # The speaker is cut out only when the style prompt asked for a different background or things behind
         # them (ADR 0901, 0614): the cut-out is made while Claude plans the edit.
         cutout = None
         if style.depth.enabled and style.depth.cutout:
             cutout = pool.submit(matte, mp4, source, reframe_result, job_dir / MATTE_FILE)
 
+        index = None
+        if looked is not None:
+            note("look")
+            try:
+                index = looked.result()
+            except Exception as e:  # the edit still works from the transcript alone
+                log.warning("visual index failed, planning from the transcript only: %s", e)
+        extra = {}
+        if index is not None and any(s.observations for s in index.shots):
+            # Names spelled on screen fix what speech recognition misheard ("Kachaba" -> "Kachava").
+            index.corrections = fix_words(transcript, index)
+            save_index(index, job_dir / "visual_index.json")
+            extra["visual_index"] = index
+
         note("analyze")
         plan = analyze(transcript, source, style, audio_wav=str(wav), strategy=strategy, visuals=visuals,
-                       pictures=pictures)
+                       pictures=pictures, **extra)
         if cutout is not None:
             note("matte")
             try:
@@ -90,7 +146,8 @@ def run_pipeline(
     if cutout is not None:
         place_titles(plan, job_dir / MATTE_FILE)
     plan = EditPlan.model_validate(plan.model_dump())  # fail here, not in the renderer
-    plan_mod.save(plan, job_dir / "plan.json")
+    # The first cut is version 1 of the project's history (ADR 0021); it also writes plan.json.
+    history.commit(job_dir, plan, "pipeline", changes=[], note="HyperCut's first cut")
     return plan
 
 
@@ -166,6 +223,9 @@ def render_plan(job_dir: str | Path, out_name: str = "output.mp4", render_dir: P
         fetch_new_assets(job_dir)
     except Exception as e:
         log.warning("fetching generated pictures failed, rendering without them: %s", e)
+    # What was drawn or fetched above is kept as a version, so undo doesn't have to draw it again.
+    if (job_dir / history.HISTORY_DIR).is_dir():
+        history.commit(job_dir, plan_mod.load(job_dir / "plan.json"), "render", note="Drawn and fetched for the render")
     out = job_dir / out_name
     cmd = [
         "npm", "run", "render", "--",
@@ -177,6 +237,11 @@ def render_plan(job_dir: str | Path, out_name: str = "output.mp4", render_dir: P
     res = subprocess.run(cmd, cwd=render_dir, capture_output=True, text=True)
     if res.returncode != 0 or not out.is_file():
         raise RuntimeError("render failed: " + (res.stderr or res.stdout).strip()[-2000:])
+    if "--overlays" not in (extra_args or []):  # the overlays-only export has no sound to level
+        try:
+            audio.normalize(out)  # the level platforms play shorts at, without clipping (ADR 0616)
+        except Exception as e:
+            log.warning("loudness normalization failed, keeping the render's own levels: %s", e)
     return out
 
 
@@ -190,6 +255,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-visuals", action="store_true", help="skip per-beat layouts and illustrations")
     ap.add_argument("--pictures", action="store_true",
                     help="let some visuals be stock footage or generated pictures (needs keys, see .env.example)")
+    ap.add_argument("--mode", choices=list(modes.MODES), help="editing mode (default talking_head)")
     args = ap.parse_args(argv)
 
     job_dir = Path(args.out) if args.out else ROOT / "media" / ("cli-" + Path(args.video).stem)
@@ -197,7 +263,7 @@ def main(argv: list[str] | None = None) -> int:
         plan = run_pipeline(
             args.video, job_dir, args.style, args.strategy,
             on_stage=lambda s: print("[" + s + "]", file=sys.stderr),
-            visuals=not args.no_visuals, pictures=args.pictures,
+            visuals=not args.no_visuals, pictures=args.pictures, mode=args.mode,
         )
         print(
             f"{len(plan.transcript.words)} words, {len(plan.hook.candidates)} hooks, "

@@ -182,6 +182,9 @@ class Reframe(_Model):
     keys: list[ReframeKey] = []  # empty: center crop
     # Source times where a new shot starts (hard cuts in the source), for animated transitions (ADR 0613).
     shots: list[float] = []
+    # Source times where, within one shot of two or more people, the crop moves to the person who started
+    # talking (ADR 0506). The keys already jump there; this says why.
+    switches: list[float] = []
 
 
 # Caption fonts the renderer bundles (Google Fonts). Any other name falls back to a system sans-serif.
@@ -295,8 +298,14 @@ class Depth(_Model):
         return self
 
 
+EditingMode = Literal["talking_head", "podcast", "product_demo", "vlog"]
+
+
 class Style(_Model):
     name: str = "bold_creator"
+    # How the reel is edited, as opposed to how it looks (ADR 0025): `hypercut.modes` sets pacing, camera,
+    # graphics and cuts for the mode, and tells the planner what makes a hook and what to keep.
+    mode: EditingMode = "talking_head"
     caption: CaptionStyle = CaptionStyle()
     graphics: GraphicsStyle = GraphicsStyle()
     pacing: Pacing = Pacing()

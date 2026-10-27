@@ -7,18 +7,31 @@ import type {EditPlan} from '@render/plan';
 import {
 	API_URL,
 	askAssistant,
+	checkPlan,
 	deleteAsset,
+	discardDraft,
+	explainCut,
 	fileUrl,
 	generateAssets,
+	getDraft,
+	getHistory,
 	getJob,
+	nameVersion,
 	recutPlan,
 	requestMatte,
 	restorePlan,
+	restoreVersion,
+	saveDraft,
 	savePlan,
 	startRender,
 	uploadAsset,
+	type CheckReport,
+	type Draft,
+	type Explanation,
 	type Generation,
+	type HistoryListing,
 	type Job,
+	type Version,
 } from '@/lib/api';
 import {useHistory} from '@/lib/history';
 import {
@@ -37,7 +50,12 @@ import Bin from './Bin';
 import Finish from './Finish';
 import Inspector from './Inspector';
 import OnScreen from './OnScreen';
+import Quality from './Quality';
 import Timeline from './Timeline';
+import Versions from './Versions';
+import WhyPanel from './WhyPanel';
+
+const AUTOSAVE_MS = 2500;
 
 const PPS_STEPS = [6, 10, 16, 24, 36, 54, 80, 120];
 
@@ -76,21 +94,32 @@ export default function Editor({job}: {job: Job}) {
 	const [fetching, setFetching] = useState(false);
 	// The speaker cut-out behind green-screen effects: made once, when the plan first asks for them.
 	const [matte, setMatte] = useState<Job['matte']>(job.files.includes('matte.webm') ? 'done' : job.matte === 'error' ? 'error' : null);
+	// Saved versions on disk, an autosaved draft found on opening, and why the first cut looks as it does (ADR 0021).
+	const [versions, setVersions] = useState<HistoryListing | null>(null);
+	const [draft, setDraft] = useState<Draft | null>(null);
+	const [autosaved, setAutosaved] = useState<number | null>(null);
+	const [why, setWhy] = useState<Explanation | null>(null);
+	// An assistant edit waiting to be kept or rejected; the preview shows it (or the edit before it).
+	const [proposal, setProposal] = useState<{before: EditPlan; after: EditPlan; instruction: string; showing: 'after' | 'before'} | null>(null);
+	const shown = proposal ? proposal[proposal.showing] : plan;
+	// Automatic checks of the edit as it is now, and the validation of the last render (ADR 0023).
+	const [report, setReport] = useState<CheckReport | null>(null);
+	const [qa, setQa] = useState<Job['qa']>(job.qa);
 	const wantsMatte = Boolean(plan.style.depth?.enabled && plan.style.depth?.cutout);
 	const playerRef = useRef<PlayerRef>(null);
 	const latest = useRef(plan);
 	latest.current = plan;
 	const dirty = plan !== saved;
 
-	const meta = useMemo(() => calculateMetadata({props: {plan, videoSrc: ''}}), [plan]);
+	const meta = useMemo(() => calculateMetadata({props: {plan: shown, videoSrc: ''}}), [shown]);
 	const inputProps = useMemo(
 		() => ({
-			plan,
+			plan: shown,
 			videoSrc: fileUrl(job.id, 'normalized.mp4'),
 			assetBase: `${API_URL}/jobs/${job.id}/files/`,
 			matteSrc: matte === 'done' ? fileUrl(job.id, 'matte.webm') : undefined,
 		}),
-		[plan, job.id, matte],
+		[shown, job.id, matte],
 	);
 	const items = useMemo(() => buildItems(plan), [plan]);
 	const duration = useMemo(() => reelDuration(plan), [plan]);
@@ -118,12 +147,34 @@ export default function Editor({job}: {job: Job}) {
 				const next = await getJob(job.id);
 				setRender(next.render);
 				setRenderError(next.render_error);
+				setQa(next.qa);
 			} catch (e) {
 				setError((e as Error).message);
 			}
 		}, 2000);
 		return () => clearInterval(timer);
 	}, [render, job.id]);
+
+	// The file is checked right after the render finishes; poll until that is done too.
+	useEffect(() => {
+		if (qa !== 'running' || render === 'running') return;
+		const timer = setInterval(async () => {
+			try {
+				setQa((await getJob(job.id)).qa);
+			} catch {
+				// keep polling
+			}
+		}, 2000);
+		return () => clearInterval(timer);
+	}, [qa, render, job.id]);
+
+	// Re-check the edit shortly after each change (cheap: no AI, no rendering).
+	useEffect(() => {
+		const timer = setTimeout(() => {
+			checkPlan(job.id, plan).then(setReport, () => setReport(null));
+		}, 800);
+		return () => clearTimeout(timer);
+	}, [plan, job.id]);
 
 	// Green-screen effects turned on (style prompt, AI box): make the cut-out, then poll until it is there.
 	useEffect(() => {
@@ -152,6 +203,26 @@ export default function Editor({job}: {job: Job}) {
 		}, 3000);
 		return () => clearInterval(timer);
 	}, [matte, job.id]);
+
+	const refreshVersions = useCallback(() => {
+		getHistory(job.id).then(setVersions, () => setVersions(null));
+	}, [job.id]);
+
+	// On opening: the versions, why the first cut is as it is, and edits autosaved but never saved (a closed tab, a crash).
+	useEffect(() => {
+		refreshVersions();
+		explainCut(job.id).then((r) => setWhy(r.first_cut), () => setWhy(null));
+		getDraft(job.id).then((r) => setDraft(r.draft), () => setDraft(null));
+	}, [job.id, refreshVersions]);
+
+	// Autosave: unsaved edits are written as a draft a moment after each change.
+	useEffect(() => {
+		if (!dirty) return;
+		const timer = setTimeout(() => {
+			saveDraft(job.id, plan).then((r) => setAutosaved(r.saved), () => undefined);
+		}, AUTOSAVE_MS);
+		return () => clearTimeout(timer);
+	}, [plan, dirty, job.id]);
 
 	// Don't lose edits by closing the tab.
 	useEffect(() => {
@@ -205,22 +276,24 @@ export default function Editor({job}: {job: Job}) {
 
 	const split = () => change(splitAt(plan, playhead()));
 
-	const save = () =>
-		run(async () => {
-			await savePlan(job.id, plan);
-			setSaved(plan);
-			if (!base) setBase(plan);
-		});
+	/** Save `p` as a version (kind and note say who made it and why), then show it in the versions list. */
+	async function commit(p: EditPlan, opts: Parameters<typeof savePlan>[2] = {}) {
+		await savePlan(job.id, p, opts);
+		setSaved(p);
+		if (!base) setBase(p);
+		setDraft(null);
+		refreshVersions();
+	}
+
+	const save = () => run(() => commit(plan));
 
 	const renderNow = () =>
 		run(async () => {
-			if (dirty) {
-				await savePlan(job.id, plan);
-				setSaved(plan);
-			}
+			if (dirty) await commit(plan);
 			await startRender(job.id);
 			setRender('running');
 			setRenderError(null);
+			setQa(null);
 		});
 
 	const restore = () => {
@@ -230,8 +303,34 @@ export default function Editor({job}: {job: Job}) {
 			change(original);
 			setSaved(original);
 			setSelected(null);
+			refreshVersions();
 		});
 	};
+
+	const goBackTo = (v: Version) => {
+		if (dirty && !window.confirm('Your unsaved edits will be replaced by this version (they stay in Undo). Go back?')) return;
+		run(async () => {
+			const res = await restoreVersion(job.id, v.id);
+			change(res.plan);
+			setSaved(res.plan);
+			setSelected(null);
+			refreshVersions();
+		});
+	};
+
+	const nameIt = (v: Version, label: string | null) => run(async () => {
+		await nameVersion(job.id, v.id, label);
+		refreshVersions();
+	});
+
+	const saveNamed = (label: string) =>
+		run(async () => {
+			if (dirty) await commit(plan, {label});
+			else if (versions?.head != null) {
+				await nameVersion(job.id, versions.head, label);
+				refreshVersions();
+			}
+		});
 
 	async function upload(files: File[]) {
 		setError(null);
@@ -275,16 +374,23 @@ export default function Editor({job}: {job: Job}) {
 		}
 	}
 
+	/** The assistant proposes; the preview shows the result until it is kept (saved as a version) or rejected. */
 	async function ask(instruction: string) {
 		const res = await askAssistant(job.id, {instruction, plan, playhead: playhead(), selected: assistantKey(selected)});
-		if (JSON.stringify(res.plan) !== JSON.stringify(plan)) {
-			change(res.plan);
-			setSelected(null);
-			// Footage or pictures the assistant added are fetched right away, so the preview shows them.
-			if (pendingAssets(res.plan).some((g) => g.type === 'media')) void fetchPictures(res.plan);
-		}
+		setProposal(JSON.stringify(res.plan) !== JSON.stringify(plan) ? {before: plan, after: res.plan, instruction, showing: 'after'} : null);
 		return res;
 	}
+
+	const acceptProposal = () => {
+		if (!proposal) return;
+		const {after, instruction} = proposal;
+		setProposal(null);
+		change(after);
+		setSelected(null);
+		run(() => commit(after, {kind: 'assistant', note: instruction}));
+		// Footage or pictures the assistant added are fetched right away, so the preview shows them.
+		if (pendingAssets(after).some((g) => g.type === 'media')) void fetchPictures(after);
+	};
 
 	// Keyboard shortcuts, ignored while typing in a field.
 	useEffect(() => {
@@ -329,6 +435,32 @@ export default function Editor({job}: {job: Job}) {
 
 	return (
 		<div className="editor-page">
+			{draft && (
+				<div className="banner">
+					<p>
+						You have edits from {new Date(draft.saved * 1000).toLocaleString()} that were never saved
+						{draft.changes.length ? `: ${draft.changes.slice(0, 3).join('; ')}${draft.changes.length > 3 ? '…' : ''}` : ''}.
+					</p>
+					<button
+						className="primary"
+						onClick={() => {
+							change(draft.plan);
+							setDraft(null);
+						}}
+					>
+						Recover them
+					</button>
+					<button
+						onClick={() => {
+							setDraft(null);
+							void discardDraft(job.id);
+						}}
+					>
+						Discard
+					</button>
+				</div>
+			)}
+			{proposal && <p className="hint">The preview shows the AI’s proposed edit ({proposal.showing}). Keep or reject it in the AI box.</p>}
 			<div className="editor-top">
 				<Bin
 					jobId={job.id}
@@ -374,7 +506,18 @@ export default function Editor({job}: {job: Job}) {
 						onSplit={split}
 						onRegenerate={generation?.available.length ? (id, prompt) => void fetchPictures(plan, id, prompt) : undefined}
 					/>
-					<Assistant onAsk={ask} disabled={busy} />
+					<Assistant
+						onAsk={ask}
+						disabled={busy}
+						proposal={
+							proposal && {
+								showing: proposal.showing,
+								onAccept: acceptProposal,
+								onReject: () => setProposal(null),
+								onToggle: () => setProposal({...proposal, showing: proposal.showing === 'after' ? 'before' : 'after'}),
+							}
+						}
+					/>
 				</div>
 			</div>
 
@@ -420,8 +563,9 @@ export default function Editor({job}: {job: Job}) {
 							${generation.spent.toFixed(2)} of ${generation.budget.toFixed(2)}
 						</span>
 					) : null}
-					<button disabled={!dirty || busy} onClick={save}>
-						{dirty ? 'Save' : 'Saved'}
+					{dirty && autosaved && <span className="hint" title="Unsaved edits are kept on disk; reopening offers them back">Draft kept {new Date(autosaved * 1000).toLocaleTimeString()}</span>}
+					<button disabled={!dirty || busy} onClick={save} title="Save as a new version (⌘/Ctrl+S)">
+						{dirty ? 'Save version' : 'Saved'}
 					</button>
 					<button className="primary" disabled={busy || render === 'running'} onClick={renderNow}>
 						{render === 'running' ? 'Rendering…' : 'Render video'}
@@ -468,11 +612,14 @@ export default function Editor({job}: {job: Job}) {
 					setSelected(null);
 				}}
 				onSeek={(t) => playerRef.current?.seekTo(Math.round(t * plan.output.fps))}
-				onSave={async () => {
-					await savePlan(job.id, plan);
-					setSaved(plan);
-				}}
+				onSave={() => commit(plan)}
 			/>
+
+			<div className="history-row">
+				<Quality report={report} qa={render === 'done' ? qa : null} onSeek={(t) => playerRef.current?.seekTo(Math.round(t * plan.output.fps))} />
+				<WhyPanel why={why} onSeek={(t) => playerRef.current?.seekTo(Math.round(t * plan.output.fps))} />
+				<Versions history={versions} dirty={dirty} onRestore={goBackTo} onName={nameIt} onSaveNamed={saveNamed} />
+			</div>
 		</div>
 	);
 }

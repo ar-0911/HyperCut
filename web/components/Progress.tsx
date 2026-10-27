@@ -12,7 +12,7 @@ export default function Progress({job}: {job: Job}) {
 				return (
 					<li key={stage} className={cls}>
 						{cls === 'done' ? '✓ ' : ''}
-						{stage === 'matte' ? 'cut out speaker' : stage === 'generate' ? 'fetch pictures' : stage}
+						{stage === 'matte' ? 'cut out speaker' : stage === 'generate' ? 'fetch pictures' : stage === 'look' ? 'look at the footage' : stage}
 					</li>
 				);
 			})}

@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from hypercut import run
 from hypercut.ingest import IngestError
+from hypercut.vision import VisualIndex
 from hypercut.plan import EditPlan, Hook, HookCandidate, Reframe, ReframeKey, Source, Transcript, Word
 
 SOURCE = Source(path="n.mp4", width=1920, height=1080, fps=30, duration=20)
@@ -42,6 +43,7 @@ def fake_stages(monkeypatch):
     monkeypatch.setattr(run, "reframe", lambda mp4, source: Reframe(keys=[ReframeKey(t=0, cx=0.4, cy=0.5)]))
     monkeypatch.setattr(run, "style_from_prompt", _style)
     monkeypatch.setattr(run, "analyze", analyze)
+    monkeypatch.setattr(run, "build_index", lambda *a: VisualIndex(duration=SOURCE.duration))
     return calls
 
 
@@ -361,3 +363,96 @@ def test_pictures_are_off_unless_asked(client, fake_stages, monkeypatch):
     assert fake_stages["pictures"] is False
     _wait(client, _submit(client, pictures="true"))
     assert fake_stages["pictures"] is True
+
+
+def test_history_undo_redo_name_and_restore(client, fake_stages):
+    job_id = _done_job(client, fake_stages)
+    h = client.get(f"/jobs/{job_id}/history").json()
+    assert h["head"] == 1 and h["versions"][0]["kind"] == "pipeline" and not h["can_undo"]
+
+    plan = client.get(f"/jobs/{job_id}").json()["plan"]
+    plan["zooms"] = [{"start": 1, "end": 2}]
+    client.put(f"/jobs/{job_id}/plan", json=plan, params={"kind": "assistant", "note": "zoom in at 1s"})
+    h = client.get(f"/jobs/{job_id}/history").json()
+    assert h["head"] == 2 and h["versions"][0]["note"] == "zoom in at 1s"
+    assert h["versions"][0]["changes"] == ["Added a zoom at 0:01.0-0:02.0"]
+
+    r = client.post(f"/jobs/{job_id}/history/undo").json()
+    assert r["plan"]["zooms"] == [] and r["can_redo"] and client.get(f"/jobs/{job_id}").json()["plan"]["zooms"] == []
+    assert client.post(f"/jobs/{job_id}/history/undo").status_code == 409
+    assert client.post(f"/jobs/{job_id}/history/redo").json()["plan"]["zooms"] != []
+
+    assert client.patch(f"/jobs/{job_id}/history/1", json={"label": "First cut"}).json()["label"] == "First cut"
+    v = client.get(f"/jobs/{job_id}/history/1").json()
+    assert v["changes_from_current"] == ["Removed a zoom at 0:01.0-0:02.0"]
+    r = client.post(f"/jobs/{job_id}/history/1/restore").json()
+    assert r["version"]["id"] == 3 and r["plan"]["zooms"] == []
+    assert client.post(f"/jobs/{job_id}/history/9/restore").status_code == 404
+
+
+def test_draft_autosave_and_explain(client, fake_stages):
+    job_id = _done_job(client, fake_stages)
+    plan = client.get(f"/jobs/{job_id}").json()["plan"]
+    assert client.get(f"/jobs/{job_id}/draft").json() == {"draft": None}
+    plan["style"]["caption"]["font"] = "Inter"
+    assert client.put(f"/jobs/{job_id}/draft", json=plan).json()["base"] == 1
+    d = client.get(f"/jobs/{job_id}/draft").json()["draft"]
+    assert d["changes"] == ["Caption font: Montserrat → Inter"]
+    client.delete(f"/jobs/{job_id}/draft")
+    assert client.get(f"/jobs/{job_id}/draft").json() == {"draft": None}
+    e = client.get(f"/jobs/{job_id}/explain").json()
+    assert "summary" in e["first_cut"] and isinstance(e["current"]["items"], list)
+
+
+def test_interrupted_work_is_marked_and_can_be_retried(client, fake_stages, monkeypatch):
+    from api import jobs, main
+
+    job_id = _done_job(client, fake_stages)
+    jobs.write(job_id, status="running", stage="analyze", render="running")
+    main.recover_interrupted()
+    body = client.get(f"/jobs/{job_id}").json()
+    assert body["status"] == "error" and body["interrupted"] and body["render"] == "error"
+    assert "stopped" in body["render_error"]
+    assert client.post(f"/jobs/{job_id}/retry").status_code == 202
+    assert _wait(client, job_id)["status"] == "done"
+    assert client.post(f"/jobs/{job_id}/retry").status_code == 409
+
+
+def test_render_is_validated_and_plans_can_be_checked(client, fake_stages, monkeypatch):
+    def render(job_dir):
+        (Path(job_dir) / "output.mp4").write_bytes(b"not a video")
+        return Path(job_dir) / "output.mp4"
+
+    monkeypatch.setattr(run, "render_plan", render)
+    job_id = _done_job(client, fake_stages)
+    client.post(f"/jobs/{job_id}/render")
+    for _ in range(100):
+        body = client.get(f"/jobs/{job_id}").json()
+        if isinstance(body.get("qa"), dict):
+            break
+        time.sleep(0.02)
+    assert body["render"] == "done" and body["qa"]["ok"] is False  # the file does not open as a video
+    assert "output.qa.json" in body["files"]
+
+    plan = body["plan"]
+    report = client.post(f"/jobs/{job_id}/checks", json=plan).json()
+    assert report["ok"] and [i["code"] for i in report["issues"]] == ["ends_mid_sentence"]
+
+
+def test_modes_listed_and_picked_at_upload(client, fake_stages):
+    listed = client.get("/modes").json()
+    assert listed["default"] == "talking_head" and {m["name"] for m in listed["modes"]} >= {"podcast", "vlog"}
+    body = _wait(client, _submit(client, mode="product_demo"))
+    assert body["mode"] == "product_demo" and body["plan"]["style"]["mode"] == "product_demo"
+    assert client.post("/jobs", files={"video": ("c.mp4", b"x")}, data={"mode": "nope"}).status_code == 422
+
+
+def test_job_shows_what_ingest_found(client, fake_stages):
+    from api import jobs
+    from hypercut.ingest import manifest
+
+    job_id = _submit(client)
+    _wait(client, job_id)
+    assert client.get(f"/jobs/{job_id}").json()["manifest"] is None  # the fake ingest wrote none
+    manifest.save(jobs.job_dir(job_id), {"video": {"orientation": "portrait"}, "warnings": ["The video is HDR"]})
+    assert client.get(f"/jobs/{job_id}").json()["manifest"]["warnings"] == ["The video is HDR"]

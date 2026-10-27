@@ -4,7 +4,7 @@
 // The plan stores source seconds; the reel is what you watch. `buildTimeline` from the renderer maps
 // between them, so the editor and the final render can never disagree about where something is.
 
-import {groupWords} from '@render/captions';
+import {groupWords, lineChars} from '@render/captions';
 import {isAroundType, isStageType, isVisualType} from '@render/layout';
 import type {EditPlan, Graphic, GraphicType, LayoutMode, Segment} from '@render/plan';
 import {buildTimeline, frameToSource, sourceToFrames, type Timeline} from '@render/timing';
@@ -158,7 +158,7 @@ export function buildItems(plan: EditPlan): Item[] {
 	});
 	// Caption lines as the viewer sees them: words grouped the way the renderer groups them.
 	const indexed = plan.transcript.words.map((w, i) => ({...w, speaker: String(i)}));
-	for (const group of groupWords(indexed, plan.style.caption.words_per_line)) {
+	for (const group of groupWords(indexed, plan.style.caption.words_per_line, lineChars(plan.style.caption.size, plan.style.caption.uppercase))) {
 		const first = Number(group.words[0].speaker);
 		const last = Number(group.words[group.words.length - 1].speaker);
 		push({kind: 'caption', first, last}, 'captions', group.words.map((w) => w.text).join(' '), group.start, group.end, false, 'caption');

@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from hypercut import edit, llm
+from hypercut import diff, edit, llm, modes
 from hypercut import plan as plan_mod
 from hypercut.analyze import cuts as cutting
 from hypercut.analyze import motion, stage, visuals
@@ -36,6 +36,7 @@ BACKGROUND_KINDS = ("original", "blur", "dim", "color", "gradient", "media")
 CUT_KINDS = ("drop", "whip", "zoom", "push")
 MAX_OPS = 20
 MAX_ADD_SECONDS = 8.0
+EPS = 1e-6
 
 SYSTEM = (
     "You are the assistant inside a short-form video editor. You turn the user's request into edit "
@@ -75,6 +76,11 @@ Operations you can use (times in reel seconds; keep the reel's own length in min
 - {{"op": "delete", "keys": ["g1", "z0", "l2"]}}  remove graphics, zooms or layout spans by key
 - {{"op": "remove_captions", "start": s, "end": e}}  hide the subtitles in that stretch
 - {{"op": "cut", "start": s, "end": e}}  remove that stretch of video from the reel
+- {{"op": "cut_words", "start": s, "end": e}}  remove exactly the spoken words in that stretch (a sentence, a \
+false start, a repeated take), cutting between words so none is clipped. Prefer this over "cut" for speech
+- {{"op": "remove_pause", "at": s, "side": "before" | "after" | "nearest"}}  shrink the [pause] just before what \
+starts at s, just after what ends at s, or the nearest one, to the natural pause kept at cuts
+- {{"op": "tighten", "start": s, "end": e}}  shrink every [pause] in that stretch
 - {{"op": "add_illustration", "start": s, "end": e, "title": "2-4 words", "brief": "what to draw: subject, \
 composition, palette", "layout": "split" | "visual"}}  a new drawn illustration; split keeps the speaker \
 and subtitles below it, visual makes it full screen
@@ -99,6 +105,7 @@ speed up the whole reel; keep_pause is how much pause stays around each cut (re-
 - {{"op": "motion", "start": s, "end": e, "title": "1-4 words", "idea": "the one 3D object or moment to show"}}  a 2-3 s full-screen 3D motion graphic of what is said there (the speaker keeps talking)
 - {{"op": "cut_transition", "at": s, "kind": "drop" | "whip" | "zoom" | "push" | "none"}}  an animated transition at a cut or shot change: drop = the old shot falls off screen, whip = a fast blurred pan, zoom = pushing through, push = slides up; "none" removes the one there. Use sparingly
 - {{"op": "depth", "enabled": false}}  turn all green-screen effects off
+- {{"op": "mode", "mode": "talking_head" | "podcast" | "product_demo" | "vlog"}}  edit the reel as another kind of video (pacing, zooms, captions, cuts; re-cuts the pauses): only when the user asks for that kind of edit
 {pictures}- {{"op": "transitions", "style": "editorial" | "hard" | "smooth" | "zoom", "fade_out": seconds}}  editorial (J-cuts, \
 punch-ins across jump cuts, a settle on new shots), hard cuts, short crossfades, or alternating punch-ins at cuts; fade to black at the end
 
@@ -123,6 +130,8 @@ class AssistResult:
     plan: EditPlan
     message: str
     changes: list[str] = field(default_factory=list)
+    # What the edit did, in words, worked out from the plans themselves (`hypercut.diff`).
+    explanation: list[str] = field(default_factory=list)
 
 
 def pictures_prompt(sources: set[str]) -> str:
@@ -151,14 +160,14 @@ def summarize(plan: EditPlan, assets: list[dict]) -> dict[str, str]:
     layout = [f"l{i}: {s.mode}, {_fmt(edit.first_reel(plan, s.start, s.end))}" for i, s in enumerate(plan.layout)]
     zooms = [f"z{i}: x{z.scale}, {_fmt(edit.first_reel(plan, z.start, z.end))}" for i, z in enumerate(plan.zooms)]
     cuts = [f"{c.kind} at {hits[0]:.1f}" for c in plan.cuts if (hits := edit.to_reel(plan, c.at))]
-    lines, line, line_t = [], [], None
-    for w in plan.transcript.words:
-        hits = edit.to_reel(plan, (w.start + w.end) / 2)
-        if not hits:
-            continue
-        for t in hits:
-            lines.append((t, w.text))
-    lines.sort()
+    line, line_t = [], None
+    # Pauses are marked so a request like "remove the pause before the second answer" can be placed.
+    lines, prev = [], None
+    for w in edit.reel_words(plan):
+        if prev is not None and prev.piece == w.piece and w.start - prev.end > edit.PAUSE_MIN:
+            lines.append((prev.end, f"[pause {w.start - prev.end:.1f}s]"))
+        lines.append((w.start, w.text))
+        prev = w
     captions = []
     for t, text in lines:
         if line_t is None or len(line) >= 8 or t - line_t > 3:
@@ -250,6 +259,29 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
             r = _reel_span(op, duration, playhead)
             if r:
                 cuts.append(r)
+        elif kind == "cut_words":
+            r = _reel_span(op, duration, playhead)
+            span = edit.word_cut(plan, *r) if r else None
+            if span:
+                cuts.append(span)
+            else:
+                changes.append("Skipped a cut: no words there")
+        elif kind == "remove_pause":
+            at = _num(op.get("at"))
+            side = op.get("side") if op.get("side") in ("before", "after", "nearest") else "nearest"
+            gap = edit.pause_near(plan, playhead if at is None else at, side)
+            span = edit.pause_cut(plan, gap) if gap else None
+            if span:
+                cuts.append(span)
+            else:
+                changes.append("Skipped: no pause long enough to remove there")
+        elif kind == "tighten":
+            r = _reel_span(op, duration, playhead, default_len=duration)
+            found = [s for g in edit.pauses(plan) if r and g[0] >= r[0] - EPS and g[1] <= r[1] + EPS
+                     and (s := edit.pause_cut(plan, g))]
+            cuts += found
+            if not found:
+                changes.append("Skipped: no pauses to tighten there")
         elif kind == "add_illustration":
             span = span_of(op, 4.0, MAX_ADD_SECONDS)
             if span and str(op.get("brief") or op.get("title") or "").strip():
@@ -317,6 +349,11 @@ def apply_ops(plan: EditPlan, ops: list, playhead: float, assets: list[dict], dr
             if pause is not None and abs(pause - plan.style.pacing.keep_pause) > 1e-6:
                 plan.style.pacing.keep_pause = min(1.0, max(0.0, pause))
                 recut = True
+        elif kind == "mode" and op.get("mode") in modes.MODES and op["mode"] != plan.style.mode:
+            before = plan.style.pacing.model_copy()
+            plan.style = modes.apply(plan.style, op["mode"])
+            changes.append(f"Edited as {diff.article(modes.get(op['mode']).label.lower())}")
+            recut = recut or plan.style.pacing != before
         elif kind == "behind_text" and str(op.get("text") or "").strip():
             span = span_of(op, 2.5, MAX_ADD_SECONDS)
             if span:
@@ -470,7 +507,7 @@ def assist(plan: EditPlan, instruction: str, playhead: float = 0.0, assets: list
     ops = raw.get("ops") if isinstance(raw.get("ops"), list) else []
     new_plan, changes = apply_ops(plan, ops, playhead, assets, audio_wav=audio_wav, sources=sources)
     message = str(raw.get("message") or "")[:300] or ("Done." if changes else "I couldn't make that change.")
-    return AssistResult(new_plan, message, changes)
+    return AssistResult(new_plan, message, changes, diff.explain(plan, new_plan))
 
 
 def main(argv: list[str] | None = None) -> int:
