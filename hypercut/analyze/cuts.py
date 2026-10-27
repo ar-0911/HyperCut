@@ -45,11 +45,18 @@ def cut_ranges(
     remove_fillers: bool = True,
     silences: list[Range] | None = None,
     keep_pause: float = 0.08,
+    remove_retakes: bool = False,
 ) -> list[Range]:
     """Ranges of source time to remove, sorted and merged."""
     pad = keep_pause  # breathing room kept around speech
     words = sorted(transcript.words, key=lambda w: w.start)
     cuts: list[Range] = []
+
+    if remove_retakes:
+        from hypercut.analyze.takes import retakes
+
+        # From the earlier take's first word to just before the kept one starts.
+        cuts += [(max(0.0, r.start - pad), max(r.start, r.end - pad)) for r in retakes(transcript)]
 
     if remove_fillers:
         cuts += [(w.start, w.end) for w in words if is_filler(w.text)]
@@ -168,7 +175,7 @@ def recut(plan, audio_wav: str | None = None):
     old_end = body[-1].end if body else plan.source.duration
     silences = detect_silences(audio_wav, pacing.max_silence) if audio_wav else []
     cuts = cut_ranges(plan.transcript, plan.source.duration, pacing.max_silence, pacing.remove_fillers, silences,
-                      keep_pause=pacing.keep_pause)
+                      keep_pause=pacing.keep_pause, remove_retakes=pacing.remove_retakes)
     hook = plan.hook.candidates[plan.hook.chosen] if plan.hook.candidates else None
     segments = build_segments(plan.source.duration, cuts, (hook.start, hook.end) if hook else None, plan.hook.strategy)
     # Keep the ending: nothing after where the reel stopped, plus the new pause after that last word.

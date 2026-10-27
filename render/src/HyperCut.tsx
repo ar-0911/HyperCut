@@ -2,6 +2,7 @@ import React, {useMemo} from 'react';
 import {AbsoluteFill, Freeze, Img, OffthreadVideo, Sequence, staticFile, useCurrentFrame} from 'remotion';
 import {AroundLayer} from './Around';
 import {StudioBackdrop} from './Backdrop';
+import {BrandLayer} from './Brand';
 import {captionFamily} from './fonts';
 import {MotionGraphic, type SceneSpec} from './Motion';
 import {Captions} from './Captions';
@@ -471,6 +472,7 @@ export const HyperCut: React.FC<CompositionProps> = ({plan: rawPlan, videoSrc, a
 				</AbsoluteFill>
 			) : null}
 			<Fades plan={plan} total={tl.durationInFrames} />
+			<BrandLayer plan={plan} tl={tl} media={(name) => mediaSrc(name, assetBase)} />
 		</AbsoluteFill>
 	);
 };

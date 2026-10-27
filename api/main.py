@@ -6,6 +6,7 @@ import os
 from contextlib import asynccontextmanager
 import shutil
 import threading
+import time
 import uuid
 from pathlib import Path
 from typing import Literal
@@ -13,13 +14,14 @@ from typing import Literal
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 from pydantic import BaseModel, Field
 
-from api import assets, jobs, recipes
+from api import assets, jobs, kits, recipes
 from hypercut import plan as plan_mod
-from hypercut import assistant, checks, diff, edit, explain, export, generate, history, llm, modes, qa, review, run, variants, vision
+from hypercut import agent, assistant, checks, diff, edit, explain, export, generate, brand, history, llm, modes, project, qa, review, run, suggest, telemetry, variants, vision
 from hypercut.analyze import cuts as cutting
-from hypercut.ingest import manifest
+from hypercut.ingest import PROXY_FILE, IngestError, make_proxy, manifest
 from hypercut.matte import MATTE_FILE
 from hypercut.plan import EditPlan, Style
 
@@ -85,53 +87,103 @@ def _base_path(job_id: str) -> Path:
 
 
 def _editable(job_id: str) -> dict:
+    # Editing goes on during a render: the render works from a snapshot of the plan (ADR 0028).
     state = _job(job_id)
     if state["status"] != "done":
         raise HTTPException(409, f"job is {state['status']}; the plan can be edited once it is done")
-    if state.get("render") == "running":
-        raise HTTPException(409, "a render is running; wait for it to finish")
     return state
 
 
 def _media_names(plan: EditPlan) -> set[str]:
     names = {str(g.props["src"]) for g in plan.graphics if g.type in ("media", "motion") and g.props.get("src")}
+    names |= {f for f in (plan.brand.logo, plan.brand.music, plan.brand.font) if f}
     return names | {b.src for b in plan.backgrounds if b.kind == "media" and b.src}
 
 
 def _known_media(job_id: str, state: dict) -> set[str]:
     """Files a plan may show: the user's imports and the stock / generated files fetched for this job."""
     generated = {p.name for p in jobs.job_dir(job_id).glob("gen-*") if p.suffix in (".jpg", ".jpeg", ".png", ".webp", ".mp4")}
-    return {a["name"] for a in state.get("assets", [])} | generated
+    branded = {p.name for p in jobs.job_dir(job_id).glob("brand-*")}  # a brand kit's files (ADR 0026)
+    return {a["name"] for a in state.get("assets", [])} | generated | branded
 
 
-def _process(job_id: str, video: Path, style: str, strategy: str, recipe: Style | None = None,
-             pictures: bool = False, vision_provider: str | None = None, mode: str | None = None) -> None:
+MAX_CLIPS = 10
+
+
+def _process(job_id: str, video: Path | list[Path], style: str, strategy: str, recipe: Style | None = None,
+             pictures: bool = False, vision_provider: str | None = None, mode: str | None = None,
+             kit: str | None = None) -> None:
     try:
         jobs.write(job_id, status="running", stage="ingest")
         run.run_pipeline(
             video, jobs.job_dir(job_id), style, strategy,
             on_stage=lambda s: jobs.write(job_id, stage=s), recipe=recipe, pictures=pictures,
-            vision=vision_provider, mode=mode,
+            vision=vision_provider, mode=mode, kit=kits.kit_dir(kit) if kit else None,
         )
-        jobs.write(job_id, status="done", stage="done", error=None)
+        state = jobs.write(job_id, status="done", stage="done", error=None)
+        _count("job_done", seconds=time.time() - state.get("created", time.time()),
+               reel_seconds=edit.reel_duration(plan_mod.load(_plan_path(job_id))))
     except Exception as e:
-        jobs.write(job_id, status="error", error=str(e))
+        state = jobs.write(job_id, status="error", error=str(e))
+        _count("job_failed", stage=state.get("stage") or "unknown")
+
+
+def _count(event: str, **fields) -> None:
+    """Record a usage count when the person turned them on (ADR 0030); never footage, text or names."""
+    telemetry.record(jobs.media_root(), event, **fields)
 
 
 def _render(job_id: str) -> None:
+    # The version being rendered, so the editor can say when the download is older than the edit.
+    head = history.listing(jobs.job_dir(job_id))["head"]
+    jobs.write(job_id, render_version=None, rendering_version=head)
+    started = time.time()
     with _render_slot:
         try:
-            run.render_plan(jobs.job_dir(job_id))
-            jobs.write(job_id, render="done", qa="running")
+            directory = jobs.job_dir(job_id)
+            run.render_plan(directory)
+            # Unedited meanwhile: the render is of the current version (with what the render drew in).
+            snapshot = directory / run.RENDER_PLAN
+            if not snapshot.is_file() or plan_mod.load(directory / "plan.json") == plan_mod.load(snapshot):
+                head = history.listing(directory)["head"]
+            jobs.write(job_id, render="done", qa="running", render_version=head)
+            _count("render_done", seconds=time.time() - started)
         except Exception as e:
             jobs.write(job_id, render="error", render_error=str(e))
+            _count("render_failed")
             return
     # A render that exited cleanly is not yet a good file: inspect it (ADR 0023).
     try:
         result = qa.validate_job(jobs.job_dir(job_id))
         jobs.write(job_id, qa=result)
+        _count("qa", ok=bool(result.get("ok")), failures=len([c for c in result.get("checks", []) if c.get("status") == "fail"]))
     except Exception as e:
         jobs.write(job_id, qa={"ok": None, "error": str(e)[:300]})
+
+
+def _stale(job_id: str) -> None:
+    """The plan changed: an earlier render no longer matches it. A render going on carries on with its snapshot
+    (ADR 0028); the editor tells its version apart from the edit by `render_version`."""
+    if jobs.read(job_id).get("render") != "running":
+        jobs.write(job_id, render=None, render_error=None, qa=None)
+
+
+_proxy_jobs: set[str] = set()  # jobs whose preview copy was started by this server process
+
+
+def _start_proxy(job_id: str) -> None:
+    with _assets_lock:
+        if job_id in _proxy_jobs:
+            return
+        _proxy_jobs.add(job_id)
+
+    def make() -> None:
+        try:
+            make_proxy(jobs.job_dir(job_id) / "normalized.mp4")
+        except Exception:  # the editor keeps playing the full video
+            pass
+
+    threading.Thread(target=make, daemon=True).start()
 
 
 _matte_jobs: set[str] = set()  # jobs whose cut-out is being made by this server process
@@ -160,21 +212,38 @@ def create_job(
     vision: Literal["", "none", "ollama", "claude"] = Form(""),
     # What kind of video this is (ADR 0025): sets how it is edited. Empty: talking head.
     mode: Literal["", "talking_head", "podcast", "product_demo", "vlog"] = Form(""),
+    # A brand kit's id (ADR 0026): its look, logo, music, end card and font go on the reel.
+    kit: str = Form(""),
+    # More clips of the same recording, joined after `video` in this order (ADR 0105).
+    more: list[UploadFile] = File(default=[]),
 ):
     saved_style = recipes.get(recipe) if recipe else None
     if recipe and saved_style is None:
         raise HTTPException(422, f"no recipe called {recipe!r}")
+    if kit and kits.kit_dir(kit) is None:
+        raise HTTPException(422, f"no brand kit {kit!r}")
     job_id = jobs.new_id()
     directory = jobs.job_dir(job_id)
     directory.mkdir(parents=True)
     upload = directory / ("upload" + Path(video.filename or "").suffix.lower()[:8])
     with upload.open("wb") as f:
         shutil.copyfileobj(video.file, f)
+    more = [m for m in more if m.filename]
+    if len(more) + 1 > MAX_CLIPS:
+        shutil.rmtree(directory, ignore_errors=True)
+        raise HTTPException(422, f"at most {MAX_CLIPS} clips in one reel")
+    clips: list[Path] = [upload]
+    for i, extra in enumerate(more, start=2):
+        clips.append(directory / (f"upload-{i}" + Path(extra.filename or "").suffix.lower()[:8]))
+        with clips[-1].open("wb") as f:
+            shutil.copyfileobj(extra.file, f)
     jobs.write(job_id, status="queued", stage=None, error=None, render=None, render_error=None,
                style=style or (f"recipe: {recipe}" if recipe else ""), hook_strategy=hook_strategy, filename=video.filename,
-               pictures=pictures, vision=vision or None, mode=mode or None)
-    background.add_task(_process, job_id, upload, style, hook_strategy, saved_style, pictures, vision or None,
-                        mode or None)
+               pictures=pictures, vision=vision or None, mode=mode or None, kit=kit or None)
+    background.add_task(_process, job_id, clips if len(clips) > 1 else upload, style, hook_strategy, saved_style,
+                        pictures, vision or None, mode or None, kit or None)
+    _count("job_created", mode=mode or "talking_head", kit=bool(kit), pictures=pictures, recipe=bool(recipe),
+           style_prompt=bool(style))
     return {"id": job_id, "status": "queued"}
 
 
@@ -188,12 +257,14 @@ def retry_job(job_id: str, background: BackgroundTasks):
         iter(sorted(jobs.job_dir(job_id).glob("upload"))), None)
     if upload is None:
         raise HTTPException(409, "the uploaded video is gone; upload it again")
+    extra = sorted(jobs.job_dir(job_id).glob("upload-*"), key=lambda p: int(p.stem.split("-")[1]) if p.stem.split("-")[1].isdigit() else 0)
     recipe = state.get("style", "")
     saved = recipes.get(recipe.removeprefix("recipe: ")) if recipe.startswith("recipe: ") else None
     jobs.write(job_id, status="queued", stage=None, error=None, interrupted=False)
-    background.add_task(_process, job_id, upload, "" if saved else state.get("style", ""),
+    background.add_task(_process, job_id, [upload, *extra] if extra else upload, "" if saved else state.get("style", ""),
                         state.get("hook_strategy", "cold_open"), saved, bool(state.get("pictures")),
-                        state.get("vision"), state.get("mode"))
+                        state.get("vision"), state.get("mode"),
+                        state.get("kit") if state.get("kit") and kits.kit_dir(state["kit"]) else None)
     return {"id": job_id, "status": "queued"}
 
 
@@ -209,6 +280,8 @@ def get_job(job_id: str):
     facts = manifest.load(jobs.job_dir(job_id)) or {}
     state["manifest"] = {k: facts.get(k) for k in ("video", "audio", "warnings", "stages")} if facts else None
     state["files"] = sorted(p.name for p in jobs.job_dir(job_id).iterdir() if p.is_file() and p.name != "job.json")
+    if state["status"] == "done" and PROXY_FILE not in state["files"]:
+        _start_proxy(job_id)  # jobs from before the preview copy, and opened projects (ADR 0028)
     # What this machine can fetch for the editor's pictures, and what this video has spent on generating them.
     state["generation"] = {**generate.spent(jobs.job_dir(job_id)), "available": sorted(generate.available())}
     return state
@@ -227,7 +300,8 @@ def put_plan(job_id: str, plan: EditPlan, kind: history.Kind = "edit", note: str
     if path.is_file() and not base.exists():
         shutil.copyfile(path, base)
     history.commit(jobs.job_dir(job_id), plan, kind, note=(note or "")[:300] or None, label=label)
-    jobs.write(job_id, render=None, render_error=None, qa=None)  # any earlier render is stale
+    _count("edit_saved", kind=kind)
+    _stale(job_id)
     return plan.model_dump(mode="json")
 
 
@@ -240,7 +314,7 @@ def restore_plan(job_id: str):
     first = next((v for v in index.versions if v.kind == "pipeline"), None)
     if first is not None:
         history.restore(directory, first.id)
-        jobs.write(job_id, render=None, render_error=None, qa=None)
+        _stale(job_id)
     return plan_mod.load(_plan_path(job_id)).model_dump(mode="json")
 
 
@@ -274,7 +348,7 @@ def _moved(job_id: str, step) -> dict:
         plan, version = step(jobs.job_dir(job_id))
     except LookupError as e:
         raise HTTPException(409, str(e)) from None
-    jobs.write(job_id, render=None, render_error=None, qa=None)
+    _stale(job_id)
     return {"plan": plan.model_dump(mode="json"), "version": version.model_dump(mode="json"),
             **{k: v for k, v in history.listing(jobs.job_dir(job_id)).items() if k != "versions"}}
 
@@ -297,7 +371,7 @@ def restore_version(job_id: str, vid: int):
         version = history.restore(directory, vid)
     except KeyError:
         raise HTTPException(404, "no such version") from None
-    jobs.write(job_id, render=None, render_error=None, qa=None)
+    _stale(job_id)
     return {"plan": plan_mod.load(_plan_path(job_id)).model_dump(mode="json"), "version": version.model_dump(mode="json")}
 
 
@@ -416,6 +490,21 @@ def recut_plan(job_id: str, plan: EditPlan):
     return cutting.recut(plan, str(wav) if wav.is_file() else None).model_dump(mode="json")
 
 
+@app.get("/jobs/{job_id}/suggestion")
+def suggestion(job_id: str):
+    """One change worth trying on the saved edit, for the editor's first steps (ADR 0029). No Claude call;
+    nothing is saved. `suggestion` is null when nothing stands out."""
+    state = _job(job_id)
+    if state["status"] != "done":
+        raise HTTPException(409, f"job is {state['status']}; wait for the plan first")
+    wav = jobs.job_dir(job_id) / "audio.wav"
+    found = suggest.suggest(plan_mod.load(_plan_path(job_id)), str(wav) if wav.is_file() else None)
+    if found is None:
+        return {"suggestion": None}
+    return {"suggestion": {"kind": found.kind, "label": found.label, "why": found.why, "changes": found.changes,
+                           "plan": found.plan.model_dump(mode="json")}}
+
+
 @app.post("/jobs/{job_id}/render", status_code=202)
 def render_job(job_id: str, background: BackgroundTasks):
     state = _job(job_id)
@@ -508,6 +597,136 @@ def delete_recipe(name: str):
     return {"deleted": name}
 
 
+# What of a job's state a project file keeps (ADR 0027): never ids, paths or run state.
+PROJECT_STATE = ("filename", "style", "hook_strategy", "mode", "assets", "pictures", "vision")
+
+
+@app.get("/jobs/{job_id}/project")
+def export_project(job_id: str, footage: bool = True):
+    """The whole edit as one `.hypercut` file: plan, versions and files, and the footage unless `footage=false`."""
+    state = _job(job_id)
+    if not _plan_path(job_id).is_file():
+        raise HTTPException(409, "the job has no edit yet")
+    out = jobs.job_dir(job_id) / f"project-{uuid.uuid4().hex[:8]}.hypercut"
+    try:
+        project.pack(jobs.job_dir(job_id), out, footage=footage, job={k: state[k] for k in PROJECT_STATE if k in state})
+    except project.ProjectError as e:
+        raise HTTPException(409, str(e)) from None
+    name = Path(state.get("filename") or "project").stem + ".hypercut"
+    _count("project_saved", footage=footage)
+    return FileResponse(out, filename=name, media_type="application/zip", background=BackgroundTask(out.unlink, missing_ok=True))
+
+
+@app.post("/projects", status_code=201)
+def import_project(project_file: UploadFile = File(...), source: UploadFile | None = File(None)):
+    """Open a `.hypercut` file as a new job. One saved without footage needs `source`, the original video, which
+    must match the project's SHA-256."""
+    job_id = jobs.new_id()
+    directory = jobs.job_dir(job_id)
+    directory.mkdir(parents=True)
+    incoming = directory / "incoming.hypercut"
+    try:
+        with incoming.open("wb") as f:
+            shutil.copyfileobj(project_file.file, f)
+        video = None
+        if source is not None and source.filename:
+            video = directory / ("upload" + Path(source.filename).suffix.lower()[:8])
+            with video.open("wb") as f:
+                shutil.copyfileobj(source.file, f)
+        meta = project.unpack(incoming, directory, video)
+    except (project.ProjectError, IngestError) as e:
+        shutil.rmtree(directory, ignore_errors=True)
+        raise HTTPException(422, str(e)) from None
+    finally:
+        incoming.unlink(missing_ok=True)
+    kept = {k: v for k, v in (meta.get("job") or {}).items() if k in PROJECT_STATE}
+    jobs.write(job_id, status="done", stage="done", error=None, render=None, render_error=None, **kept)
+    _count("project_opened")
+    return {"id": job_id, "footage": meta.get("footage"), "versions": len(history.listing(directory)["versions"])}
+
+
+@app.get("/kits")
+def list_kits():
+    return {"kits": kits.all_kits()}
+
+
+@app.post("/kits", status_code=201)
+async def create_kit(
+    name: str = Form(..., min_length=1, max_length=60),
+    # The look to keep: the current style of this job, else an explicit Style JSON, else the defaults.
+    from_job: str = Form(""),
+    style: str = Form(""),
+    logo: UploadFile | None = File(None),
+    music: UploadFile | None = File(None),
+    font: UploadFile | None = File(None),
+    logo_corner: Literal["top_left", "top_right", "bottom_left", "bottom_right"] = Form("top_right"),
+    logo_size: float = Form(0.16),
+    end_card: str = Form("", max_length=80),
+    music_volume: float = Form(0.25),
+    duck: float = Form(0.3),
+    font_name: str = Form("", max_length=40),
+):
+    """Save a brand kit: the look of an edit plus a logo, music, a font and an end card line."""
+    if from_job:
+        path = _plan_path(from_job)
+        if not path.is_file():
+            raise HTTPException(404, "no plan for that job")
+        look = plan_mod.load(path).style
+    else:
+        try:
+            look = Style.model_validate_json(style) if style else Style()
+        except ValueError as e:
+            raise HTTPException(422, f"style: {e}") from None
+    files = {}
+    for kind, upload in (("logo", logo), ("music", music), ("font", font)):
+        if upload is not None and upload.filename:
+            files[kind] = (upload.filename, await upload.read())
+    try:
+        kit_brand = plan_mod.Brand(logo_corner=logo_corner, logo_size=logo_size, end_card=" ".join(end_card.split()),
+                                   music_volume=music_volume, duck=duck,
+                                   font_name=(" ".join(font_name.split()) or "Brand font") if "font" in files else "")
+        kit_id = kits.create(brand.Kit(name=" ".join(name.split()), look=brand.look_of(look), brand=kit_brand), files)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    return {"id": kit_id, **brand.summary(kits.kit_dir(kit_id))}
+
+
+@app.get("/kits/{kit_id}/files/{name}")
+def kit_file(kit_id: str, name: str):
+    path = kits.kit_dir(kit_id)
+    if path is None or name not in {f for f in brand.files_of(path).values() if f}:
+        raise HTTPException(404, "no such file")
+    return FileResponse(path / name)
+
+
+@app.delete("/kits/{kit_id}")
+def delete_kit(kit_id: str):
+    if not kits.delete(kit_id):
+        raise HTTPException(404, "no such brand kit")
+    return {"deleted": kit_id}
+
+
+class KitRequest(BaseModel):
+    kit: str
+
+
+@app.post("/jobs/{job_id}/kit")
+def apply_kit(job_id: str, req: KitRequest):
+    """Put a brand kit on the current edit, as a new version."""
+    state = _job(job_id)
+    path = _plan_path(job_id)
+    if state["status"] != "done" or not path.is_file():
+        raise HTTPException(409, "the job has no edit yet")
+    folder = kits.kit_dir(req.kit)
+    if folder is None:
+        raise HTTPException(404, "no such brand kit")
+    plan = plan_mod.load(path)
+    changes = brand.apply(plan, folder, jobs.job_dir(job_id))
+    history.commit(jobs.job_dir(job_id), plan, "edit", changes=changes, note=changes[0])
+    _count("kit_applied")
+    return {"plan": plan.model_dump(mode="json"), "changes": changes}
+
+
 def _clone(job_id: str, plan: EditPlan, label: str) -> str:
     """A new, editable job with the same footage and files as `job_id` and its own plan."""
     state = _job(job_id)
@@ -596,3 +815,122 @@ def get_file(job_id: str, name: str):
     if path.parent != root or name == "job.json" or not path.is_file():
         raise HTTPException(404, "no such file")
     return FileResponse(path)
+
+
+# Usage counts (ADR 0030): off until turned on, kept in the media folder, never sent anywhere.
+
+class TelemetrySetting(BaseModel):
+    enabled: bool
+
+
+class TelemetryEvent(BaseModel):
+    event: str = Field(max_length=40)
+    fields: dict = Field(default_factory=dict)
+
+
+@app.get("/telemetry")
+def telemetry_summary():
+    """Whether counting is on, what has been counted, and every event with the only fields it can hold."""
+    return {**telemetry.summary(jobs.media_root()), "fields": {e: sorted(f) for e, f in telemetry.EVENTS.items()}}
+
+
+@app.put("/telemetry")
+def telemetry_setting(req: TelemetrySetting):
+    telemetry.set_enabled(jobs.media_root(), req.enabled)
+    return telemetry.summary(jobs.media_root())
+
+
+@app.post("/telemetry/events", status_code=204)
+def telemetry_event(req: TelemetryEvent):
+    """What the web app counts itself (a suggestion kept, a share). Unknown events and fields are dropped."""
+    if req.event in telemetry.CLIENT_EVENTS:
+        _count(req.event, **req.fields)
+
+
+@app.get("/telemetry/file")
+def telemetry_file():
+    path = jobs.media_root() / telemetry.FILE
+    if not path.is_file():
+        raise HTTPException(404, "nothing recorded")
+    return FileResponse(path, media_type="application/x-ndjson", filename="hypercut-usage.jsonl")
+
+
+@app.delete("/telemetry")
+def telemetry_clear():
+    telemetry.clear(jobs.media_root())
+    return telemetry.summary(jobs.media_root())
+
+
+# The editing agent (ADR 0031): several reels from one long recording. The session is a job folder of its own
+# (`kind: "agent"`) holding the recording, its transcript and `agent.json`; each reel is a normal job.
+
+def _run_agent(session_id: str, video: Path, count: int, style: str, mode: str | None, kit: str | None) -> None:
+    session = jobs.job_dir(session_id)
+    title = Path(jobs.read(session_id).get("filename") or "recording").stem
+
+    def job_dir_for(i: int) -> Path:
+        reel_id = jobs.new_id()
+        jobs.job_dir(reel_id).mkdir(parents=True)
+        jobs.write(reel_id, status="running", stage="ingest", error=None, render=None, render_error=None,
+                   filename=f"{title} – reel {i}", style=style, hook_strategy="cold_open", mode=mode, kit=kit,
+                   agent=session_id)
+        return jobs.job_dir(reel_id)
+
+    def make(excerpt, job_dir, style_prompt, strategy, **kw):
+        reel_id = Path(job_dir).name
+        try:
+            plan = run.run_pipeline(excerpt, job_dir, style_prompt, strategy,
+                                    on_stage=lambda s: jobs.write(reel_id, stage=s), **kw)
+        except Exception as e:
+            jobs.write(reel_id, status="error", error=str(e))
+            raise
+        jobs.write(reel_id, status="done", stage="done", error=None)
+        return plan
+
+    def update(state: dict) -> None:
+        jobs.write(session_id, step=state["step"], status="done" if state["status"] == "done" else
+                   "error" if state["status"] == "error" else "running", error=state.get("error"))
+
+    state = agent.run_agent(video, session, count, job_dir_for=job_dir_for, style_prompt=style, mode=mode,
+                            kit=kits.kit_dir(kit) if kit else None, make=make, on_update=update)
+    _count("agent_done", reels=sum(c["status"] == "done" for c in state["clips"]), asked=count)
+
+
+@app.post("/agent", status_code=202)
+def start_agent(
+    background: BackgroundTasks,
+    video: UploadFile = File(...),
+    count: int = Form(4, ge=1, le=agent.MAX_REELS),
+    style: str = Form(""),
+    mode: Literal["", "talking_head", "podcast", "product_demo", "vlog"] = Form(""),
+    kit: str = Form(""),
+):
+    """Several reels from one long recording (up to an hour). Claude plans the clips first (or code does, without
+    Claude); each reel is then made and checked, and opens in the editor."""
+    if kit and kits.kit_dir(kit) is None:
+        raise HTTPException(422, f"no brand kit {kit!r}")
+    session_id = jobs.new_id()
+    directory = jobs.job_dir(session_id)
+    directory.mkdir(parents=True)
+    upload = directory / ("upload" + Path(video.filename or "").suffix.lower()[:8])
+    with upload.open("wb") as f:
+        shutil.copyfileobj(video.file, f)
+    jobs.write(session_id, kind="agent", status="queued", step=None, error=None, filename=video.filename, count=count,
+               style=style, mode=mode or None, kit=kit or None)
+    background.add_task(_run_agent, session_id, upload, count, style, mode or None, kit or None)
+    return {"id": session_id, "status": "queued"}
+
+
+@app.get("/agent/{session_id}")
+def get_agent(session_id: str):
+    """The session: its step (understand, plan, make, done) and each clip, with the reel's job id and status."""
+    state = _job(session_id)
+    if state.get("kind") != "agent":
+        raise HTTPException(404, "no such session")
+    plan = agent.load(jobs.job_dir(session_id)) or {"clips": []}
+    clips = []
+    for c in plan.get("clips", []):
+        reel = jobs.read(c["job_id"]) if c.get("job_id") and (jobs.job_dir(c["job_id"]) / "job.json").is_file() else {}
+        clips.append({**c, "stage": reel.get("stage"), "render": reel.get("render")})
+    return {"id": session_id, "status": state.get("status"), "step": state.get("step"), "error": state.get("error"),
+            "filename": state.get("filename"), "count": state.get("count"), "clips": clips}

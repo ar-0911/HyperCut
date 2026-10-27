@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import {useParams} from 'next/navigation';
 import {useEffect, useState} from 'react';
 import Editor from '@/components/Editor';
@@ -50,6 +51,11 @@ export default function JobPage() {
 
 	return (
 		<>
+			{job.agent && (
+				<p className="hint">
+					<Link href={`/agent/${job.agent}`}>← All reels from this recording</Link>
+				</p>
+			)}
 			<h1>{job.filename ?? 'Your short'}</h1>
 			{job.manifest?.warnings?.length ? (
 				<ul className="notes">

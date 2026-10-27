@@ -19,14 +19,14 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
-from hypercut import audio, history, modes
+from hypercut import audio, brand, history, modes
 from hypercut import plan as plan_mod
 from hypercut.analyze import analyze
 from hypercut.analyze.transitions import plan_transitions
 from hypercut.generate import generate, pending
-from hypercut.ingest import ingest, manifest
+from hypercut.ingest import ingest, ingest_files, make_proxy, manifest
 from hypercut.matte import MATTE_FILE, matte, needs_matte, place_titles
-from hypercut.plan import EditPlan, Style
+from hypercut.plan import EditPlan, Style, Transcript
 from hypercut.reframe import reframe
 from hypercut.style import style_from_prompt
 from hypercut.transcribe import transcribe
@@ -65,9 +65,16 @@ def _tracked(fn):
     return run
 
 
+def _proxy(mp4: Path) -> None:
+    try:
+        make_proxy(mp4)
+    except Exception as e:  # the editor falls back to the full video
+        log.warning("no preview copy: %s", e)
+
+
 @_tracked
 def run_pipeline(
-    video: str | Path,
+    video: str | Path | list[str | Path],
     job_dir: str | Path,
     style_prompt: str = "",
     strategy: str = "cold_open",
@@ -77,6 +84,8 @@ def run_pipeline(
     pictures: bool = False,
     vision: str | None = None,
     mode: str | None = None,
+    kit: str | Path | None = None,
+    transcript: Transcript | None = None,
 ) -> EditPlan:
     """Run every stage and save `plan.json` in `job_dir`. `on_stage(name)` is called as each begins.
     A `recipe` (a saved style, ADR 0018) is used as the style as it is, instead of reading the style prompt.
@@ -84,22 +93,29 @@ def run_pipeline(
     without keys it changes nothing. `vision` picks who describes the sampled frames of the visual index
     (ADR 0024): "none" (local signals only), "ollama" (a local model) or "claude" (sends frames to Claude);
     default `HYPERCUT_VISION` or "none"; "off" skips the index. `mode` is the editing mode (ADR 0025): podcast,
-    product_demo, vlog or talking_head; what the style prompt or recipe asked for still wins over it."""
+    product_demo, vlog or talking_head; what the style prompt or recipe asked for still wins over it. `kit` is a brand
+    kit folder (ADR 0026): its look, logo, music, end card and font go on the reel. A `transcript` already made (the
+    editing agent's excerpt of a long recording, ADR 0031) is used instead of transcribing again."""
     job_dir = Path(job_dir)
     note = on_stage or (lambda _name: None)
 
     note("ingest")
-    source, mp4, wav = ingest(video, job_dir)
+    if isinstance(video, (list, tuple)) and len(video) > 1:
+        source, mp4, wav = ingest_files(video, job_dir)  # several clips, joined in order (ADR 0105)
+    else:
+        source, mp4, wav = ingest(video[0] if isinstance(video, (list, tuple)) else video, job_dir)
 
     note("transcribe")
     # Face tracking needs only the video and the style only the prompt, so both run while Whisper works.
-    with ThreadPoolExecutor(max_workers=3) as pool:
+    with ThreadPoolExecutor(max_workers=4) as pool:
         track = pool.submit(reframe, str(mp4), source)
+        pool.submit(_proxy, mp4)  # the editor's light preview copy (ADR 0028)
         styled = pool.submit(lambda: recipe.model_copy(deep=True)) if recipe is not None else pool.submit(style_from_prompt, style_prompt)
         # What is on screen (ADR 0024): shots need the face track's cuts, so it starts once those are known.
         provider = (vision or os.environ.get("HYPERCUT_VISION") or "none").lower()
         looked = pool.submit(lambda: build_index(mp4, source, track.result(), job_dir, provider)) if provider != "off" else None
-        transcript = transcribe(wav)
+        if transcript is None:
+            transcript = transcribe(wav)
         reframe_result = track.result()
 
         note("style")
@@ -137,6 +153,8 @@ def run_pipeline(
                 log.warning("speaker cut-out failed, rendering without green-screen effects: %s", e)
                 cutout = None
     plan = plan.model_copy(update={"reframe": reframe_result})
+    if kit is not None:
+        brand.apply(plan, kit, job_dir)
     # Stock footage and generated pictures / clips the plan asks for (ADR 0016); none unless asked for and keys are set.
     if pending(plan):
         note("generate")
@@ -154,12 +172,12 @@ def run_pipeline(
 _matte_lock = threading.Lock()  # one cut-out at a time: the editor and a render may both ask
 
 
-def ensure_matte(job_dir: str | Path, force: bool = False) -> Path | None:
+def ensure_matte(job_dir: str | Path, force: bool = False, plan_name: str = "plan.json") -> Path | None:
     """Make the speaker cut-out for the job if its plan asks for green-screen effects (or `force`, when
     the editor has turned them on in an unsaved plan) and there is none yet. Returns its path, or None
     if not needed."""
     job_dir = Path(job_dir)
-    plan = plan_mod.load(job_dir / "plan.json")
+    plan = plan_mod.load(job_dir / plan_name)
     if not (force or needs_matte(plan)):
         return None
     out = job_dir / MATTE_FILE
@@ -169,17 +187,17 @@ def ensure_matte(job_dir: str | Path, force: bool = False) -> Path | None:
     return out
 
 
-def place_new_titles(job_dir: str | Path) -> None:
+def place_new_titles(job_dir: str | Path, plan_name: str = "plan.json") -> None:
     """Give titles put behind the speaker in the editor their height from the cut-out, before a render."""
     job_dir = Path(job_dir)
-    path, out = job_dir / "plan.json", job_dir / MATTE_FILE
+    path, out = job_dir / plan_name, job_dir / MATTE_FILE
     plan = plan_mod.load(path)
     unplaced = any(g.layer == "behind" and g.type == "kinetic_text" and "y" not in g.props for g in plan.graphics)
     if needs_matte(plan) and out.is_file() and unplaced:
         plan_mod.save(place_titles(plan, out), path)
 
 
-def draw_new_around(job_dir: str | Path, draw=None, illustrate=None, design=None) -> None:
+def draw_new_around(job_dir: str | Path, draw=None, illustrate=None, design=None, plan_name: str = "plan.json") -> None:
     """Draw the graphics added or changed in the editor before a render: orbit / fly-out items (ADR 0610),
     cards and scenes (ADR 0611), motion graphics (ADR 0612)."""
     from hypercut.analyze.analyze import draw_around
@@ -187,7 +205,7 @@ def draw_new_around(job_dir: str | Path, draw=None, illustrate=None, design=None
 
     from hypercut.analyze.motion import design_scenes
 
-    path = Path(job_dir) / "plan.json"
+    path = Path(job_dir) / plan_name
     plan = plan_mod.load(path)
     # Motion graphics added in the editor (or whose idea was changed) get their 3D scene designed (ADR 0612).
     scenes = design_scenes(plan.graphics, plan.transcript, plan.style, design)
@@ -197,39 +215,53 @@ def draw_new_around(job_dir: str | Path, draw=None, illustrate=None, design=None
         plan_mod.save(plan, path)
 
 
-def fetch_new_assets(job_dir: str | Path) -> None:
+def fetch_new_assets(job_dir: str | Path, plan_name: str = "plan.json") -> None:
     """Fetch the pictures and clips added or asked again for in the editor, before a render (ADR 0016)."""
-    path = Path(job_dir) / "plan.json"
+    path = Path(job_dir) / plan_name
     plan = plan_mod.load(path)
     if pending(plan):
         plan_mod.save(generate(plan, job_dir), path)
 
 
+RENDER_PLAN = "render.plan.json"  # the snapshot a render works from, so editing can go on (ADR 0028)
+
+
 def render_plan(job_dir: str | Path, out_name: str = "output.mp4", render_dir: Path = RENDER_DIR,
                 extra_args: list[str] | None = None) -> Path:
     """Render `plan.json` + `normalized.mp4` in `job_dir` with the Remotion project's npm script.
-    A `matte.webm` next to the video is picked up by the render script."""
+    A `matte.webm` next to the video is picked up by the render script.
+
+    The render works from a snapshot of the plan taken when it starts, so the editor can keep saving meanwhile
+    (ADR 0028). What the render draws or fetches first goes back into `plan.json` as a version, unless the plan was
+    edited in the meantime: then the edits win and the next render draws again."""
     job_dir = Path(job_dir).resolve()
+    snapshot = job_dir / RENDER_PLAN
+    started = (job_dir / "plan.json").read_bytes()
+    snapshot.write_bytes(started)
     try:
-        ensure_matte(job_dir)
-        place_new_titles(job_dir)
+        ensure_matte(job_dir, plan_name=RENDER_PLAN)
+        place_new_titles(job_dir, plan_name=RENDER_PLAN)
     except Exception as e:
         log.warning("speaker cut-out failed, rendering without green-screen effects: %s", e)
     try:
-        draw_new_around(job_dir)
+        draw_new_around(job_dir, plan_name=RENDER_PLAN)
     except Exception as e:
         log.warning("drawing effects around the speaker failed, rendering built-in icons: %s", e)
     try:
-        fetch_new_assets(job_dir)
+        fetch_new_assets(job_dir, plan_name=RENDER_PLAN)
     except Exception as e:
         log.warning("fetching generated pictures failed, rendering without them: %s", e)
     # What was drawn or fetched above is kept as a version, so undo doesn't have to draw it again.
-    if (job_dir / history.HISTORY_DIR).is_dir():
-        history.commit(job_dir, plan_mod.load(job_dir / "plan.json"), "render", note="Drawn and fetched for the render")
+    if snapshot.read_bytes() != started and (job_dir / "plan.json").read_bytes() == started:
+        prepared = plan_mod.load(snapshot)
+        if (job_dir / history.HISTORY_DIR).is_dir():
+            history.commit(job_dir, prepared, "render", note="Drawn and fetched for the render")
+        else:
+            plan_mod.save(prepared, job_dir / "plan.json")
     out = job_dir / out_name
     cmd = [
         "npm", "run", "render", "--",
-        "--plan", str(job_dir / "plan.json"),
+        "--plan", str(snapshot),
         "--video", str(job_dir / "normalized.mp4"),
         "--out", str(out),
         *(extra_args or []),
@@ -247,7 +279,7 @@ def render_plan(job_dir: str | Path, out_name: str = "output.mp4", render_dir: P
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m hypercut.run", description=__doc__.splitlines()[0])
-    ap.add_argument("video")
+    ap.add_argument("video", nargs="+", help="the video, or several clips to join in order")
     ap.add_argument("--style", default="", help="style prompt, e.g. 'calm minimal, white captions'")
     ap.add_argument("--strategy", choices=["cold_open", "trim"], default="cold_open")
     ap.add_argument("--out", help="output directory (default media/cli-<video name>)")
@@ -258,7 +290,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--mode", choices=list(modes.MODES), help="editing mode (default talking_head)")
     args = ap.parse_args(argv)
 
-    job_dir = Path(args.out) if args.out else ROOT / "media" / ("cli-" + Path(args.video).stem)
+    job_dir = Path(args.out) if args.out else ROOT / "media" / ("cli-" + Path(args.video[0]).stem)
     try:
         plan = run_pipeline(
             args.video, job_dir, args.style, args.strategy,

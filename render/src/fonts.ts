@@ -84,3 +84,18 @@ export function captionWeight(name: string, weight: number): number {
 	const ws = def.weights.map(Number);
 	return ws.reduce((best, w) => (Math.abs(w - weight) < Math.abs(best - weight) ? w : best), ws[0]);
 }
+
+const brandFonts = new Set<string>();
+
+/** Register a brand kit's own font file (ADR 0026) under `family`, once; captions name it like any other font. */
+export function loadBrandFont(family: string, url: string): void {
+	if (!family || brandFonts.has(family) || typeof document === 'undefined' || typeof FontFace === 'undefined') return;
+	brandFonts.add(family);
+	const handle = delayRender(`Loading brand font ${family}`);
+	const face = new FontFace(family, `url(${url})`);
+	face
+		.load()
+		.then(() => document.fonts.add(face))
+		.catch((e) => console.warn(`brand font ${family} failed to load; using the fallback`, e))
+		.finally(() => continueRender(handle));
+}

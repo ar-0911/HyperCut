@@ -78,6 +78,33 @@ The assistant has word-accurate operations (remove a pause, tighten a stretch, c
 [ADR 0021](decisions/0021-project-history-autosave-recovery.md) and
 [ADR 0022](decisions/0022-explained-edits-and-word-accurate-ops.md).
 
+A project travels as one `.hypercut` file (`hypercut/project.py`): the plan, every version, the transcript, the
+visual index and manifest, the files the plan shows, and the footage unless it is left out. Opening one makes a
+new job; a project without footage asks for the original, recognised by its SHA-256 even if it was moved or
+renamed. See [ADR 0027](decisions/0027-portable-projects.md).
+
+Editing goes on during a render: the render works from a snapshot (`render.plan.json`) and puts what it drew back
+into the plan only if nobody edited meanwhile; the job says which version the download is. The editor previews a
+960 px `proxy.mp4` instead of the full video. See [ADR 0028](decisions/0028-background-render-and-proxy-preview.md).
+
+New users get a short path (ADR 0029): the upload page asks only for the video and the goal, with the rest under
+"More options"; the editor opens on first steps (goal, first cut, one change suggested by `hypercut/suggest.py`
+without a Claude call, export) until they ask for all the controls. See
+[ADR 0029](decisions/0029-first-steps-onboarding.md).
+
+Usage counts are opt-in and stay on the machine (`hypercut/telemetry.py`, `media/telemetry.jsonl`): a fixed list of
+events whose fields are numbers, yes/no or fixed words, never footage, text or names. "Share" hands the rendered mp4
+and a caption to the system share sheet, or downloads it with the caption copied. See
+[ADR 0030](decisions/0030-opt-in-local-usage-counts-and-sharing.md).
+
+## The editing agent
+
+One long recording (up to an hour) becomes several reels (`hypercut/agent.py`, ADR 0031): it is transcribed once,
+Claude plans the clips from the numbered sentences (code checks them and fills in without Claude), the plan is
+shown before anything is made, then each clip is cut out and made into a normal job by the usual pipeline with its
+words passed in, and checked: the plan checks run and code fixes what it can (length, hook, stray graphics) as an
+undoable version. The session page (`/agent/<id>`) lists each reel; each opens in the editor.
+
 ## Understanding the footage
 
 Next to the transcript, the "look" stage (`hypercut/vision`) builds a visual index of the source: shots (the face
@@ -95,6 +122,14 @@ What the user is making (talking head, podcast clip, product demo, vlog) is `pla
 settings applied over the style's preset (what the user asked for still wins), and a paragraph of planner guidance
 on hooks, what to keep and which graphics suit it. It is picked on the upload page or switched later with the
 assistant, which re-cuts the pauses and keeps the rest of the edit. See [ADR 0025](decisions/0025-editing-modes.md).
+
+## Brand kits
+
+A brand kit (`hypercut/brand.py`, stored by `api/kits.py` under `media/kits/`) is the look of a style (captions,
+colours, cuts) plus a logo, music, an end card line and a font. Applying one copies its files into the job as
+`brand-*` and records them in `plan.brand`; the renderer's `BrandLayer` puts the logo in its corner, loops the music
+under the reel with ducking from the word timings, and shows the end card over the last seconds. Chosen at upload
+or in the editor's Brand tab. See [ADR 0026](decisions/0026-brand-kits.md).
 
 ## Quality: checks, export validation, benchmark
 
@@ -118,6 +153,9 @@ transcription (ADR 0101). `Source` is probed from the normalized file. Manual ru
 Ingest also writes `manifest.json` (ADR 0104): the original's facts (SHA-256, codecs, rotation, orientation, frame
 rate and whether it varies, HDR, audio tracks), warnings in plain words for what it had to fix, and each stage's
 status, updated by the pipeline. The job page shows the warnings.
+Several clips of one session can make one reel (ADR 0105): the upload page's "More clips" or `python -m
+hypercut.run a.mp4 b.mp4`. They are joined in order at the first clip's size (another shape is fitted inside a
+blurred copy of itself), and the manifest lists each clip with where it starts.
 
 **Transcribe.** Returns every word with start and end times. faster-whisper runs locally for free (the
 `small` model handles 3 minutes in about a minute on CPU); Deepgram is the fast paid option, chosen with
@@ -154,7 +192,8 @@ gets the transcript as `index time word` lines and the style, and returns as JSO
 Every item is validated against the source duration and dropped if invalid. Cuts never involve Claude:
 filler words and gaps over `style.pacing.max_silence` come from word timings (plus FFmpeg `silencedetect`
 when the wav is given). Code then assembles `segments`: `cold_open` puts the hook first and keeps it in
-place; `trim` starts at the hook. See ADR 0401. Each cut pause keeps `pacing.keep_pause` (0.15 s) on each side
+place; `trim` starts at the hook. See ADR 0401. Retakes are cut too (`hypercut/analyze/takes.py`, ADR 0405): a
+line said again within 8 s, or a sentence restarted, keeps only the last take (`pacing.remove_retakes`). Each cut pause keeps `pacing.keep_pause` (0.15 s) on each side
 and is only cut if at least 0.25 s goes, so there are no tiny jump cuts. The same call names the ending, the
 last word worth keeping; code checks it ends a sentence in the second half (falling back to the last such word)
 and ends the reel 0.4 s after it, so a reel never stops mid-thought. `recut(plan, wav)` rebuilds the segments

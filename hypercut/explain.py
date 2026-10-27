@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from hypercut import diff, edit
 from hypercut.analyze.cuts import is_filler
+from hypercut.analyze.takes import retakes
 from hypercut.plan import EditPlan
 
 EPS = 1e-3
@@ -44,6 +45,7 @@ def first_cut(plan: EditPlan, index=None) -> dict:
 
     silence = fillers = trimmed = 0.0
     n_silence = n_filler = 0
+    takes = retakes(plan.transcript) if plan.style.pacing.remove_retakes else []
     if body:
         edges = [(0.0, body[0].start)] + [(a.end, b.start) for a, b in zip(body, body[1:])]
         for i, (a, b) in enumerate(edges):
@@ -64,6 +66,10 @@ def first_cut(plan: EditPlan, index=None) -> dict:
                 n_filler += len(gone)
                 items.append({"at": round(at, 2), "kind": "filler",
                               "text": f"Removed the filler {_quote([w.text for w in gone])} ({b - a:.1f} s)."})
+            elif any(r.start < b and r.end > a for r in takes):
+                trimmed += b - a
+                items.append({"at": round(at, 2), "kind": "retake",
+                              "text": f"Cut an earlier take of {_quote([w.text for w in gone])}; kept the last one."})
             else:
                 trimmed += b - a
                 items.append({"at": round(at, 2), "kind": "trim",

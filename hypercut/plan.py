@@ -222,6 +222,8 @@ class GraphicsStyle(_Model):
 
 class Pacing(_Model):
     remove_fillers: bool = True
+    # A line said again, or a sentence restarted: keep the last take (ADR 0405).
+    remove_retakes: bool = True
     max_silence: float = Field(default=0.35, ge=0)  # longer gaps get cut
     # Pause kept on each side of a cut, so speech doesn't run into itself. Older plans used 0.08.
     keep_pause: float = Field(default=0.15, ge=0, le=1)
@@ -314,6 +316,28 @@ class Style(_Model):
     depth: Depth = Depth()
 
 
+LogoCorner = Literal["top_left", "top_right", "bottom_left", "bottom_right"]
+
+
+class Brand(_Model):
+    """A brand kit applied to this reel (ADR 0026): logo, music bed, end card and font. Files sit next to the video
+    (`brand-*`). Empty fields mean none; the look (captions, colours, cuts) is in `style`."""
+
+    name: str = ""  # the kit it came from
+    logo: str | None = None  # image file
+    logo_corner: LogoCorner = "top_right"
+    logo_size: float = Field(default=0.16, ge=0.05, le=0.4)  # width, as a fraction of the frame width
+    logo_opacity: float = Field(default=0.9, ge=0.1, le=1)
+    music: str | None = None  # audio file, looped under the whole reel
+    music_volume: float = Field(default=0.25, ge=0, le=1)  # where nobody speaks
+    # Share of `music_volume` kept while someone speaks (ducking); 1 = no ducking.
+    duck: float = Field(default=0.3, ge=0, le=1)
+    end_card: str = ""  # a line shown with the logo over the last seconds (a call to action); empty: none
+    end_card_seconds: float = Field(default=2.0, ge=0.5, le=5)
+    font: str | None = None  # font file (ttf/otf/woff/woff2), registered under `font_name`
+    font_name: str = ""  # the family name captions use when `style.caption.font` names it
+
+
 class EditPlan(_Model):
     version: Literal[1] = SCHEMA_VERSION
     source: Source
@@ -328,6 +352,7 @@ class EditPlan(_Model):
     reframe: Reframe = Reframe()
     style: Style = Style()
     cuts: list[CutTransition] = []  # animated transitions; elsewhere footage meets by `style.transitions`
+    brand: Brand = Brand()
 
     @model_validator(mode="after")
     def _within_source(self) -> "EditPlan":
