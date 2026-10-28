@@ -1,8 +1,7 @@
 'use client';
 
-import {Player, type PlayerRef} from '@remotion/player';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {HyperCut, calculateMetadata} from '@render/HyperCut';
+import Preview, {type PreviewRef} from './Preview';
 import type {EditPlan} from '@render/plan';
 import {
 	API_URL,
@@ -137,12 +136,11 @@ export default function Editor({job}: {job: Job}) {
 		count('view', {simple: on});
 	};
 	const wantsMatte = Boolean(plan.style.depth?.enabled && plan.style.depth?.cutout);
-	const playerRef = useRef<PlayerRef>(null);
+	const playerRef = useRef<PreviewRef>(null);
 	const latest = useRef(plan);
 	latest.current = plan;
 	const dirty = plan !== saved;
 
-	const meta = useMemo(() => calculateMetadata({props: {plan: shown, videoSrc: ''}}), [shown]);
 	const inputProps = useMemo(
 		() => ({
 			plan: shown,
@@ -526,18 +524,7 @@ export default function Editor({job}: {job: Job}) {
 				/>
 				)}
 				<div className="player">
-					<Player
-						ref={playerRef}
-						component={HyperCut}
-						inputProps={inputProps}
-						durationInFrames={meta.durationInFrames}
-						fps={meta.fps}
-						compositionWidth={meta.width}
-						compositionHeight={meta.height}
-						style={{width: '100%'}}
-						controls
-						clickToPlay={false}
-					/>
+					<Preview ref={playerRef} props={inputProps} />
 					<OnScreen plan={plan} playerRef={playerRef} onSelect={setSelected} />
 				</div>
 				<div className="side">

@@ -10,3 +10,4 @@ media/
 *.wav
 !tests/fixtures/*.mp4
 *.egg-info/
+web/public/hf/

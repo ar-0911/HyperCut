@@ -3,10 +3,10 @@
 // scene from the transcript as a small JSON description (objects, materials, how they move); this file draws
 // it. Everything is a pure function of time, so renders are repeatable.
 
-import {ThreeCanvas} from '@remotion/three';
+import {ThreeCanvas} from './frame-three';
 import {useThree} from '@react-three/fiber';
 import React, {useMemo} from 'react';
-import {AbsoluteFill, interpolate} from 'remotion';
+import {AbsoluteFill, interpolate} from './frame';
 import * as THREE from 'three';
 import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';

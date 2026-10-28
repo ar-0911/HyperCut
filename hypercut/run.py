@@ -228,7 +228,7 @@ RENDER_PLAN = "render.plan.json"  # the snapshot a render works from, so editing
 
 def render_plan(job_dir: str | Path, out_name: str = "output.mp4", render_dir: Path = RENDER_DIR,
                 extra_args: list[str] | None = None) -> Path:
-    """Render `plan.json` + `normalized.mp4` in `job_dir` with the Remotion project's npm script.
+    """Render `plan.json` + `normalized.mp4` in `job_dir` with the renderer's npm script (HyperFrames, ADR 0618).
     A `matte.webm` next to the video is picked up by the render script.
 
     The render works from a snapshot of the plan taken when it starts, so the editor can keep saving meanwhile
@@ -283,7 +283,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--style", default="", help="style prompt, e.g. 'calm minimal, white captions'")
     ap.add_argument("--strategy", choices=["cold_open", "trim"], default="cold_open")
     ap.add_argument("--out", help="output directory (default media/cli-<video name>)")
-    ap.add_argument("--render", action="store_true", help="also render output.mp4 with Remotion")
+    ap.add_argument("--render", action="store_true", help="also render output.mp4")
     ap.add_argument("--no-visuals", action="store_true", help="skip per-beat layouts and illustrations")
     ap.add_argument("--pictures", action="store_true",
                     help="let some visuals be stock footage or generated pictures (needs keys, see .env.example)")

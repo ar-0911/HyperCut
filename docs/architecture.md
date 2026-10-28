@@ -32,7 +32,7 @@ See [ADR 0001](decisions/0001-edit-plan-is-the-contract.md).
                                        plan.json  ◄──────── assembled EditPlan ┘
                                            │
                                            ▼
-                                    6. render (Remotion) ──► output.mp4 + captions.srt
+                                    6. render (HyperFrames) ──► output.mp4 + captions.srt
 ```
 
 Ingest runs first; transcription and reframing then run in parallel (one is audio, the other video).
@@ -46,14 +46,14 @@ finished plan.
 | 3 | style | `hypercut/style` | prompt text | `Style` | presets + Claude |
 | 4 | analyze | `hypercut/analyze` | transcript + style | `hook`, `segments`, `graphics`, `zooms` | Claude + FFmpeg loudness |
 | 5 | reframe | `hypercut/reframe` | `normalized.mp4` | `Reframe` | MediaPipe face detection |
-| 6 | render | `render/` | `plan.json` + video | `output.mp4`, loudness-normalized to -14 LUFS (ADR 0616) | Remotion (React, TypeScript), FFmpeg loudnorm |
+| 6 | render | `render/` | `plan.json` + video | `output.mp4`, loudness-normalized to -14 LUFS (ADR 0616) | HyperFrames (HTML to video in headless Chrome) drawing React components, FFmpeg loudnorm |
 | 7 | matte (only when asked) | `hypercut/matte` | `normalized.mp4` + reframe | `matte.webm` (speaker cut-out) | MediaPipe selfie segmentation + MODNet + FFmpeg |
 | 8 | generate (only with keys) | `hypercut/generate` | plan with `generate` requests | `gen-*` stock and generated pictures / clips | Pexels, Pixabay, Wikimedia Commons; fal.ai or local diffusers |
 | 9 | look (visual index) | `hypercut/vision` | `normalized.mp4` + reframe shots | `visual_index.json` (shots, frames, what is on screen), name respellings | FFmpeg, Tesseract if installed; Claude or Ollama only when chosen |
 
 The API (`api/`, FastAPI) runs these stages as a job per upload and stores everything under
 `media/<job_id>/`. The web app (`web/`, Next.js) uploads, shows the hook candidates, takes the style
-prompt, previews the plan with the same Remotion components the renderer uses, and downloads the result.
+prompt, previews the plan with the same HyperFrames page the renderer draws, and downloads the result.
 
 ## Time: one timeline for everything
 
@@ -272,11 +272,16 @@ starts it while analyze runs; the API makes it on demand when the editor turns t
 makes it if missing. Models come from storage.googleapis.com and huggingface.co into `~/.cache/hypercut`.
 CLI `python -m hypercut.matte normalized.mp4 --plan plan.json`. See decisions 0901 and 0902.
 
-**Render.** A Remotion composition (`HyperCut`, props `{plan, videoSrc}`) draws, per output frame: the
+**Render.** The reel is a HyperFrames composition (ADR [0032](decisions/0032-render-with-hyperframes.md)): one page whose script draws the React
+component `HyperCut` (props `{plan, videoSrc}`) for whatever frame HyperFrames seeks, on a small frame runtime
+(`src/frame.tsx`: current frame, sequences, freezes, springs, frame-exact video, sound). A dry run draws every
+frame once to list the video frames to extract with FFmpeg and the sound, which becomes HyperFrames `<audio>`
+clips with volume envelopes; HyperFrames then captures each frame in headless Chrome, mixes and encodes. Per
+output frame the component draws: the
 cropped and zoomed source frame, the caption line for the current words (styled and animated by
 `Style.caption`; lines break by phrase, never on "the" or "of", never leaving a sentence's last word alone, and
 within the characters that fit at the caption size, decision 0617), and any active graphic templates. Output is 1080x1920, 30 fps H.264, with size, fps and
-length taken from the plan. The video layer is one Remotion sequence per segment; overlays are driven by the
+length taken from the plan. The video layer is one sequence per segment; overlays are driven by the
 *source* time of the current frame, so the cold-open hook shows its captions and graphics both times it plays
 and cut material shows nothing. The logic is in pure, unit-tested modules (`timing.ts`, `layout.ts`,
 `captions.ts`); `sceneAt(plan, t)` gives both layers the frame's layout mode, speaker panel, crop, zoom and
@@ -288,7 +293,7 @@ in speaker mode graphics take one of three vertical bands chosen to stay clear o
 `illustration` graphics are Claude-drawn SVG layers that pop in one by one. Every frame is a pure function
 of the frame number (no CSS animation, no randomness). `media` graphics are the user's own imported
 pictures and clips (decision 0607): they fill the split panel or, in a `visual` span, the whole frame;
-pictures drift in slowly, clips play muted from `trim_start` in one Remotion sequence per stretch of output
+pictures drift in slowly, clips play muted from `trim_start` in one sequence per stretch of output
 (`mediaRuns`, so B-roll plays straight through small filler cuts) and hold their last frame if the block
 outlasts the clip. In the browser preview they load from the `assetBase` prop; in the final render they sit
 next to the video. `pacing.speed` slows or speeds the whole reel (segments last `duration / speed`, video
@@ -301,11 +306,11 @@ cut in the source or a jump to another shot) settles in from 1.04x over 0.4 s; a
 and `fade_in`/`fade_out` fade picture and sound at the ends. Caption fonts are twelve bundled Google fonts
 (`src/fonts.ts`), and `caption.box` puts each line in a rounded box instead of an outline. See decisions 0608
 and 0613. A few cuts are animated (`plan.cuts`, `src/cuts.ts`, decision 0613): for a few frames the last frame
-before the cut, footage, graphics and captions together, is held (Remotion `Freeze`) and dropped, whipped,
+before the cut, footage, graphics and captions together, is held (`Freeze`) and dropped, whipped,
 pushed through or slid away over the live incoming footage. Backdrops are never a flat colour: split and
 visual stretches, cards, charts and colour backgrounds stand on a studio set with a grid floor
 (`src/Backdrop.tsx`). A `motion` graphic (`src/Motion.tsx`, decision 0612) fills the frame with a 3D scene
-drawn by three.js through `@remotion/three` (software WebGL in the render): the scene is measured at rest
+drawn by three.js through react-three-fiber, once per frame (`src/frame-three.tsx`, software WebGL in the render): the scene is measured at rest
 and fitted under its serif title, lit by three's built-in room environment, with sprung entrances and a slow
 camera push, all pure functions of time. Green-screen effects (decision 0609) need the `matteSrc` prop (the
 cut-out video): the video layer then draws the footage with its background kept, blurred, dimmed or covered
@@ -324,8 +329,8 @@ they are drawn over the real footage instead: cards slide in from the frame edge
 face, sized to clear it, and a chart builds in the taller of the spaces above the face and between the face and
 the captions; scenes are not drawn. The matte is only used with `style.depth.cutout`.
 Run it with `npm run render -- --plan plan.json --video normalized.mp4 --out out.mp4 [--assets DIR] [--matte matte.webm]` in
-`render/` (`REMOTION_BROWSER` selects a Chromium; imported files are read from the video's folder unless
-`--assets` says otherwise). See ADRs [0601](decisions/0601-render-architecture.md) to
+`render/` (`HYPERCUT_BROWSER` selects a Chromium; imported files are read from the video's folder unless
+`--assets` says otherwise; `--keep DIR` leaves the HyperFrames project for `npx hyperframes preview`). See ADRs [0601](decisions/0601-render-architecture.md) to
 [0614](decisions/0614-real-background-and-editorial-cuts.md).
 
 
@@ -362,8 +367,9 @@ Later additions ([ADR 0704](decisions/0704-generation-recipes-variants-review-ex
 chips fill the prompt) and a hook strategy; `/jobs/[id]` polls the job and shows the four stages, then the
 editor (decision 0804), laid out like a video editor: a bin on the left (tabs for text and graphics, zoom and
 layout tiles, the user's imported media with an import drop zone, removed blocks, the hook choice and the
-transcript), the `@remotion/player` preview of the `HyperCut` composition imported from `render/src` (one
-implementation of the look, no copy) in the middle, and an inspector plus the "Ask AI to edit" box on the
+transcript), the preview (`components/Preview.tsx`: HyperFrames' `<hyperframes-player>` playing the reel's page, built
+from `render/src` by the same code as the render, ADR 0032: one implementation of the look, no copy; edits reach
+the page as messages, and it is rebuilt only when the sound changes) in the middle, and an inspector plus the "Ask AI to edit" box on the
 right. Below is a toolbar (undo, redo, split, duplicate, delete, timeline zoom, snap, restore original, save,
 render, download) and a timeline in reel time with six tracks: Visuals, Overlays, Layout, Zooms, Video (the
 kept segments, hook marked) and Captions (one block per caption line). Blocks drag to move, drag at the edges
@@ -397,7 +403,7 @@ the CLI backend lets Claude Code read just those files, the API backend sends th
 ```
 hypercut/        Python pipeline (one package per stage) + plan.py, llm.py
 schema/          generated JSON schema + example plan
-render/          Remotion project (TypeScript)
+render/          HyperFrames renderer (TypeScript, React components)
 api/             FastAPI job server
 web/             Next.js app
 media/           uploads and outputs, git-ignored

@@ -7,7 +7,7 @@ they can open instead.
 ## The question that decides everything: where does the video get processed?
 
 Three things in the pipeline are heavy: transcription (Whisper), face tracking and the speaker cut-out
-(MediaPipe), and rendering (Remotion driving headless Chrome, about 12 minutes per 50-second reel on 4 CPU
+(MediaPipe), and rendering (HyperFrames driving headless Chrome, about 12 minutes per 50-second reel on 4 CPU
 cores). Wherever those run is where the video has to be. That gives three options.
 
 | | A. Everyone runs their own copy | B. Hosted page, local engine | C. Fully hosted service |
@@ -33,7 +33,7 @@ Yes, in two ways, and only one is practical now.
    visitor's own computer at `http://localhost:8000`. The upload goes from their browser to their own machine.
    Your server never sees a frame.
 2. **Everything inside the browser.** Whisper (transformers.js with WebGPU), MediaPipe (has a web build),
-   FFmpeg (ffmpeg.wasm) and Remotion (its web renderer, built on WebCodecs) all have browser versions, so in
+   FFmpeg (ffmpeg.wasm) and a WebCodecs encoder for the HyperFrames page all have browser versions, so in
    principle nothing needs installing. In practice it is a rewrite of every stage in TypeScript, a 3-minute
    4K clip strains browser memory, rendering is slower than native, and Claude can only be reached with the
    user's own API key pasted into the page (a subscription cannot be used from a browser). Worth revisiting
@@ -110,9 +110,8 @@ subscriber's own use).
 - `api/main.py`: auth middleware, upload size and duration limits before processing, per-user rate limits,
   render queue instead of the in-process semaphore.
 - Workers: download inputs from storage, run the existing stage functions unchanged, upload outputs.
-- Renderer: either keep CPU workers, or move to Remotion Lambda for fast parallel renders.
-- Licensing: Remotion is free for individuals and companies of up to 3 people; a larger company needs a
-  Remotion company license, hosted or not.
+- Renderer: either keep CPU workers, or move to HyperFrames' AWS Lambda or Cloud Run rendering for fast parallel renders.
+- Licensing: the renderer, HyperFrames, is Apache 2.0, so hosting needs no renderer licence (ADR 0032).
 
 **Cost estimate per reel** (3-minute input, about 50-second output; rough, check current prices):
 

@@ -4,7 +4,10 @@
   "private": true,
   "description": "Next.js UI for HyperCut: upload, pick the hook, preview, render, download",
   "scripts": {
+    "hf-assets": "node scripts/hf-assets.mjs",
+    "predev": "node scripts/hf-assets.mjs",
     "dev": "next dev -p 3000",
+    "prebuild": "node scripts/hf-assets.mjs",
     "build": "next build",
     "start": "next start -p 3000",
     "typecheck": "tsc --noEmit",
@@ -12,12 +15,9 @@
   },
   "dependencies": {
     "@react-three/fiber": "8.17.10",
-    "@remotion/player": "4.0.250",
-    "@remotion/three": "4.0.250",
     "next": "14.2.18",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "remotion": "4.0.250",
     "three": "0.169.0"
   },
   "devDependencies": {

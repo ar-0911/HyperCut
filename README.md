@@ -113,6 +113,7 @@ is available outside Docker.
 | Transcript text, style prompt, AI edit box requests | Claude (Anthropic), to write the plan. Anthropic doesn't train on API or Claude Code data by default |
 | Audio | Only if you choose Deepgram |
 | Model files (Whisper, MediaPipe) | Downloaded once from huggingface.co and storage.googleapis.com; nothing is uploaded |
+| Renderer usage reports (HyperFrames) | Off: HyperCut always runs HyperFrames with its reporting turned off |
 
 When illustrations are on, Claude may run a web search for reference, which sends search terms, not your
 media. Nothing is uploaded to a HyperCut server: there isn't one.
@@ -140,7 +141,7 @@ then run `claude` once and log in). On Linux, MediaPipe also needs `sudo apt ins
 git clone https://github.com/ar-0911/HyperCut.git hypercut && cd hypercut
 python3 -m venv .venv
 .venv/bin/pip install -e '.[api,whisper,reframe,matte]'   # add ,anthropic for the API key, ,deepgram for Deepgram
-(cd render && npm ci)                                     # renderer; downloads a headless Chrome on first render
+(cd render && npm ci && npx hyperframes browser ensure)   # renderer (HyperFrames) and the headless Chrome it drives
 (cd web && npm ci)
 ```
 
@@ -175,7 +176,7 @@ Set these in `.env` (Docker) or as environment variables (without Docker).
 | `HYPERCUT_CACHE` | `~/.cache/hypercut` | Where MediaPipe models are cached |
 | `HYPERCUT_WEB_ORIGINS` | `http://localhost:3000` | Web app origins the API accepts (comma-separated) |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Where the web app finds the API (build time) |
-| `REMOTION_BROWSER` | Remotion's own download | Path to a Chrome or Chromium for rendering |
+| `HYPERCUT_BROWSER` | A Playwright Chromium if there is one, else HyperFrames' own Chrome | Path to a Chrome or Chromium for rendering (`REMOTION_BROWSER` still works) |
 | `PEXELS_API_KEY`, `PIXABAY_API_KEY` | | Real stock B-roll (clips and photos), credited |
 | `HYPERCUT_STOCK` | | `commons` adds Wikimedia Commons photos (no key; open licences only) |
 | `FAL_KEY` | | Generated pictures and clips through fal.ai (pay per use) |

@@ -2,7 +2,7 @@
 // see font-files/licenses), so the preview and the render draw the same letters with no network. The list
 // mirrors CAPTION_FONTS in hypercut/plan.py. Each font loads only when a plan uses it.
 
-import {continueRender, delayRender} from 'remotion';
+import {continueRender, delayRender} from './frame';
 import anton from './font-files/anton-latin-400-normal.woff2';
 import archivoBlack from './font-files/archivo-black-latin-400-normal.woff2';
 import bangers from './font-files/bangers-latin-400-normal.woff2';

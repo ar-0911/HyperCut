@@ -1,6 +1,6 @@
 'use client';
 
-import type {PlayerRef} from '@remotion/player';
+import type {PreviewRef as PlayerRef} from './Preview';
 import type {EditPlan} from '@render/plan';
 import {useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent, type RefObject} from 'react';
 import {

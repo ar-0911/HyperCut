@@ -1,6 +1,6 @@
 'use client';
 
-import type {PlayerRef} from '@remotion/player';
+import type {PreviewRef as PlayerRef} from './Preview';
 import {useEffect, useMemo, useState, type RefObject} from 'react';
 import type {EditPlan} from '@render/plan';
 import {GRAPHIC_NAMES, graphicLabel, onScreenAt, timelineOf, type ItemRef} from '@/lib/timeline';

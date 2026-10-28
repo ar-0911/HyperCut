@@ -19,7 +19,8 @@
       "@render/*": ["../render/src/*"],
       "react": ["./node_modules/@types/react"],
       "react/*": ["./node_modules/@types/react/*"],
-      "remotion": ["./node_modules/remotion"]
+      "react-dom": ["./node_modules/@types/react-dom"],
+      "react-dom/*": ["./node_modules/@types/react-dom/*"]
     }
   },
   "include": ["next-env.d.ts", "../render/src/font-files.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
