@@ -5,6 +5,16 @@ and opens with it, and drops in motion graphics where the content calls for them
 in a prompt. The speaker is never altered: everything is cuts and overlays. You can then re-edit the reel
 in a timeline editor in the browser and render a 1080x1920 mp4.
 
+<a href="https://docs.adityapoc.xyz/r/ar-0911/hypercut">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://docs.adityapoc.xyz/r/ar-0911/hypercut/card.svg?theme=dark">
+    <img alt="ar-0911/hypercut, explained on Elemnt" src="https://docs.adityapoc.xyz/r/ar-0911/hypercut/card.svg">
+  </picture>
+</a>
+
+New here? The [interactive guide](https://docs.adityapoc.xyz/r/ar-0911/hypercut) walks one clip through the
+whole edit, with widgets for every stage, layout and cut style.
+
 HyperCut runs on your own computer. Your videos stay on your disk; see [Privacy](#privacy-what-leaves-your-computer)
 for the two small exceptions. To let other people use it over the internet, see the
 [hosting plan](docs/hosting-plan.md).
@@ -220,6 +230,7 @@ service (you store their videos and pay for Claude and compute).
 (cd web && npm test)                   # web tests + production build
 ```
 
+- [Interactive guide](https://docs.adityapoc.xyz/r/ar-0911/hypercut): HyperCut explained, with widgets
 - [Architecture](docs/architecture.md): how the pipeline works
 - [Decisions](docs/decisions/README.md): every design decision and why
 - [Hosting plan](docs/hosting-plan.md): options for running HyperCut for everyone over the internet
